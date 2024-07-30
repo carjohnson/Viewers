@@ -90,6 +90,8 @@ import notificationsSuccess from './../../assets/icons/notifications-success.svg
 import nextArrow from './../../assets/icons/next-arrow.svg';
 import prevArrow from './../../assets/icons/prev-arrow.svg';
 import viewportStatusTracked from './../../assets/icons/viewport-status-tracked.svg';
+/** Image Quizzer */
+import imagequizzer from './../../assets/icons/imagequizzer.png';
 
 /** Tools */
 import toggleDicomOverlay from './../../assets/icons/tool-toggle-dicom-overlay.svg';
@@ -432,6 +434,8 @@ const ICONS = {
   'layout-common-2x2': layoutCommon2x2,
   'layout-common-2x3': layoutCommon2x3,
   'tab-4d': tab4D,
+  /** Image Quizzer */
+  'imagequizzer': imagequizzer,
 
   /** New investigational use */
   'illustration-investigational-use': investigationalUse,

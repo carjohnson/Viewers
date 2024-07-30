@@ -69,6 +69,27 @@ module.exports = (env, argv) => {
         // Hoisted Yarn Workspace Modules
         path.resolve(__dirname, '../../../node_modules'),
         SRC_DIR,
+        path.resolve(
+          __dirname,
+          'D:/Users/cjohnson/GitRepositories/Viewers/dev/ohif-modes/ohif-mode-imagequizzer/node_modules'
+        ),
+
+        path.resolve(
+          __dirname,
+          'D:/Users/cjohnson/GitRepositories/Viewers/dev/ohif-extensions/ohif-extension-imagequizzer/node_modules'
+        ),
+        path.resolve(
+          __dirname,
+          'D:/Users/cjohnson/GitRepositories/Viewers/dev/ohif-extensions/ohif-extension-imagequizzer/node_modules'
+        ),
+        path.resolve(
+          __dirname,
+          'D:/Users/cjohnson/GitRepositories/Viewers/dev/ohif-modes/ohif-mode-imagequizzer/node_modules'
+        ),
+        path.resolve(
+          __dirname,
+          'D:/Users/cjohnson/GitRepositories/Viewers/dev/ohif-extensions/ohif-extension-imagequizzer/node_modules'
+        ),
       ],
     },
     plugins: [
