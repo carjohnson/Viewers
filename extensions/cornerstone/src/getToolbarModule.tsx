@@ -6,7 +6,7 @@ const getToggledClassName = (isToggled: boolean) => {
     : '!text-common-bright hover:!bg-primary-dark hover:text-primary-light';
 };
 
-export default function getToolbarModule({ commandsManager, servicesManager }) {
+export default function getToolbarModule({ commandsManager, servicesManager }: withAppTypes) {
   const {
     toolGroupService,
     toolbarService,
@@ -250,7 +250,7 @@ export default function getToolbarModule({ commandsManager, servicesManager }) {
         const displaySets = displaySetUIDs.map(displaySetService.getDisplaySetByUID);
 
         const areReconstructable = displaySets.every(displaySet => {
-          return displaySet.isReconstructable;
+          return displaySet?.isReconstructable;
         });
 
         if (!areReconstructable) {
