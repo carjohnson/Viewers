@@ -28,7 +28,7 @@ export default {
     return [
       {
         name: 'imagequizzer',
-        iconName: 'imagequizzer',
+        iconName: 'ImageQuizzer',
         iconLabel: 'Image Quizzer',
         label: 'Image Quizzer',
         component: ImageQuizzerSidePanelComponent
