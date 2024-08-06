@@ -204,7 +204,7 @@ import MRDefault from './../../assets/icons/MR-Default.png';
 import MRMIP from './../../assets/icons/MR-MIP.png';
 import MRT2Brain from './../../assets/icons/MR-T2-Brain.png';
 import VolumeRendering from './../../assets/icons/VolumeRendering.png';
-import ImageQuizzer from './../../assets/icons/imagequizzer.png';
+import tabimagequizzer from './../../assets/icons/imagequizzer.png';
 
 const ICONS = {
   'arrow-down': arrowDown,
@@ -419,7 +419,7 @@ const ICONS = {
   'layout-common-2x3': layoutCommon2x3,
   'tab-4d': tab4D,
   /** Image Quizzer */
-  'ImageQuizzer': ImageQuizzer,
+  'tab-imagequizzer': tabimagequizzer,
 
   /** New investigational use */
   'illustration-investigational-use': investigationalUse,

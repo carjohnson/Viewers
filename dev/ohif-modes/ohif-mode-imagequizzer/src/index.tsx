@@ -1,6 +1,10 @@
 import { hotkeys } from '@ohif/core';
-import { initToolGroups, toolbarButtons } from '@ohif/mode-longitudinal';
 import { id } from './id';
+import toolbarButtons from './toolbarButtons';
+import initToolGroups from './initToolGroups';
+import segmentationButtons from './segmentationButtons';
+import moreTools from './moreTools';
+
 
 const ohif = {
   layout: '@ohif/extension-default.layoutTemplateModule.viewerLayout',
@@ -12,7 +16,15 @@ const ohif = {
 
 const cornerstone = {
   viewport: '@ohif/extension-cornerstone.viewportModule.cornerstone',
+ };
+
+const segmentation = {
+  panel: '@ohif/extension-cornerstone-dicom-seg.panelModule.panelSegmentation',
+  panelTool: '@ohif/extension-cornerstone-dicom-seg.panelModule.panelSegmentationWithTools',
+  sopClassHandler: '@ohif/extension-cornerstone-dicom-seg.sopClassHandlerModule.dicom-seg',
+  viewport: '@ohif/extension-cornerstone-dicom-seg.viewportModule.dicom-seg',
 };
+
 
 /**
  * Just two dependencies to be able to render a viewport with panels in order
@@ -21,6 +33,7 @@ const cornerstone = {
 const extensionDependencies = {
   '@ohif/extension-default': '^3.0.0',
   '@ohif/extension-cornerstone': '^3.0.0',
+  '@ohif/extension-cornerstone-dicom-seg': '^3.0.0',
   'ohif-extension-imagequizzer': '^0.0.1'
 };
 
@@ -42,7 +55,7 @@ function modeFactory({ modeConfiguration }) {
      * Services and other resources.
      */
     onModeEnter: ({ servicesManager, extensionManager, commandsManager }) => {
-      const { measurementService, toolbarService, toolGroupService } = servicesManager.services;
+      const { toolbarService, toolGroupService, measurementService } = servicesManager.services;
 
       measurementService.clearMeasurements();
 
@@ -50,16 +63,22 @@ function modeFactory({ modeConfiguration }) {
       initToolGroups(extensionManager, toolGroupService, commandsManager);
 
       toolbarService.addButtons(toolbarButtons);
+      toolbarService.addButtons(segmentationButtons);
+      toolbarService.addButtons(moreTools);
+
       toolbarService.createButtonSection('primary', [
         'MeasurementTools',
         'Zoom',
         'WindowLevel',
         'Pan',
+        'TrackballRotate',
         'Capture',
         'Layout',
         'Crosshairs',
         'MoreTools',
       ]);
+      toolbarService.createButtonSection('segmentationToolbox', ['BrushTools', 'Shapes']);
+
     },
     onModeExit: ({ servicesManager }) => {
       const {
@@ -110,7 +129,7 @@ function modeFactory({ modeConfiguration }) {
             id: ohif.layout,
             props: {
               leftPanels: [ohif.leftPanel],
-              rightPanels: [ohif.rightPanel, 'ohif-extension-imagequizzer.panelModule.imagequizzer'],
+              rightPanels: ['ohif-extension-imagequizzer.panelModule.imagequizzer', segmentation.panelTool, ohif.rightPanel],
               viewports: [
                 {
                   namespace: cornerstone.viewport,
