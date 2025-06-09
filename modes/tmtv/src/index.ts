@@ -16,8 +16,7 @@ const ohif = {
 
 const cs3d = {
   viewport: '@ohif/extension-cornerstone.viewportModule.cornerstone',
-  // segPanel: '@ohif/extension-cornerstone.panelModule.panelSegmentationNoHeader',
-  segPanel: '@ohif/extension-cornerstone.panelModule.panelSegmentation',
+  segPanel: '@ohif/extension-cornerstone.panelModule.panelSegmentationNoHeader',
   measurements: '@ohif/extension-cornerstone.panelModule.measurements',
 };
 

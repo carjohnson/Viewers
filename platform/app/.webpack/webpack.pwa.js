@@ -79,6 +79,14 @@ module.exports = (env, argv) => {
         // Hoisted Yarn Workspace Modules
         path.resolve(__dirname, '../../../node_modules'),
         SRC_DIR,
+        path.resolve(
+          __dirname,
+          'D:/Users/cjohnson/GitRepositories/OHIF-Viewer-Dev/ohif-modes/ohif-mode-webquiz/node_modules'
+        ),
+        path.resolve(
+          __dirname,
+          'D:/Users/cjohnson/GitRepositories/OHIF-Viewer-Dev/ohif-extensions/ohif-extension-webquiz/node_modules'
+        ),
       ],
     },
     plugins: [
