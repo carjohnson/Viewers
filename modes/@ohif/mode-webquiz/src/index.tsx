@@ -36,6 +36,7 @@ const extensionDependencies = {
   '@ohif/extension-cornerstone': '^3.0.0',
   '@ohif/extension-cornerstone-dicom-seg': '^3.0.0',
   '@ohif/extension-cornerstone-dicom-rt': '^3.0.0',
+  '@ohif/extension-webquiz': '^0.0.1',
 };
 
 function modeFactory({ modeConfiguration }) {
@@ -220,7 +221,7 @@ function modeFactory({ modeConfiguration }) {
             props: {
               leftPanels: [ ohif.thumbnailList],
               leftPanelResizable: true,
-              rightPanels: [ cornerstone.segmentation, cornerstone.measurements ],
+              rightPanels: [ '@ohif/extension-webquiz.panelModule.webquiz', cornerstone.segmentation, cornerstone.measurements ],
               rightPanelResizable: true,
               viewports: [
                 {

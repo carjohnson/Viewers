@@ -12,7 +12,8 @@
       "extensions/*",
       "modes/*",
       "addOns/externals/*",
-      "modes/@ohif/*"
+      "modes/@ohif/*",
+      "extensions/@ohif/*"
     ],
     "nohoist": [
       "**/html-minifier-terser"
