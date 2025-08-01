@@ -15,6 +15,10 @@ services:
     volumes:
       # Nginx config
       - ./config/nginx.conf:/etc/nginx/nginx.conf
+      # ### cj July 2025 ### added
+      # ### Mount built OHIF files directly into container
+      # ###  this avoids having to reoeat the container build
+      - ../../dist:/usr/share/nginx/html/ohif
       # Logs
       - ./logs/nginx:/var/logs/nginx
       # Let's Encrypt
