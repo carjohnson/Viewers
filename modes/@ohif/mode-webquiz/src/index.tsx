@@ -21,6 +21,18 @@ const cornerstone = {
   viewport: '@ohif/extension-cornerstone.viewportModule.cornerstone',
 };
 
+const tracked = {
+  measurements: '@ohif/extension-measurement-tracking.panelModule.trackedMeasurements',
+  thumbnailList: '@ohif/extension-measurement-tracking.panelModule.seriesList',
+  viewport: '@ohif/extension-measurement-tracking.viewportModule.cornerstone-tracked',
+};
+
+const dicomsr = {
+  sopClassHandler: '@ohif/extension-cornerstone-dicom-sr.sopClassHandlerModule.dicom-sr',
+  sopClassHandler3D: '@ohif/extension-cornerstone-dicom-sr.sopClassHandlerModule.dicom-sr-3d',
+  viewport: '@ohif/extension-cornerstone-dicom-sr.viewportModule.dicom-sr',
+};
+
 const segmentation = {
   sopClassHandler: '@ohif/extension-cornerstone-dicom-seg.sopClassHandlerModule.dicom-seg',
   viewport: '@ohif/extension-cornerstone-dicom-seg.viewportModule.dicom-seg',
@@ -34,6 +46,7 @@ const dicomRT = {
 const extensionDependencies = {
   '@ohif/extension-default': '^3.0.0',
   '@ohif/extension-cornerstone': '^3.0.0',
+  '@ohif/extension-cornerstone-dicom-sr': '^3.0.0',
   '@ohif/extension-cornerstone-dicom-seg': '^3.0.0',
   '@ohif/extension-cornerstone-dicom-rt': '^3.0.0',
   '@ohif/extension-webquiz': '^0.0.1',
@@ -235,6 +248,14 @@ function modeFactory({ modeConfiguration }) {
                 {
                   namespace: dicomRT.viewport,
                   displaySetsToDisplay: [dicomRT.sopClassHandler],
+                },
+                {
+                  namespace: tracked.viewport,
+                  displaySetsToDisplay: [dicomsr.sopClassHandler3D,],
+                },
+                {
+                  namespace: dicomsr.viewport,
+                  displaySetsToDisplay: [dicomsr.sopClassHandler],
                 },              ],
             },
           };
@@ -245,7 +266,13 @@ function modeFactory({ modeConfiguration }) {
     /** HangingProtocol used by the mode */
     hangingProtocol: ['default'],
     /** SopClassHandlers used by the mode */
-    sopClassHandlers: [ohif.sopClassHandler, segmentation.sopClassHandler, dicomRT.sopClassHandler],
+    sopClassHandlers: [
+      ohif.sopClassHandler,
+      segmentation.sopClassHandler,
+      dicomsr.sopClassHandler3D,
+      dicomsr.sopClassHandler,
+      dicomRT.sopClassHandler,
+    ],
   } //return
 };  //mode factory
 
