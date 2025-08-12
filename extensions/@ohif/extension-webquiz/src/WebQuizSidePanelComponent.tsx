@@ -218,8 +218,6 @@ function WebQuizSidePanelComponent() {
         <div className="text-white w-full text-center">
         {`Web Quiz version : ${sqrt(4)}`}
         <BtnComponent
-            measurementData={annotationData}
-            segmentationData={segmentationData}
             refreshData={refreshData}
             setIsSaved={setIsSaved}
         />

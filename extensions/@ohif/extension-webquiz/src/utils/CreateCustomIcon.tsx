@@ -1,6 +1,6 @@
 
 import React from 'react';
-import baineslogo from '../assets/BainesTransparentTiny.png';
+import baineslogo from '../../assets/BainesTransparentTiny.png';
 
 type ImageIconProps = React.ImgHTMLAttributes<HTMLImageElement>;
 
