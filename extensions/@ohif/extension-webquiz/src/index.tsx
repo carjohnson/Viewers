@@ -1,6 +1,6 @@
 import { id } from './id';
 import WebQuizSidePanelComponent from './WebQuizSidePanelComponent';
-import CreateCustomIcon from './CreateCustomIcon';
+import CreateCustomIcon from './utils/CreateCustomIcon';
 import { Icons } from '@ohif/ui-next';
 
 CreateCustomIcon(Icons);
