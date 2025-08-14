@@ -104,7 +104,7 @@ function BtnComponent( { refreshData, setIsSaved }) {
   };
 
 
-  const handleRestoreMeasurementsClick = () => {
+  const handleRedrawSavedMeasurementsClick = () => {
     measurementListRef.current.forEach(savedAnnotation => {
       if (
         savedAnnotation &&
@@ -121,8 +121,30 @@ function BtnComponent( { refreshData, setIsSaved }) {
     // }
   };
 
+   async function handleFetchAnnotationsClick() {
+    try {
+      console.log('Fetching annotations from server');
+
+      // const response = await fetch('tempForTesting/testSavedAnnotationObjects.json');
+      const response = await fetch('http://localhost:3000/tempForTesting/testSavedAnnotationObjects.json');
+      if (!response.ok) throw new Error('Network response was not ok');
+      const annotations = await response.json();
+      annotations.forEach(fetchedAnnotation => {
+        if (
+          fetchedAnnotation &&
+          typeof fetchedAnnotation.annotationUID === 'string' &&
+          fetchedAnnotation.annotationUID.length > 0
+        ) {
+          annotation.state.addAnnotation(fetchedAnnotation);
+        }
+      });
+    } catch (error) {
+      console.error('❌ Error fetching annotations (check if Express is running):', error);
+    }
+  }
 
 
+  
   return (
       <div>
         <br/>
@@ -134,7 +156,10 @@ function BtnComponent( { refreshData, setIsSaved }) {
         <Button onClick={handleClearMeasurementsClick}>Clear Measurements</Button>
         <br></br>
         <br></br>
-        <Button onClick={handleRestoreMeasurementsClick}>Restore Measurements</Button>
+        <Button onClick={handleRedrawSavedMeasurementsClick}>Redraw Measurements saved in OHIF</Button>
+        <br></br>
+        <br></br>
+        <Button onClick={handleFetchAnnotationsClick}>Restore Measurements from static dir</Button>
       </div>
   );
 }
