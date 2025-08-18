@@ -16,10 +16,17 @@ const { datasetToDict } = data;
 
 
 
-function BtnComponent( { refreshData, setIsSaved }) {
+function BtnComponent( {userInfo, refreshData, setIsSaved }) {
  
   
   const measurementListRef = useRef([]);
+  const userDefinedBtnLabel = () => {
+    if (userInfo?.role === "admin") {
+      return "Restore all users' measurements.";
+    } else {
+      return "Restore logged-in user's measurements.";
+    }
+  };
  
   const handleUploadAnnotationsClick = () => {
 
@@ -123,8 +130,8 @@ function BtnComponent( { refreshData, setIsSaved }) {
 
    async function handleFetchAnnotationsClick() {
     try {
-      console.log('Fetching annotations from server');
 
+      console.log('Fetching annotations from server');
       // const response = await fetch('tempForTesting/testSavedAnnotationObjects.json');
       const response = await fetch('http://localhost:3000/tempForTesting/testSavedAnnotationObjects.json');
       if (!response.ok) throw new Error('Network response was not ok');
@@ -159,7 +166,7 @@ function BtnComponent( { refreshData, setIsSaved }) {
         <Button onClick={handleRedrawSavedMeasurementsClick}>Redraw Measurements saved in OHIF</Button>
         <br></br>
         <br></br>
-        <Button onClick={handleFetchAnnotationsClick}>Restore Measurements from static dir</Button>
+        <Button onClick={handleFetchAnnotationsClick}>{userDefinedBtnLabel(userInfo)}</Button>
       </div>
   );
 }

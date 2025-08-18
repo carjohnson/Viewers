@@ -25,6 +25,7 @@ function WebQuizSidePanelComponent() {
     const [segmentationData, setSegmentationData] = useState([]);
     const [volumeData, setVolumeData] = useState([]);
     const [annotationData, setAnnotationData] = useState([]);
+    const [userInfo, setUserInfo] = useState(null);
     const [isSaved, setIsSaved] = useState(true);
 
 
@@ -146,6 +147,27 @@ function WebQuizSidePanelComponent() {
         }
     }, [segmentationData]);
 
+    // get user info from parent iframehost
+    useEffect(() => {
+        // send request to parent for user info
+        window.parent.postMessage({ type: 'request-user-info'}, '*');
+
+        // Listen for response
+        const handleMessage = (event) => {
+            if (event.data.type === 'user-info') {
+                console.log('✅ Viewer > Received user info:', event.data.payload);
+                setUserInfo(event.data.payload);
+            }
+        };
+
+        window.addEventListener('message', handleMessage);
+
+        // Cleanup listener on unmount
+        return () => {
+            window.removeEventListener('message', handleMessage);
+        };
+    }, []);
+
 
     ////////////////////////////////////////////
     //=====================
@@ -200,10 +222,12 @@ function WebQuizSidePanelComponent() {
     const refreshData = () => {
         const lo_annotationStats = getAnnotationsStats();
         setAnnotationData(lo_annotationStats);
+        
         const [lo_segmentations, lo_allVolumes] = getSegmentationStats();
         setVolumeData(lo_allVolumes);
         setSegmentationData(lo_segmentations);
         console.table(lo_allVolumes);
+        
         return [lo_annotationStats, lo_allVolumes, lo_segmentations]; // ensures stats are updated before continuing
     };
 
@@ -218,9 +242,11 @@ function WebQuizSidePanelComponent() {
         <div className="text-white w-full text-center">
         {`Web Quiz version : ${sqrt(4)}`}
         <BtnComponent
+            userInfo={userInfo} 
             refreshData={refreshData}
             setIsSaved={setIsSaved}
         />
+        {userInfo && <div>User Role: {userInfo.role} </div>}
         </div>
     );    
 
