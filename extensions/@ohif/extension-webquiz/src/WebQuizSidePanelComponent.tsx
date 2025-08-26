@@ -246,7 +246,12 @@ function WebQuizSidePanelComponent() {
             refreshData={refreshData}
             setIsSaved={setIsSaved}
         />
-        {userInfo && <div>User Role: {userInfo.role} </div>}
+        {userInfo && (
+            <div>
+                <div>User Name: {userInfo.username}</div>
+                <div>User Role: {userInfo.role}</div>
+            </div>
+            )}
         </div>
     );    
 
