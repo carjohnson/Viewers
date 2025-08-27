@@ -148,47 +148,80 @@ function BtnComponent( {userInfo, refreshData, setIsSaved }) {
   };
 
 
-  useEffect(() => {
-    const username = userInfo?.role === 'reader' ? userInfo.username : 'all';
-    window.parent.postMessage({ type: 'request-list-users-annotations', username }, '*');
 
-    const handleUsersAnnotationsMessage = (event) => {
-      if (event.data.type === 'list-users-annotations') {
-        const annotationsList = event.data.payload;
-        setListOfUsersAnnotations(annotationsList);
+// // OLD - getting annotations from server folder
+//    async function handleFetchAnnotationsClick() {
+//     try {
 
-        annotationsList.forEach(userAnnotationObjects => {
-          userAnnotationObjects.forEach(fetchedAnnotation => {
-            if (
-              fetchedAnnotation &&
-              typeof fetchedAnnotation.annotationUID === 'string' &&
-              fetchedAnnotation.annotationUID.length > 0
-            ) {
-              annotation.state.addAnnotation(fetchedAnnotation);
-            }
-          });
-        });
-      }
-    };
+//       console.log('Fetching annotations from server');
 
-    window.addEventListener('message', handleUsersAnnotationsMessage);
+//       // get annotation objects from json file
+//       const response = await fetch('http://localhost:3000/tempForTesting/testSavedAnnotationObjects.json');
+//       if (!response.ok) throw new Error('Network response was not ok');
+//       const annotations = await response.json();
+//       annotations.forEach(fetchedAnnotation => {
+//         if (
+//           fetchedAnnotation &&
+//           typeof fetchedAnnotation.annotationUID === 'string' &&
+//           fetchedAnnotation.annotationUID.length > 0
+//         ) {
+//           annotation.state.addAnnotation(fetchedAnnotation);
+//         }
+//       });
 
-    return () => {
-      window.removeEventListener('message', handleUsersAnnotationsMessage);
-    };
-  }, [userInfo]);
+//     } catch (error) {
+//       console.error('❌ Error fetching annotations (check if Express is running):', error);
+//     }
+//   }
+
+//   // useEffect if you want the annotations to appear automatically when the component mounts
+//   useEffect(() => {
+//   const fetchAnnotations = async () => {
+//     const username = userInfo?.role === 'reader' ? userInfo.username : 'all';
+
+//     try {
+//       const response = await fetch(`/webquiz/list-users-annotations?username=${username}`);
+//       if (!response.ok) throw new Error('Failed to fetch annotations');
+
+//       const { payload: annotationsList } = await response.json();
+//       setListOfUsersAnnotations(annotationsList);
+
+//       annotationsList.forEach(userAnnotationObjects => {
+//         userAnnotationObjects.forEach(fetchedAnnotation => {
+//           if (
+//             fetchedAnnotation &&
+//             typeof fetchedAnnotation.annotationUID === 'string' &&
+//             fetchedAnnotation.annotationUID.length > 0
+//           ) {
+//             annotation.state.addAnnotation(fetchedAnnotation);
+//           }
+//         });
+//       });
+//     } catch (error) {
+//       console.error('❌ Error fetching annotations:', error);
+//     }
+//   };
+
+//   fetchAnnotations();
+// }, [userInfo]);
 
 
-   async function handleFetchAnnotationsClick() {
-    try {
+// get annotations from database based on user role
+async function handleFetchAnnotationsClick() {
+  const username = userInfo?.role === 'reader' ? userInfo.username : 'all';
 
-      console.log('Fetching annotations from server');
+  try {
+  const response = await fetch(`https://localhost:3000/webquiz/list-users-annotations?username=${username}&patientid=${patientName}`, {
+    credentials: 'include'
+  });
+    // const response = await fetch(`/webquiz/list-users-annotations?username=${username}&patientid=${patientName}`);
+    if (!response.ok) throw new Error('Failed to fetch annotations from DB');
 
-      // get annotation objects from json file
-      const response = await fetch('http://localhost:3000/tempForTesting/testSavedAnnotationObjects.json');
-      if (!response.ok) throw new Error('Network response was not ok');
-      const annotations = await response.json();
-      annotations.forEach(fetchedAnnotation => {
+    const { payload: annotationsList } = await response.json();
+    setListOfUsersAnnotations(annotationsList);
+
+    annotationsList.forEach(userAnnotationObjects => {
+      userAnnotationObjects.forEach(fetchedAnnotation => {
         if (
           fetchedAnnotation &&
           typeof fetchedAnnotation.annotationUID === 'string' &&
@@ -197,13 +230,11 @@ function BtnComponent( {userInfo, refreshData, setIsSaved }) {
           annotation.state.addAnnotation(fetchedAnnotation);
         }
       });
-
-    } catch (error) {
-      console.error('❌ Error fetching annotations (check if Express is running):', error);
-    }
+    });
+  } catch (error) {
+    console.error('❌ Error fetching annotations:', error);
   }
-
-
+}
   
   return (
       <div>
@@ -225,3 +256,6 @@ function BtnComponent( {userInfo, refreshData, setIsSaved }) {
 }
 
 export default BtnComponent
+
+
+
