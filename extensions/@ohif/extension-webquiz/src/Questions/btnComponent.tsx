@@ -21,7 +21,7 @@ const { datasetToDict } = data;
 
 
 
-function BtnComponent( {userInfo, refreshData, setIsSaved }) {
+function BtnComponent( {userInfo, refreshData, setIsSaved, studyInfo }) {
  
   const [listOfUsersAnnotations, setListOfUsersAnnotations] = useState(null);
     

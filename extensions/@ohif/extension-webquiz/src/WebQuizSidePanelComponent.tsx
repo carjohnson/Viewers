@@ -6,6 +6,7 @@ import { useSystem } from '@ohif/core';
 import * as cornerstone from '@cornerstonejs/core';
 import * as cornerstoneTools from '@cornerstonejs/tools';
 import { annotation } from '@cornerstonejs/tools';
+import { useStableStudyInfo } from './utils/useStableStudyInfo';
 
 
 /**
@@ -28,11 +29,30 @@ function WebQuizSidePanelComponent() {
     const [userInfo, setUserInfo] = useState(null);
     const [isSaved, setIsSaved] = useState(true);
 
+    // const studyInfo = useStableStudyInfo();
+    // if (studyInfo) {
+    //     console.log("🧪 studyInfo (inline):", studyInfo);
+    // } else {
+    //     console.log(" ERROR - NO STUDY INFO");
+    // }
+    // useEffect(() => {
+    //     console.log("📦 Study Info in component:", studyInfo);
+    // }, [studyInfo]);
 
+    ///////// For Testing
 
+    try {
+        const studyInfo = {
+            patientName: "4774726339",
+            patientId: "12345",
+            studyUID: "1.2.3.4.5",
+            frameUID: "abcde"
+        };
+        console.log("📦 Study Info in component:", studyInfo);
+    } catch (err) {
+        console.error("❌ Error in WebQuizSidePanelComponent:", err);
+    }    
     type AnnotationStats = Record<string, Record<string, unknown>>;     // generic for capture of cachedStats object
-
-
     // Annotations listeners
     useEffect(() => {
         const handleAnnotationChange = () => {
@@ -155,7 +175,7 @@ function WebQuizSidePanelComponent() {
         // Listen for response
         const handleMessage = (event) => {
             if (event.data.type === 'user-info') {
-                console.log('✅ Viewer > Received user info:', event.data.payload);
+                console.log('✅ Viewer > Received user info >>>:', event.data.payload);
                 setUserInfo(event.data.payload);
             }
         };
@@ -196,26 +216,26 @@ function WebQuizSidePanelComponent() {
     // function to get the list of objects holding segmentations and
     //  extract volume data
     const getSegmentationStats = () => {
-    const lo_segmentations = segmentationService.getSegmentations();
-    const lo_allVolumes = [];
+        const lo_segmentations = segmentationService.getSegmentations();
+        const lo_allVolumes = [];
 
-    lo_segmentations.forEach((segmentation, segIndex) => {
-        const segments = segmentation.segments;
+        lo_segmentations.forEach((segmentation, segIndex) => {
+            const segments = segmentation.segments;
 
-        Object.keys(segments).forEach((segmentKey) => {
-        const segment = segments[segmentKey];
-        const volume = segment?.cachedStats?.namedStats?.volume?.value;
+            Object.keys(segments).forEach((segmentKey) => {
+            const segment = segments[segmentKey];
+            const volume = segment?.cachedStats?.namedStats?.volume?.value;
 
-        if (volume !== undefined) {
-            lo_allVolumes.push({
-            segmentation: segIndex + 1,
-            segment: segmentKey,
-            volume,
+            if (volume !== undefined) {
+                lo_allVolumes.push({
+                segmentation: segIndex + 1,
+                segment: segmentKey,
+                volume,
+                });
+            }
             });
-        }
         });
-    });
-    return [lo_segmentations, lo_allVolumes];
+        return [lo_segmentations, lo_allVolumes];
     };
 
     //=====================
@@ -231,9 +251,7 @@ function WebQuizSidePanelComponent() {
         return [lo_annotationStats, lo_allVolumes, lo_segmentations]; // ensures stats are updated before continuing
     };
 
-
-
-     ////////////////////////////////////////////
+    ////////////////////////////////////////////
     //=====================
     // return
     //=====================
@@ -245,13 +263,20 @@ function WebQuizSidePanelComponent() {
             userInfo={userInfo} 
             refreshData={refreshData}
             setIsSaved={setIsSaved}
+            studyInfo={studyInfo}
         />
         {userInfo && (
             <div>
                 <div>User Name: {userInfo.username}</div>
                 <div>User Role: {userInfo.role}</div>
             </div>
-            )}
+        )}
+        {studyInfo.patientName && studyInfo.studyUID && (
+            <div>
+                <div>Patient Name: {studyInfo.patientName}</div>
+                <div>StudyUID: {studyInfo.studyUID}</div>
+            </div>
+        )}
         </div>
     );    
 
