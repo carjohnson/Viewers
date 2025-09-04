@@ -4,6 +4,7 @@ const path = require('path');
 const { merge } = require('webpack-merge');
 const webpack = require('webpack');
 const webpackBase = require('./../../../.webpack/webpack.base.js');
+const fs = require('fs');
 // ~~ Plugins
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
@@ -156,7 +157,10 @@ module.exports = (env, argv) => {
       // Causes Cypress: `wait-on` issue in CI
       // compress: true,
       // http2: true,
-      // https: true,
+      https: {
+        key: fs.readFileSync('./.recipes/Nginx-Orthanc/config/nginx.key'),
+        cert: fs.readFileSync('./.recipes/Nginx-Orthanc/config/nginx.crt'),
+      },
       open: true,
       port: OHIF_PORT,
       client: {
@@ -170,6 +174,13 @@ module.exports = (env, argv) => {
             '^/dicom-microscopy-viewer': `/${PUBLIC_URL}/dicom-microscopy-viewer`,
           },
         },
+        // '/pacs/dicom-web': {
+        //   target: 'https://orthanc:8042',
+        //   secure: false, // disable SSL verification for self-signed certs
+        //   changeOrigin: true,
+        //   pathRewrite: { '^/pacs/dicom-web': '/dicom-web' },
+        //   logLevel: 'debug',
+        // },        
       },
       static: [
         {
