@@ -163,7 +163,14 @@ module.exports = (env, argv) => {
       },
       open: true,
       port: OHIF_PORT,
+      webSocketServer: 'ws',
       client: {
+        webSocketURL: {
+          hostname: 'localhost',
+          port: OHIF_PORT,
+          protocol: 'wss',
+          pathname: '/ws',
+        },
         overlay: { errors: true, warnings: false },
       },
       proxy: {
@@ -174,13 +181,6 @@ module.exports = (env, argv) => {
             '^/dicom-microscopy-viewer': `/${PUBLIC_URL}/dicom-microscopy-viewer`,
           },
         },
-        // '/pacs/dicom-web': {
-        //   target: 'https://orthanc:8042',
-        //   secure: false, // disable SSL verification for self-signed certs
-        //   changeOrigin: true,
-        //   pathRewrite: { '^/pacs/dicom-web': '/dicom-web' },
-        //   logLevel: 'debug',
-        // },        
       },
       static: [
         {
