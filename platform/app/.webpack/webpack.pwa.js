@@ -153,6 +153,26 @@ module.exports = (env, argv) => {
     ],
     // https://webpack.js.org/configuration/dev-server/
     devServer: {
+      /**
+       * Webpack Dev Server Configuration for OHIF Viewer
+       *
+       * This config supports two development modes:
+       * 1. Direct OHIF Viewer access via `yarn start:https` at https://localhost:3000/ohif
+       *    - Useful for isolated viewer testing and debugging
+       *    - WebSocket client connects to wss://localhost:3000/ws
+       *
+       * 2. Integrated Express app access via iframe at https://localhost/ohif
+       *    - Viewer is served from /dist and embedded in the Express app
+       *    - WebSocket client connects to wss://localhost/ws via Nginx or Express proxy
+       *
+       * Notes:
+       * - When switching from dev mode to Express app, a full rebuild is required:
+       *     - Delete node_modules and platform/app/dist
+       *     - Run `yarn cache clean`
+       *     - Run `yarn build`
+       * - This ensures the dev client is removed and the static build is clean
+       * - Avoid running `yarn start:https` after `yarn build` unless you intend to test the dev server
+       */
       // gzip compression of everything served
       // Causes Cypress: `wait-on` issue in CI
       // compress: true,
@@ -167,7 +187,6 @@ module.exports = (env, argv) => {
       client: {
         webSocketURL: {
           hostname: 'localhost',
-          port: OHIF_PORT,
           protocol: 'wss',
           pathname: '/ws',
         },
