@@ -37,6 +37,7 @@
     "build:demo": "lerna run build:viewer:demo --stream",
     "build:package-all": "lerna run build:package --parallel --stream",
     "build:package-all-1": "lerna run build:package-1 --parallel --stream",
+    "build:nocache": "lerna run build:viewer --stream --skip-nx-cache",
     "dev:fast": "cd platform/app && yarn run dev:fast",
     "show:config": "echo Config is $APP_CONFIG on $PUBLIC_URL",
     "dev": "lerna run dev:viewer --stream",
