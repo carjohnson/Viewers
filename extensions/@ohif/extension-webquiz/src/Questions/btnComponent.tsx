@@ -1,31 +1,42 @@
-// import React from "react";
 import React, { useRef, useEffect, useState } from 'react';
 import { Button } from '@ohif/ui-next';
 import { data } from 'dcmjs';
-
-// import * as cornerstone from '@cornerstonejs/core';
-import * as cornerstoneTools from "@cornerstonejs/tools";
-import { getEnabledElement } from '@cornerstonejs/core';
 import { Buffer } from 'buffer';
 import { getGeneratedSegmentation } from "../utils/util_segmentation";
-
 import { annotation } from '@cornerstonejs/tools';
-import { init } from '@cornerstonejs/core';
-import { useSystem } from '@ohif/core';
-import { usePatientInfo } from '@ohif/extension-default';
 
 
+/////////////
+// NOTE:
+// Removing customized rendering engine since AddAnnotation already does the render
+// There may be some missing variables at this stage if this is to
+// be brought back on line
+// import { RenderingEngine } from '@cornerstonejs/core';
 
 
 const { datasetToDict } = data;
 
+interface BtnComponentProps {
+  userInfo: any;
+  refreshData: () => void;
+  setIsSaved: (value: boolean) => void;
+  studyInfo: any;
+  // renderingEngine: RenderingEngine | null;
+}
 
 
-function BtnComponent( {userInfo, refreshData, setIsSaved, studyInfo }) {
+
+const BtnComponent: React.FC<BtnComponentProps> = ( {
+  userInfo,
+  refreshData,
+  setIsSaved,
+  studyInfo
+  // renderingEngine
+}) => {
  
   const [listOfUsersAnnotations, setListOfUsersAnnotations] = useState(null);
-    
   const measurementListRef = useRef([]);
+  const patientName = studyInfo?.patientName || null;
 
   const userDefinedBtnLabel = () => {
     if (userInfo?.role === "admin") {
@@ -35,15 +46,18 @@ function BtnComponent( {userInfo, refreshData, setIsSaved, studyInfo }) {
     }
   };
 
-  const { servicesManager } = useSystem();
-  const displaySetService = servicesManager.services.displaySetService;
-  const activeDisplaySets = displaySetService.getActiveDisplaySets();
+  //>>>>> for rendering engine <<<<<
+  // const { servicesManager } = useSystem();
+  // const displaySetService = servicesManager.services.displaySetService;
+  // const activeDisplaySets = displaySetService.getActiveDisplaySets();
 
-  const studyInstanceUID = activeDisplaySets[0]?.StudyInstanceUID;
-  const { patientInfo } = usePatientInfo();
-  // in this study, patient name is set up to be unique and is being
-  //  sent to the parent as the patient_id
-  const patientName = patientInfo.PatientName;
+  // const studyInstanceUID = activeDisplaySets[0]?.StudyInstanceUID;
+  // const { patientInfo } = usePatientInfo();
+  // // in this study, patient name is set up to be unique and is being
+  // //  sent to the parent as the patient_id
+  // const patientName = patientInfo.PatientName;
+  //>>>>> <<<<<
+
 
   const handleUploadAnnotationsClick = () => {
 
@@ -73,8 +87,10 @@ function BtnComponent( {userInfo, refreshData, setIsSaved, studyInfo }) {
     const [, , freshSegmentationData] = refreshData();
     const selectedId = freshSegmentationData[0]?.segmentationId;
 
-    const currentViewports = cornerstoneTools.utilities.getAllViewportIds?.() || [getEnabledElement()?.viewport?.id];
-    const state = { segmentationId: selectedId, viewportIds: currentViewports };
+    const viewportService = servicesManager.services.cornerstoneViewportService;
+    const viewportIds = viewportService.getViewportIds();
+
+    const state = { segmentationId: selectedId, viewportIds };
     const result = await getGeneratedSegmentation(state);
 
     if (!result?.dataset) {
@@ -120,13 +136,8 @@ function BtnComponent( {userInfo, refreshData, setIsSaved, studyInfo }) {
       const { annotationUID } = annotationEntry;
       annotation.state.removeAnnotation(annotationUID);
     });
-    // // trigger a re-render or update the viewport
-    // const renderingEngine = getRenderingEngine('webquizRenderEngine');
-    // const viewports = renderingEngine.getViewports();
 
-    // if (viewports.length > 0) {
-    //   renderingEngine.renderViewports(viewports.map(vp => vp.id));
-    // }
+    // triggerRender();
   };
 
 
@@ -141,38 +152,8 @@ function BtnComponent( {userInfo, refreshData, setIsSaved, studyInfo }) {
       }
     });
 
-    // const renderingEngine = getRenderingEngine('yourRenderingEngineId');
-    // if (renderingEngine) {
-    //   renderingEngine.render();
-    // }
   };
 
-
-
-// // OLD - getting annotations from server folder
-//    async function handleFetchAnnotationsClick() {
-//     try {
-
-//       console.log('Fetching annotations from server');
-
-//       // get annotation objects from json file
-//       const response = await fetch('http://localhost:3000/tempForTesting/testSavedAnnotationObjects.json');
-//       if (!response.ok) throw new Error('Network response was not ok');
-//       const annotations = await response.json();
-//       annotations.forEach(fetchedAnnotation => {
-//         if (
-//           fetchedAnnotation &&
-//           typeof fetchedAnnotation.annotationUID === 'string' &&
-//           fetchedAnnotation.annotationUID.length > 0
-//         ) {
-//           annotation.state.addAnnotation(fetchedAnnotation);
-//         }
-//       });
-
-//     } catch (error) {
-//       console.error('❌ Error fetching annotations (check if Express is running):', error);
-//     }
-//   }
 
 //   // useEffect if you want the annotations to appear automatically when the component mounts
 //   useEffect(() => {
@@ -206,35 +187,64 @@ function BtnComponent( {userInfo, refreshData, setIsSaved, studyInfo }) {
 // }, [userInfo]);
 
 
-// get annotations from database based on user role
-async function handleFetchAnnotationsClick() {
-  const username = userInfo?.role === 'reader' ? userInfo.username : 'all';
+  // get annotations from database based on user role
+  async function handleFetchAnnotationsClick() {
+    const username = userInfo?.role === 'reader' ? userInfo.username : 'all';
 
-  try {
-  const response = await fetch(`https://localhost:3000/webquiz/list-users-annotations?username=${username}&patientid=${patientName}`, {
-    credentials: 'include'
-  });
-    // const response = await fetch(`/webquiz/list-users-annotations?username=${username}&patientid=${patientName}`);
-    if (!response.ok) throw new Error('Failed to fetch annotations from DB');
-
-    const { payload: annotationsList } = await response.json();
-    setListOfUsersAnnotations(annotationsList);
-
-    annotationsList.forEach(userAnnotationObjects => {
-      userAnnotationObjects.forEach(fetchedAnnotation => {
-        if (
-          fetchedAnnotation &&
-          typeof fetchedAnnotation.annotationUID === 'string' &&
-          fetchedAnnotation.annotationUID.length > 0
-        ) {
-          annotation.state.addAnnotation(fetchedAnnotation);
-        }
+    try {
+      const response = await fetch(`https://localhost:3000/webquiz/list-users-annotations?username=${username}&patientid=${patientName}`, {
+        credentials: 'include'
       });
-    });
-  } catch (error) {
-    console.error('❌ Error fetching annotations:', error);
+
+      if (!response.ok) throw new Error('Failed to fetch annotations from DB');
+
+      const { payload: annotationsList, legend } = await response.json();
+      setListOfUsersAnnotations(annotationsList);
+
+      annotationsList.forEach(({ data, color }) => {
+        data.forEach(annotationObj => {
+          if (
+            annotationObj &&
+            typeof annotationObj.annotationUID === 'string' &&
+            annotationObj.annotationUID.length > 0
+          ) {
+
+            annotation.config.style.setAnnotationStyles(annotationObj.annotationUID, {
+              color: color,
+            });
+
+            annotation.state.addAnnotation(annotationObj);
+          }
+        });
+      });
+
+      window.parent.postMessage({
+        type: 'update-legend',
+        legend: legend
+      }, '*');
+
+    } catch (error) {
+      console.error('❌ Error fetching annotations:', error);
+    }
   }
-}
+
+
+
+// const triggerRender = () => {
+
+//   if (!renderingEngine) {
+//     console.error('❌ Rendering engine not found. Did you initialize it?');
+//     return;
+//   }
+
+//   const viewportService = servicesManager.services.cornerstoneViewportService;
+//   const viewportIds = viewportService.getViewportIds();
+
+//   if (viewportIds.length > 0) {
+//     renderingEngine.renderViewports(viewportIds);
+//   }
+// };
+
   
   return (
       <div>

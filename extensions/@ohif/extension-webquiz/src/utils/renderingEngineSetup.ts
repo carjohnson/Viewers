@@ -1,13 +1,13 @@
 // utils/renderingEngineSetup.ts
-import { RenderingEngine } from '@cornerstonejs/core';
 import { Enums } from "@cornerstonejs/core";
+import { getRenderingEngine } from '@cornerstonejs/core';
+import { RenderingEngine } from '@cornerstonejs/core';
 
 
 const { ViewportType } = Enums;
 
-export function setupRenderingEngine() {
+export function setupRenderingEngine(viewportId) {
   const renderingEngineId = 'webquizEngine';
-  const viewportId = 'webquizViewport';
   const type = ViewportType.STACK;
 
   const element = document.getElementById('cornerstone-element') as HTMLDivElement;
@@ -15,7 +15,7 @@ export function setupRenderingEngine() {
     throw new Error("❌ cornerstone-element not found in DOM.");
   }
 
-  const renderingEngine = new RenderingEngine(renderingEngineId);
+  const renderingEngine = getRenderingEngine(renderingEngineId) || new RenderingEngine(renderingEngineId);;
 
   renderingEngine.enableElement({
     viewportId,

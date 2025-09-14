@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { sqrt } from 'math.js'
 import BtnComponent from './Questions/btnComponent';
 import { useSystem } from '@ohif/core';
@@ -6,7 +6,16 @@ import { useSystem } from '@ohif/core';
 import * as cornerstone from '@cornerstonejs/core';
 import * as cornerstoneTools from '@cornerstonejs/tools';
 import { annotation } from '@cornerstonejs/tools';
-import { useStableStudyInfo } from './utils/useStableStudyInfo';
+import { useStudyInfoStore } from './stores/useStudyInfoStore';
+import { useStudyInfo } from './hooks/useStudyInfo';
+import { usePatientInfo } from '@ohif/extension-default';
+
+
+// import { RenderingEngine, getRenderingEngine, Enums } from '@cornerstonejs/core';
+
+// const renderingEngineId = 'webquizEngine';
+// const viewportId = 'webquizViewport';
+// const type = Enums.ViewportType.STACK;
 
 
 /**
@@ -29,29 +38,68 @@ function WebQuizSidePanelComponent() {
     const [userInfo, setUserInfo] = useState(null);
     const [isSaved, setIsSaved] = useState(true);
 
-    // const studyInfo = useStableStudyInfo();
-    // if (studyInfo) {
-    //     console.log("🧪 studyInfo (inline):", studyInfo);
-    // } else {
-    //     console.log(" ERROR - NO STUDY INFO");
-    // }
-    // useEffect(() => {
-    //     console.log("📦 Study Info in component:", studyInfo);
-    // }, [studyInfo]);
+    // ---------------------------------------------
+    // Hook Setup for Study Metadata
+    // ---------------------------------------------
+    // - usePatientInfo(): Retrieves patient-level metadata (name, ID) from OHIF's context.
+    // - useStudyInfo(): Polls displaySetService for studyUID and frameUID once viewer is ready.
+    // - useStudyInfoStore(): Zustand store for persisting combined study metadata across tabs.
+    //
+    // These hooks work together to ensure that:
+    // - Patient and study metadata are available reactively
+    // - Zustand holds the full object for consistent access
+    // - Data persists even when switching OHIF modes (e.g. Measurements → Viewer)
+    //
+    // Note: Hooks must be called unconditionally and in this order to comply with React rules.
+    const { patientInfo } = usePatientInfo();
+    const studyInfoFromHook = useStudyInfo();
+    const { studyInfo, setStudyInfo } = useStudyInfoStore();
 
-    ///////// For Testing
+    useEffect(() => {
+        if (!studyInfoFromHook?.studyUID || !patientInfo?.PatientName) {
+            console.log('⏳ Waiting for full study info...');
+            return;
+        }
 
-    try {
-        const studyInfo = {
-            patientName: "4774726339",
-            patientId: "12345",
-            studyUID: "1.2.3.4.5",
-            frameUID: "abcde"
+        const fullInfo = {
+            ...studyInfoFromHook,
+            patientName: patientInfo.PatientName,
+            patientId: patientInfo.PatientID,
         };
-        console.log("📦 Study Info in component:", studyInfo);
-    } catch (err) {
-        console.error("❌ Error in WebQuizSidePanelComponent:", err);
-    }    
+
+        console.log('✅ Setting full study info in Zustand:', fullInfo);
+        setStudyInfo(fullInfo);
+    }, [studyInfoFromHook, patientInfo]);
+
+    //>>>>> for debug <<<<<
+    // console.log('🧠 useStudyInfo() returned:', studyInfoFromHook);
+    // console.log('📦 Zustand store currently holds:', studyInfo);
+    
+
+    // // for render engine, 
+    // const cornerstoneRef = useRef<HTMLDivElement>(null);
+    // const [engine, setEngine] = useState<RenderingEngine | null>(null);
+
+    // useEffect(() => {
+    //     const element = cornerstoneRef.current;
+    //     if (!element) return;
+
+    //     let renderingEngine = getRenderingEngine(renderingEngineId);
+    //     if (!renderingEngine) {
+    //     renderingEngine = new RenderingEngine(renderingEngineId);
+    //     renderingEngine.enableElement({
+    //         viewportId,
+    //         element,
+    //         type,
+    //     });
+    //     renderingEngine.renderViewports([viewportId]);
+    //     }
+
+    //     setEngine(renderingEngine);
+    // }, []);
+
+
+
     type AnnotationStats = Record<string, Record<string, unknown>>;     // generic for capture of cachedStats object
     // Annotations listeners
     useEffect(() => {
@@ -247,7 +295,7 @@ function WebQuizSidePanelComponent() {
         setVolumeData(lo_allVolumes);
         setSegmentationData(lo_segmentations);
         console.table(lo_allVolumes);
-        
+
         return [lo_annotationStats, lo_allVolumes, lo_segmentations]; // ensures stats are updated before continuing
     };
 
@@ -258,7 +306,6 @@ function WebQuizSidePanelComponent() {
     ////////////////////////////////////////////
     return (
         <div className="text-white w-full text-center">
-        {`Web Quiz version : ${sqrt(4)}`}
         <BtnComponent
             userInfo={userInfo} 
             refreshData={refreshData}
@@ -271,7 +318,7 @@ function WebQuizSidePanelComponent() {
                 <div>User Role: {userInfo.role}</div>
             </div>
         )}
-        {studyInfo.patientName && studyInfo.studyUID && (
+        {studyInfo?.patientName && studyInfo?.studyUID && (
             <div>
                 <div>Patient Name: {studyInfo.patientName}</div>
                 <div>StudyUID: {studyInfo.studyUID}</div>
