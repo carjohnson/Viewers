@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { sqrt } from 'math.js'
-import BtnComponent from './Questions/btnComponent';
+import BtnComponent from './components/btnComponent';
 import { useSystem } from '@ohif/core';
 
 import * as cornerstone from '@cornerstonejs/core';
