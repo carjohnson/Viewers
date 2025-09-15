@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { sqrt } from 'math.js'
+// import { sqrt } from 'math.js'
 import BtnComponent from './components/btnComponent';
-import { useSystem } from '@ohif/core';
+// import { useSystem } from '@ohif/core';
 
 import * as cornerstone from '@cornerstonejs/core';
 import * as cornerstoneTools from '@cornerstonejs/tools';
@@ -29,11 +29,11 @@ function WebQuizSidePanelComponent() {
     //  as the other components may be updating asynchronously and this
     //  component needs to be subscribed to those updates
 
-    const { servicesManager } = useSystem();
-    const { segmentationService } = servicesManager.services;
+    // const { servicesManager } = useSystem();
+    // const { segmentationService } = servicesManager.services;
     
-    const [segmentationData, setSegmentationData] = useState([]);
-    const [volumeData, setVolumeData] = useState([]);
+    // const [segmentationData, setSegmentationData] = useState([]);
+    // const [volumeData, setVolumeData] = useState([]);
     const [annotationData, setAnnotationData] = useState([]);
     const [userInfo, setUserInfo] = useState(null);
     const [isSaved, setIsSaved] = useState(true);
@@ -137,60 +137,60 @@ function WebQuizSidePanelComponent() {
     // Segmentation listener
 
 
-    // don't rely on segmentationService. 
-    // These useEffects are tapping into the events for a more immediate response
+    // // don't rely on segmentationService. 
+    // // These useEffects are tapping into the events for a more immediate response
+    // // useEffect(() => {
+    // //     const lo_allVolumes = getSegmentationStats();
+    // //     setVolumeData(lo_allVolumes);
+    // //     console.table(lo_allVolumes);
+    // //     }, [segmentationService]);
+    // // Refactored ... ===>
     // useEffect(() => {
-    //     const lo_allVolumes = getSegmentationStats();
-    //     setVolumeData(lo_allVolumes);
-    //     console.table(lo_allVolumes);
-    //     }, [segmentationService]);
-    // Refactored ... ===>
-    useEffect(() => {
-        const handleSegmentationChange = () => {
-            const [lo_segmentations, lo_allVolumes] = getSegmentationStats();
-            setVolumeData(lo_allVolumes);
-            console.table(lo_allVolumes);
-        };
+    //     const handleSegmentationChange = () => {
+    //         const [lo_segmentations, lo_allVolumes] = getSegmentationStats();
+    //         setVolumeData(lo_allVolumes);
+    //         console.table(lo_allVolumes);
+    //     };
 
-        cornerstone.eventTarget.addEventListener(
-            cornerstoneTools.Enums.Events.SEGMENTATION_ADDED,
-            handleSegmentationChange
-        );
+    //     cornerstone.eventTarget.addEventListener(
+    //         cornerstoneTools.Enums.Events.SEGMENTATION_ADDED,
+    //         handleSegmentationChange
+    //     );
 
-        cornerstone.eventTarget.addEventListener(
-            cornerstoneTools.Enums.Events.SEGMENTATION_DELETED,
-            handleSegmentationChange
-        );
+    //     cornerstone.eventTarget.addEventListener(
+    //         cornerstoneTools.Enums.Events.SEGMENTATION_DELETED,
+    //         handleSegmentationChange
+    //     );
 
-        cornerstone.eventTarget.addEventListener(
-            cornerstoneTools.Enums.Events.SEGMENTATION_MODIFIED,
-            handleSegmentationChange
-        );
+    //     cornerstone.eventTarget.addEventListener(
+    //         cornerstoneTools.Enums.Events.SEGMENTATION_MODIFIED,
+    //         handleSegmentationChange
+    //     );
 
-        cornerstone.eventTarget.addEventListener(
-            cornerstoneTools.Enums.Events.SEGMENTATION_DATA_MODIFIED,
-            handleSegmentationChange
-        );
+    //     cornerstone.eventTarget.addEventListener(
+    //         cornerstoneTools.Enums.Events.SEGMENTATION_DATA_MODIFIED,
+    //         handleSegmentationChange
+    //     );
 
-        return () => {
-            cornerstone.eventTarget.removeEventListener(
-            cornerstoneTools.Enums.Events.SEGMENTATION_ADDED,
-            handleSegmentationChange
-            );
-            cornerstone.eventTarget.removeEventListener(
-            cornerstoneTools.Enums.Events.SEGMENTATION_DELETED,
-            handleSegmentationChange
-            );
-            cornerstone.eventTarget.removeEventListener(
-            cornerstoneTools.Enums.Events.SEGMENTATION_MODIFIED,
-            handleSegmentationChange
-            );
-            cornerstone.eventTarget.removeEventListener(
-            cornerstoneTools.Enums.Events.SEGMENTATION_DATA_MODIFIED,
-            handleSegmentationChange
-            );
-        };
-    }, []);
+    //     return () => {
+    //         cornerstone.eventTarget.removeEventListener(
+    //         cornerstoneTools.Enums.Events.SEGMENTATION_ADDED,
+    //         handleSegmentationChange
+    //         );
+    //         cornerstone.eventTarget.removeEventListener(
+    //         cornerstoneTools.Enums.Events.SEGMENTATION_DELETED,
+    //         handleSegmentationChange
+    //         );
+    //         cornerstone.eventTarget.removeEventListener(
+    //         cornerstoneTools.Enums.Events.SEGMENTATION_MODIFIED,
+    //         handleSegmentationChange
+    //         );
+    //         cornerstone.eventTarget.removeEventListener(
+    //         cornerstoneTools.Enums.Events.SEGMENTATION_DATA_MODIFIED,
+    //         handleSegmentationChange
+    //         );
+    //     };
+    // }, []);
 
     //=====================
     // watch for changes to the state properties
@@ -201,19 +201,19 @@ function WebQuizSidePanelComponent() {
         }
     }, [annotationData]);
 
-    useEffect(() => {
-        if (volumeData.length > 0) {
-            setIsSaved(false)
-            // console.log(' Volume Change');
-        }
-    }, [volumeData]);
+    // useEffect(() => {
+    //     if (volumeData.length > 0) {
+    //         setIsSaved(false)
+    //         // console.log(' Volume Change');
+    //     }
+    // }, [volumeData]);
 
-    useEffect(() => {
-        if (segmentationData.length > 0) {
-            setIsSaved(false)
-            // console.log(' Volume Change');
-        }
-    }, [segmentationData]);
+    // useEffect(() => {
+    //     if (segmentationData.length > 0) {
+    //         setIsSaved(false)
+    //         // console.log(' Volume Change');
+    //     }
+    // }, [segmentationData]);
 
     // get user info from parent iframehost
     useEffect(() => {
@@ -260,43 +260,44 @@ function WebQuizSidePanelComponent() {
         return lo_annotationStats;
     };
 
-    //=====================
-    // function to get the list of objects holding segmentations and
-    //  extract volume data
-    const getSegmentationStats = () => {
-        const lo_segmentations = segmentationService.getSegmentations();
-        const lo_allVolumes = [];
+    // //=====================
+    // // function to get the list of objects holding segmentations and
+    // //  extract volume data
+    // const getSegmentationStats = () => {
+    //     const lo_segmentations = segmentationService.getSegmentations();
+    //     const lo_allVolumes = [];
 
-        lo_segmentations.forEach((segmentation, segIndex) => {
-            const segments = segmentation.segments;
+    //     lo_segmentations.forEach((segmentation, segIndex) => {
+    //         const segments = segmentation.segments;
 
-            Object.keys(segments).forEach((segmentKey) => {
-            const segment = segments[segmentKey];
-            const volume = segment?.cachedStats?.namedStats?.volume?.value;
+    //         Object.keys(segments).forEach((segmentKey) => {
+    //         const segment = segments[segmentKey];
+    //         const volume = segment?.cachedStats?.namedStats?.volume?.value;
 
-            if (volume !== undefined) {
-                lo_allVolumes.push({
-                segmentation: segIndex + 1,
-                segment: segmentKey,
-                volume,
-                });
-            }
-            });
-        });
-        return [lo_segmentations, lo_allVolumes];
-    };
+    //         if (volume !== undefined) {
+    //             lo_allVolumes.push({
+    //             segmentation: segIndex + 1,
+    //             segment: segmentKey,
+    //             volume,
+    //             });
+    //         }
+    //         });
+    //     });
+    //     return [lo_segmentations, lo_allVolumes];
+    // };
 
     //=====================
     const refreshData = () => {
         const lo_annotationStats = getAnnotationsStats();
         setAnnotationData(lo_annotationStats);
         
-        const [lo_segmentations, lo_allVolumes] = getSegmentationStats();
-        setVolumeData(lo_allVolumes);
-        setSegmentationData(lo_segmentations);
-        console.table(lo_allVolumes);
+        // const [lo_segmentations, lo_allVolumes] = getSegmentationStats();
+        // setVolumeData(lo_allVolumes);
+        // setSegmentationData(lo_segmentations);
+        // console.table(lo_allVolumes);
 
-        return [lo_annotationStats, lo_allVolumes, lo_segmentations]; // ensures stats are updated before continuing
+        // return [lo_annotationStats, lo_allVolumes, lo_segmentations]; // ensures stats are updated before continuing
+        return [lo_annotationStats]; // ensures stats are updated before continuing
     };
 
     ////////////////////////////////////////////

@@ -43,7 +43,7 @@ function modeFactory({ modeConfiguration }) {
   return {
     id,
     routeName: 'webquiz',
-    displayName: 'WebQuiz Mode',
+    displayName: 'Liver Study',
 
     onModeEnter:({servicesManager, extensionManager, commandsManager }: withAppTypes) => {
       const { measurementService, toolbarService, toolGroupService, customizationService } =
