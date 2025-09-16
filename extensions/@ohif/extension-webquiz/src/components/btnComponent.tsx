@@ -1,11 +1,9 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Button } from '@ohif/ui-next';
-// import { data } from 'dcmjs';
 import { annotation } from '@cornerstonejs/tools';
 
-// const { datasetToDict } = data;
-
 interface BtnComponentProps {
+  baseUrl: string,
   userInfo: any;
   refreshData: () => void;
   setIsSaved: (value: boolean) => void;
@@ -13,6 +11,7 @@ interface BtnComponentProps {
 }
 
 const BtnComponent: React.FC<BtnComponentProps> = ( {
+  baseUrl,
   userInfo,
   refreshData,
   setIsSaved,
@@ -51,85 +50,61 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
     setIsSaved(true);
   }
 
-//   // useEffect if you want the annotations to appear automatically when the component mounts
-//   useEffect(() => {
-//   const fetchAnnotations = async () => {
-//     const username = userInfo?.role === 'reader' ? userInfo.username : 'all';
-
-//     try {
-//       const response = await fetch(`/webquiz/list-users-annotations?username=${username}`);
-//       if (!response.ok) throw new Error('Failed to fetch annotations');
-
-//       const { payload: annotationsList } = await response.json();
-//       setListOfUsersAnnotations(annotationsList);
-
-//       annotationsList.forEach(userAnnotationObjects => {
-//         userAnnotationObjects.forEach(fetchedAnnotation => {
-//           if (
-//             fetchedAnnotation &&
-//             typeof fetchedAnnotation.annotationUID === 'string' &&
-//             fetchedAnnotation.annotationUID.length > 0
-//           ) {
-//             annotation.state.addAnnotation(fetchedAnnotation);
-//           }
-//         });
-//       });
-//     } catch (error) {
-//       console.error('❌ Error fetching annotations:', error);
-//     }
-//   };
-
-//   fetchAnnotations();
-// }, [userInfo]);
-
-
   // get annotations from database based on user role
-  async function handleFetchAnnotationsClick() {
-    const username = userInfo?.role === 'reader' ? userInfo.username : 'all';
+  useEffect(() => {
+    // only run when userInfo and patientName are available
+    if (!userInfo?.username || !patientName) return;
 
-    try {
-      const response = await fetch(`https://localhost:3000/webquiz/list-users-annotations?username=${username}&patientid=${patientName}`, {
-        credentials: 'include'
-      });
+    const fetchAnnotations = async () => {
 
-      if (!response.ok) throw new Error('Failed to fetch annotations from DB');
-
-      const { payload: annotationsList, legend } = await response.json();
-      setListOfUsersAnnotations(annotationsList);
-
-      annotationsList.forEach(({ data, color }) => {
-        data.forEach(annotationObj => {
-          if (
-            annotationObj &&
-            typeof annotationObj.annotationUID === 'string' &&
-            annotationObj.annotationUID.length > 0
-          ) {
-
-            annotation.config.style.setAnnotationStyles(annotationObj.annotationUID, {
-              color: color,
-            });
-
-            annotation.state.addAnnotation(annotationObj);
-          }
+      const username = userInfo?.role === 'reader' ? userInfo.username : 'all';
+      
+      try {
+        const response = await fetch(`${baseUrl}/webquiz/list-users-annotations?username=${username}&patientid=${patientName}`, {
+          credentials: 'include'
         });
-      });
 
-      window.parent.postMessage({
-        type: 'update-legend',
-        legend: legend
-      }, '*');
+        if (!response.ok) throw new Error('Failed to fetch annotations from DB');
 
-    } catch (error) {
-      console.error('❌ Error fetching annotations:', error);
-    }
-  }
+        const { payload: annotationsList, legend } = await response.json();
+        setListOfUsersAnnotations(annotationsList);
+
+        annotationsList.forEach(({ data, color }) => {
+          data.forEach(annotationObj => {
+            if (
+              annotationObj &&
+              typeof annotationObj.annotationUID === 'string' &&
+              annotationObj.annotationUID.length > 0
+            ) {
+
+              annotation.config.style.setAnnotationStyles(annotationObj.annotationUID, {
+                color: color,
+              });
+
+              annotation.state.addAnnotation(annotationObj);
+            }
+          });
+        });
+
+
+        window.parent.postMessage({
+          type: 'update-legend',
+          legend: legend
+        }, '*');
+
+      } catch (error) {
+        console.error('❌ Error fetching annotations:', error);
+      }
+    };
+
+    // trigger the fetch
+    fetchAnnotations();
+  }, [userInfo, patientName]);
   
   return (
       <div>
         <br></br>
         <br></br>
-        <Button onClick={handleFetchAnnotationsClick}>{userDefinedBtnLabel(userInfo)}</Button>
-        <br/><br/>
         <Button onClick={handleUploadAnnotationsClick}>Submit measurements</Button>
       </div>
   );

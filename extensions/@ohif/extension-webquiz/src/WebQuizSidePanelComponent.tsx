@@ -7,7 +7,8 @@ import { annotation } from '@cornerstonejs/tools';
 import { useStudyInfoStore } from './stores/useStudyInfoStore';
 import { useStudyInfo } from './hooks/useStudyInfo';
 import { usePatientInfo } from '@ohif/extension-default';
-import { forEach } from 'platform/core/src/utils/hierarchicalListUtils';
+// import { forEach } from 'platform/core/src/utils/hierarchicalListUtils';
+import { API_BASE_URL } from './config/config';
 
 /**
  *  Creating a React component to be used as a side panel in OHIF.
@@ -21,6 +22,8 @@ function WebQuizSidePanelComponent() {
     const [annotationData, setAnnotationData] = useState([]);
     const [userInfo, setUserInfo] = useState(null);
     const [isSaved, setIsSaved] = useState(true);
+    console.log("🔍 API Base URL:", API_BASE_URL);
+
 
     // ---------------------------------------------
     // Hook Setup for Study Metadata
@@ -197,6 +200,7 @@ function WebQuizSidePanelComponent() {
     return (
         <div className="text-white w-full text-center">
         <BtnComponent
+            baseUrl={API_BASE_URL}
             userInfo={userInfo} 
             refreshData={refreshData}
             setIsSaved={setIsSaved}
