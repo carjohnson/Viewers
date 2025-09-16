@@ -7,8 +7,7 @@ import { annotation } from '@cornerstonejs/tools';
 import { useStudyInfoStore } from './stores/useStudyInfoStore';
 import { useStudyInfo } from './hooks/useStudyInfo';
 import { usePatientInfo } from '@ohif/extension-default';
-
-
+import { forEach } from 'platform/core/src/utils/hierarchicalListUtils';
 
 /**
  *  Creating a React component to be used as a side panel in OHIF.
@@ -64,13 +63,31 @@ function WebQuizSidePanelComponent() {
     type AnnotationStats = Record<string, Record<string, unknown>>;     // generic for capture of cachedStats object
     // Annotations listeners
     useEffect(() => {
+        if (!userInfo?.username) return;
+
+        const handleAnnotationAdd = (event) => {
+        if (!userInfo?.username) {
+            console.warn("⚠️ Username not available yet. Skipping label assignment.");
+            return;
+        }
+            setTimeout(() => {
+                const measurementIndex = getLastIndexStored() + 1;
+                const customLabel = `${userInfo.username}_${measurementIndex}`;
+
+                const { annotation } = event.detail;
+                if (annotation.data.label === "") {
+                annotation.data.label = customLabel;
+                }
+            }, 200);  // give measurement service time to render proper labels
+            };
+        
         const handleAnnotationChange = () => {
             const lo_annotationStats = getAnnotationsStats();
             setAnnotationData(lo_annotationStats);
         } ;
 
         // Register listeners
-        // cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_ADDED, handleAnnotationChange);
+        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_ADDED, handleAnnotationAdd);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, handleAnnotationChange);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, handleAnnotationChange);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, handleAnnotationChange);
@@ -78,12 +95,12 @@ function WebQuizSidePanelComponent() {
 
         // Cleanup on unmount
         return() => {
-            // cornerstone.eventTarget.removeEventListener(cornerstoneTools.Enums.Events.ANNOTATION_ADDED, handleAnnotationChange);
+            cornerstone.eventTarget.removeEventListener(cornerstoneTools.Enums.Events.ANNOTATION_ADDED, handleAnnotationAdd);
             cornerstone.eventTarget.removeEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, handleAnnotationChange);
             cornerstone.eventTarget.removeEventListener(cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, handleAnnotationChange);
             cornerstone.eventTarget.removeEventListener(cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, handleAnnotationChange);
         }
-    }, [] );
+    }, [userInfo] );
 
 
     //=====================
@@ -140,6 +157,28 @@ function WebQuizSidePanelComponent() {
 
         return lo_annotationStats;
     };
+
+    //=====================
+    // function to get the last index used when adding annotations
+    const getLastIndexStored = (): number => {
+        let iLastIndex = 0;
+        const allAnnotations = annotation.state.getAllAnnotations();
+
+        allAnnotations.forEach((oAnnotation, index) => {
+        // console.log("🧩 Annotation object:", oAnnotation);
+        const sLabel = oAnnotation?.data?.label;
+            if (sLabel) {
+                let iCurrentIndex = parseInt(sLabel.split('_').pop() ?? "0", 10);
+                if (isNaN(iCurrentIndex)) {
+                    iCurrentIndex = 99
+                }
+                iLastIndex = Math.max(iLastIndex, iCurrentIndex);
+            }
+        });
+
+        return iLastIndex;
+    };
+
 
 
     //=====================
