@@ -9,6 +9,8 @@ import { useStudyInfo } from './hooks/useStudyInfo';
 import { usePatientInfo } from '@ohif/extension-default';
 // import { forEach } from 'platform/core/src/utils/hierarchicalListUtils';
 import { API_BASE_URL } from './config/config';
+import { AnnotationStats } from './components/annotationStats';
+import { debounce } from './utils/debounce';
 
 /**
  *  Creating a React component to be used as a side panel in OHIF.
@@ -19,11 +21,10 @@ function WebQuizSidePanelComponent() {
     //  as the other components may be updating asynchronously and this
     //  component needs to be subscribed to those updates
 
-    const [annotationData, setAnnotationData] = useState([]);
+    const [annotationData, setAnnotationData] = useState<AnnotationStats[]>([]);
     const [userInfo, setUserInfo] = useState(null);
     const [isSaved, setIsSaved] = useState(true);
     console.log("🔍 API Base URL:", API_BASE_URL);
-
 
     // ---------------------------------------------
     // Hook Setup for Study Metadata
@@ -41,6 +42,7 @@ function WebQuizSidePanelComponent() {
     const { patientInfo } = usePatientInfo();
     const studyInfoFromHook = useStudyInfo();
     const { studyInfo, setStudyInfo } = useStudyInfoStore();
+
 
     useEffect(() => {
         if (!studyInfoFromHook?.studyUID || !patientInfo?.PatientName) {
@@ -62,32 +64,37 @@ function WebQuizSidePanelComponent() {
     // console.log('🧠 useStudyInfo() returned:', studyInfoFromHook);
     // console.log('📦 Zustand store currently holds:', studyInfo);
     
-
-    type AnnotationStats = Record<string, Record<string, unknown>>;     // generic for capture of cachedStats object
     // Annotations listeners
     useEffect(() => {
         if (!userInfo?.username) return;
 
         const handleAnnotationAdd = (event) => {
-        if (!userInfo?.username) {
-            console.warn("⚠️ Username not available yet. Skipping label assignment.");
-            return;
-        }
+            if (!userInfo?.username) {
+                console.warn("⚠️ Username not available yet. Skipping label assignment.");
+                return;
+            }
             setTimeout(() => {
                 const measurementIndex = getLastIndexStored() + 1;
                 const customLabel = `${userInfo.username}_${measurementIndex}`;
 
                 const { annotation } = event.detail;
                 if (annotation.data.label === "") {
-                annotation.data.label = customLabel;
+                    annotation.data.label = customLabel;
                 }
             }, 200);  // give measurement service time to render proper labels
-            };
-        
+            debouncedUpdateStats(); // wait for system to settle after add
+
+        };
+
+        // delay acquiring stats to let ohif complete the add of the annotation
+        const debouncedUpdateStats = debounce(() => {
+            setAnnotationData(getAnnotationsStats());
+        }, 100);
+
         const handleAnnotationChange = () => {
-            const lo_annotationStats = getAnnotationsStats();
-            setAnnotationData(lo_annotationStats);
-        } ;
+            debouncedUpdateStats();
+        };        
+
 
         // Register listeners
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_ADDED, handleAnnotationAdd);
@@ -146,15 +153,25 @@ function WebQuizSidePanelComponent() {
 
     //=====================
     // function to get list of all cached annotation stats
+    //  also store the annotation uid
     const getAnnotationsStats = (): AnnotationStats[] => {
         const lo_annotationStats: AnnotationStats[] = [];
         const allAnnotations = annotation.state.getAllAnnotations();
 
         allAnnotations.forEach((ann, index) => {
             const stats = ann.data?.cachedStats as AnnotationStats;
-            if (stats && Object.keys(stats).length > 0) {
-                lo_annotationStats.push(stats);
-                // console.log("ANNOTATION Tool ===>", ` Annotation ${index}:`, ann.data.cachedStats);
+            const uid = ann.annotationUID;
+
+            if (
+                stats &&
+                Object.keys(stats).length > 0 &&
+                uid &&
+                !lo_annotationStats.some(existing => existing.uid === uid)
+            ) {
+                lo_annotationStats.push({
+                    ...stats,
+                    uid,
+                });
             }
         });
 
@@ -188,21 +205,18 @@ function WebQuizSidePanelComponent() {
     const refreshData = () => {
         const lo_annotationStats = getAnnotationsStats();
         setAnnotationData(lo_annotationStats);
-        
-        return [lo_annotationStats]; // ensures stats are updated before continuing
+
+        return lo_annotationStats; // ensures stats are updated before continuing
     };
 
     ////////////////////////////////////////////
-    //=====================
-    // return
-    //=====================
     ////////////////////////////////////////////
     return (
         <div className="text-white w-full text-center">
         <BtnComponent
             baseUrl={API_BASE_URL}
             userInfo={userInfo} 
-            refreshData={refreshData}
+            annotationData={annotationData}
             setIsSaved={setIsSaved}
             studyInfo={studyInfo}
         />

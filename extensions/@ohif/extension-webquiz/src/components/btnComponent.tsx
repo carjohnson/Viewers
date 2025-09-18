@@ -1,11 +1,16 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Button } from '@ohif/ui-next';
 import { annotation } from '@cornerstonejs/tools';
+import { AnnotationStats } from './components/annotationStats';
+
+import { useSystem } from '@ohif/core';
+import { EyeIcon, EyeOffIcon } from '../utils/CreateCustomIcon';
+
 
 interface BtnComponentProps {
   baseUrl: string,
   userInfo: any;
-  refreshData: () => void;
+  annotationData: AnnotationStats[];
   setIsSaved: (value: boolean) => void;
   studyInfo: any;
 }
@@ -13,7 +18,7 @@ interface BtnComponentProps {
 const BtnComponent: React.FC<BtnComponentProps> = ( {
   baseUrl,
   userInfo,
-  refreshData,
+  annotationData,
   setIsSaved,
   studyInfo
 }) => {
@@ -55,7 +60,7 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
     // only run when userInfo and patientName are available
     if (!userInfo?.username || !patientName) return;
 
-    const fetchAnnotations = async () => {
+    const fetchAnnotationsFromDB = async () => {
 
       const username = userInfo?.role === 'reader' ? userInfo.username : 'all';
       
@@ -98,14 +103,91 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
     };
 
     // trigger the fetch
-    fetchAnnotations();
+    fetchAnnotationsFromDB();
   }, [userInfo, patientName]);
-  
+
+      
+  const { servicesManager } = useSystem();
+  const { measurementService } = servicesManager.services;
+  const { viewportGridService } = servicesManager.services;
+  const activeViewportId = viewportGridService.getActiveViewportId();
+  const measurementList = measurementService.getMeasurements();
+  const [visibilityMap, setVisibilityMap] = useState<Record<string, boolean>>({});
+
+  const handleMeasurementClick = (measurementId: string) => {
+    const ohifAnnotation = annotation.state.getAnnotation(measurementId);
+    if (ohifAnnotation) {
+      measurementService.jumpToMeasurement(activeViewportId, measurementId);
+    } else {
+      console.warn('No annotation found for UID:', measurementId);
+    }
+  }
+
+  const toggleVisibility = (uid: string) => {
+    const currentVisibility = visibilityMap[uid] ?? true;
+    const newVisibility = !currentVisibility;
+
+    measurementService.toggleVisibilityMeasurement(uid, newVisibility);
+
+    setVisibilityMap(prev => ({
+      ...prev,
+      [uid]: newVisibility,
+    }));
+  };
+
   return (
       <div>
         <br></br>
         <br></br>
         <Button onClick={handleUploadAnnotationsClick}>Submit measurements</Button>
+        <br></br>
+        <br></br>
+        <div>
+          <h3>Annotations</h3>
+          <ul>
+            {measurementList.map((measurement, index) => {
+              const uid = measurement.uid;
+              const isVisible = visibilityMap[uid] ?? true;
+
+              return (
+                <li
+                  key={uid || index}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '4px',
+                    borderBottom: '1px solid #ccc',
+                  }}
+                >
+                  <span
+                    style={{ flexGrow: 1, cursor: 'pointer' }}
+                    onClick={() => handleMeasurementClick(uid)}
+                  >
+                    {measurement.label || `Measurement ${index + 1}`}
+                  </span>
+
+                  <span
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => toggleVisibility(uid)}
+                    title={isVisible ? 'Hide annotation' : 'Show annotation'}
+                  >
+                    {isVisible ? <EyeIcon /> : <EyeOffIcon />}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+        {/* <div>
+          <h3>UIDs</h3>
+          <ul>
+            {annotationData.map((m, index) => (
+              <li key={index}>
+                {m.uid || `Index ${index + 1}`}
+              </li>
+            ))}
+          </ul>
+        </div> */}
       </div>
   );
 }
