@@ -1,11 +1,15 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Button } from '@ohif/ui-next';
 import { annotation } from '@cornerstonejs/tools';
+import { AnnotationStats } from './components/annotationStats';
+
+import { useSystem } from '@ohif/core';
+
 
 interface BtnComponentProps {
   baseUrl: string,
   userInfo: any;
-  refreshData: () => void;
+  annotationData: AnnotationStats[];
   setIsSaved: (value: boolean) => void;
   studyInfo: any;
 }
@@ -13,7 +17,7 @@ interface BtnComponentProps {
 const BtnComponent: React.FC<BtnComponentProps> = ( {
   baseUrl,
   userInfo,
-  refreshData,
+  annotationData,
   setIsSaved,
   studyInfo
 }) => {
@@ -55,7 +59,7 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
     // only run when userInfo and patientName are available
     if (!userInfo?.username || !patientName) return;
 
-    const fetchAnnotations = async () => {
+    const fetchAnnotationsFromDB = async () => {
 
       const username = userInfo?.role === 'reader' ? userInfo.username : 'all';
       
@@ -98,14 +102,63 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
     };
 
     // trigger the fetch
-    fetchAnnotations();
+    fetchAnnotationsFromDB();
   }, [userInfo, patientName]);
-  
+
+      
+  const { servicesManager } = useSystem();
+  const { measurementService } = servicesManager.services;
+  const { viewportGridService } = servicesManager.services;
+  const activeViewportId = viewportGridService.getActiveViewportId();
+  const measurementList = measurementService.getMeasurements();
+
+  console.log('Annotation Data:', annotationData);
+
+  const handleMeasurementClick = (measurementId: string) => {
+    const ohifAnnotation = annotation.state.getAnnotation(measurementId);
+    if (ohifAnnotation) {
+      measurementService.jumpToMeasurement(activeViewportId, measurementId);
+    } else {
+      console.warn('No annotation found for UID:', measurementId);
+    }
+  }
+
   return (
       <div>
         <br></br>
         <br></br>
         <Button onClick={handleUploadAnnotationsClick}>Submit measurements</Button>
+        <br></br>
+        <br></br>
+        <div>
+          <h3>Annotations</h3>
+          <ul>
+            {measurementList.map((measurement, index) => {
+              const matchingAnnotation = annotationData.find(
+                ann => ann.uid === measurement.uid
+              );
+              return (
+                <li
+                  key={measurement.uid || index}
+                  style={{ cursor: 'pointer', padding: '4px', borderBottom: '1px solid #ccc' }}
+                  onClick={() => handleMeasurementClick(measurement.uid)}
+                >
+                  {measurement.label || `Measurement ${index + 1}`}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+        {/* <div>
+          <h3>UIDs</h3>
+          <ul>
+            {annotationData.map((m, index) => (
+              <li key={index}>
+                {m.uid || `Index ${index + 1}`}
+              </li>
+            ))}
+          </ul>
+        </div> */}
       </div>
   );
 }
