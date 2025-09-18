@@ -4,6 +4,7 @@ import { annotation } from '@cornerstonejs/tools';
 import { AnnotationStats } from './components/annotationStats';
 
 import { useSystem } from '@ohif/core';
+import { EyeIcon, EyeOffIcon } from '../utils/CreateCustomIcon';
 
 
 interface BtnComponentProps {
@@ -111,8 +112,7 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
   const { viewportGridService } = servicesManager.services;
   const activeViewportId = viewportGridService.getActiveViewportId();
   const measurementList = measurementService.getMeasurements();
-
-  console.log('Annotation Data:', annotationData);
+  const [visibilityMap, setVisibilityMap] = useState<Record<string, boolean>>({});
 
   const handleMeasurementClick = (measurementId: string) => {
     const ohifAnnotation = annotation.state.getAnnotation(measurementId);
@@ -122,6 +122,18 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
       console.warn('No annotation found for UID:', measurementId);
     }
   }
+
+  const toggleVisibility = (uid: string) => {
+    const currentVisibility = visibilityMap[uid] ?? true;
+    const newVisibility = !currentVisibility;
+
+    measurementService.toggleVisibilityMeasurement(uid, newVisibility);
+
+    setVisibilityMap(prev => ({
+      ...prev,
+      [uid]: newVisibility,
+    }));
+  };
 
   return (
       <div>
@@ -134,16 +146,33 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
           <h3>Annotations</h3>
           <ul>
             {measurementList.map((measurement, index) => {
-              const matchingAnnotation = annotationData.find(
-                ann => ann.uid === measurement.uid
-              );
+              const uid = measurement.uid;
+              const isVisible = visibilityMap[uid] ?? true;
+
               return (
                 <li
-                  key={measurement.uid || index}
-                  style={{ cursor: 'pointer', padding: '4px', borderBottom: '1px solid #ccc' }}
-                  onClick={() => handleMeasurementClick(measurement.uid)}
+                  key={uid || index}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '4px',
+                    borderBottom: '1px solid #ccc',
+                  }}
                 >
-                  {measurement.label || `Measurement ${index + 1}`}
+                  <span
+                    style={{ flexGrow: 1, cursor: 'pointer' }}
+                    onClick={() => handleMeasurementClick(uid)}
+                  >
+                    {measurement.label || `Measurement ${index + 1}`}
+                  </span>
+
+                  <span
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => toggleVisibility(uid)}
+                    title={isVisible ? 'Hide annotation' : 'Show annotation'}
+                  >
+                    {isVisible ? <EyeIcon /> : <EyeOffIcon />}
+                  </span>
                 </li>
               );
             })}
