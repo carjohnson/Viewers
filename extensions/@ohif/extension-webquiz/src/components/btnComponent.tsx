@@ -5,6 +5,7 @@ import { AnnotationStats } from './components/annotationStats';
 
 import { useSystem } from '@ohif/core';
 import { EyeIcon, EyeOffIcon } from '../utils/CreateCustomIcon';
+import Select from 'react-select';
 
 
 interface BtnComponentProps {
@@ -113,6 +114,7 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
   const activeViewportId = viewportGridService.getActiveViewportId();
   const measurementList = measurementService.getMeasurements();
   const [visibilityMap, setVisibilityMap] = useState<Record<string, boolean>>({});
+  const [selectionMap, setSelectionMap] = useState<Record<string, string>>({});
 
   const handleMeasurementClick = (measurementId: string) => {
     const ohifAnnotation = annotation.state.getAnnotation(measurementId);
@@ -134,6 +136,24 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
       [uid]: newVisibility,
     }));
   };
+
+  const handleDropdownChange = (uid: string, value: string) => {
+    setSelectionMap(prev => ({
+      ...prev,
+      [uid]: value,
+    }));
+
+    console.log(`Selected "${value}" for UID ${uid}`);
+    // Eventually: send to backend or store in annotation.data
+  };  
+
+  const scoreOptions = [
+    { value: '1', label: 'definitely benign' },
+    { value: '2', label: 'probably benign' },
+    { value: '3', label: 'indeterminent' },
+    { value: '4', label: 'probably metastatic' },
+    { value: '5', label: 'definitely metastatic' },
+  ];
 
   return (
       <div>
@@ -159,6 +179,41 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
                     borderBottom: '1px solid #ccc',
                   }}
                 >
+
+                  {/* Dropdown */}
+                  <Select
+                    options={scoreOptions}
+                    value={scoreOptions.find(opt => opt.value === selectionMap[measurement.uid])}
+                    onChange={(selectedOption) =>
+                      handleDropdownChange(measurement.uid, selectedOption?.value)
+                    }
+                    getOptionLabel={(e) => e.value}
+                    styles={{
+                      control: (base) => ({
+                        ...base,
+                        backgroundColor: 'transparent',
+                        borderColor: '#ccc',
+                        color: 'white',
+                      }),
+                      singleValue: (base) => ({
+                        ...base,
+                        color: 'white',
+                      }),
+                      menu: (base) => ({
+                        ...base,
+                        backgroundColor: '#222',
+                        color: 'white',
+                      }),
+                      option: (base, state) => ({
+                        ...base,
+                        backgroundColor: state.isFocused ? '#444' : '#222',
+                        color: 'white',
+                      }),
+                    }}
+                    placeholder="Suspicion score"
+                  />
+
+                  {/* Measurement label */}
                   <span
                     style={{ flexGrow: 1, cursor: 'pointer' }}
                     onClick={() => handleMeasurementClick(uid)}
@@ -166,6 +221,7 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
                     {measurement.label || `Measurement ${index + 1}`}
                   </span>
 
+                  {/* Visibility Icon */}
                   <span
                     style={{ cursor: 'pointer' }}
                     onClick={() => toggleVisibility(uid)}
