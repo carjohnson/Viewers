@@ -30,14 +30,6 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
   const measurementListRef = useRef([]);
   const patientName = studyInfo?.patientName || null;
 
-  const userDefinedBtnLabel = () => {
-    if (userInfo?.role === "admin") {
-      return "Restore all users' measurements";
-    } else {
-      return "Restore measurements";
-    }
-  };
-
   const handleUploadAnnotationsClick = () => {
 
     // refresh the annotation data before posting

@@ -7,7 +7,6 @@ import { annotation } from '@cornerstonejs/tools';
 import { useStudyInfoStore } from './stores/useStudyInfoStore';
 import { useStudyInfo } from './hooks/useStudyInfo';
 import { usePatientInfo } from '@ohif/extension-default';
-// import { forEach } from 'platform/core/src/utils/hierarchicalListUtils';
 import { API_BASE_URL } from './config/config';
 import { AnnotationStats } from './components/annotationStats';
 import { debounce } from './utils/debounce';
@@ -29,25 +28,9 @@ function WebQuizSidePanelComponent() {
     const [isSaved, setIsSaved] = useState(true);
     const [annotationsLoaded, setAnnotationsLoaded] = useState(false);
 
-    console.log("🔍 API Base URL:", API_BASE_URL);
-    const { servicesManager } = useSystem();
-    const toolbarService = servicesManager.services.toolbarService;
-    const toolGroupService = servicesManager.services.toolGroupService;
-
-    const measurementTools = toolbarService.getButtonSection('MeasurementTools');
+    // console.log("🔍 API Base URL:", API_BASE_URL);
 
 
-    const toolGroupIds = toolGroupService.getToolGroupIds();
-
-    toolGroupIds.forEach(id => {
-    const group = toolGroupService.getToolGroup(id);
-    // console.log(`🧠 ToolGroup ID: ${id}`);
-    // console.log('🧠  group', group)
-
-
-    });
-    const config = toolGroupService.getToolConfiguration('default', 'Length');
-    console.log('🔍 Length tool config:', config);
     // ---------------------------------------------
     // Hook Setup for Study Metadata
     // ---------------------------------------------
@@ -87,7 +70,7 @@ function WebQuizSidePanelComponent() {
     // console.log('📦 Zustand store currently holds:', studyInfo);
 
 
-// Annotations listeners
+    // Annotations listeners
     useEffect(() => {
         if (!userInfo?.username) return;
 
@@ -96,22 +79,17 @@ function WebQuizSidePanelComponent() {
                 console.warn("⚠️ Username not available yet. Skipping label assignment.");
                 return;
             }
-            // if (userInfo.role === 'admin') {
-            //     console.warn('Admins are not allowed to add annotations.');
-            //     return;
-            // } else {
-                setTimeout(() => {
-                    const measurementIndex = getLastIndexStored() + 1;
-                    const customLabel = `${userInfo.username}_${measurementIndex}`;
+            setTimeout(() => {
+                const measurementIndex = getLastIndexStored() + 1;
+                const customLabel = `${userInfo.username}_${measurementIndex}`;
 
-                    const { annotation } = event.detail;
-                    if (annotation.data.label === "") {
-                        annotation.data.label = customLabel;
-                    }
-                }, 200);  // give measurement service time to render proper labels
+                const { annotation } = event.detail;
+                if (annotation.data.label === "") {
+                    annotation.data.label = customLabel;
+                }
+            }, 200);  // give measurement service time to render proper labels
 
-                debouncedUpdateStats(); // wait for system to settle after add
-            // };
+            debouncedUpdateStats(); // wait for system to settle after add
         }
         
         // delay acquiring stats to let ohif complete the add of the annotation
@@ -120,12 +98,7 @@ function WebQuizSidePanelComponent() {
         }, 100);
 
         const handleAnnotationChange = () => {
-            if (userInfo.role === 'admin') {
-                console.warn('Admins are not allowed to modify annotations.');
-                return;
-            } else {
-                debouncedUpdateStats();
-            }
+            debouncedUpdateStats();
         };        
 
 
@@ -176,6 +149,16 @@ function WebQuizSidePanelComponent() {
         };
     }, []);
 
+    // wait for all annotations to be loaded, then set to locked if user role is 'admin'
+    useEffect(() => {
+        if (!annotationsLoaded || userInfo?.role !== 'admin') return;
+
+        annotation.state.getAllAnnotations().forEach(ann => {
+            ann.isLocked = true;
+        });
+
+        console.log('🔒 All annotations locked for admin user:', userInfo.username);
+    }, [userInfo, annotationsLoaded]);
 
     ////////////////////////////////////////////
     //=====================
@@ -235,12 +218,12 @@ function WebQuizSidePanelComponent() {
 
 
     //=====================
-    const refreshData = () => {
-        const lo_annotationStats = getAnnotationsStats();
-        setAnnotationData(lo_annotationStats);
+    // const refreshData = () => {
+    //     const lo_annotationStats = getAnnotationsStats();
+    //     setAnnotationData(lo_annotationStats);
 
-        return lo_annotationStats; // ensures stats are updated before continuing
-    };
+    //     return lo_annotationStats; // ensures stats are updated before continuing
+    // };
 
     ////////////////////////////////////////////
     ////////////////////////////////////////////
@@ -254,18 +237,6 @@ function WebQuizSidePanelComponent() {
             setIsSaved={setIsSaved}
             studyInfo={studyInfo}
         />
-        {/* {userInfo && (
-            <div>
-                <div>User Name: {userInfo.username}</div>
-                <div>User Role: {userInfo.role}</div>
-            </div>
-        )}
-        {studyInfo?.patientName && studyInfo?.studyUID && (
-            <div>
-                <div>Patient Name: {studyInfo.patientName}</div>
-                <div>StudyUID: {studyInfo.studyUID}</div>
-            </div>
-        )} */}
         </div>
     );    
 
