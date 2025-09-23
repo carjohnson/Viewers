@@ -10,7 +10,7 @@ import { usePatientInfo } from '@ohif/extension-default';
 import { API_BASE_URL } from './config/config';
 import { AnnotationStats } from './components/annotationStats';
 import { debounce } from './utils/debounce';
-import { useSystem } from '@ohif/core';
+import { setUserInfo, getUserInfo } from './../../../../modes/@ohif/mode-webquiz/src/userInfoService';
 
 
 
@@ -24,9 +24,12 @@ function WebQuizSidePanelComponent() {
     //  component needs to be subscribed to those updates
 
     const [annotationData, setAnnotationData] = useState<AnnotationStats[]>([]);
-    const [userInfo, setUserInfo] = useState(null);
+    // const [userInfo, setUserInfo] = useState(null);
     const [isSaved, setIsSaved] = useState(true);
     const [annotationsLoaded, setAnnotationsLoaded] = useState(false);
+
+    const userInfo = getUserInfo();
+
 
     // console.log("🔍 API Base URL:", API_BASE_URL);
 
@@ -70,7 +73,7 @@ function WebQuizSidePanelComponent() {
     // console.log('📦 Zustand store currently holds:', studyInfo);
 
 
-    // Annotations listeners
+    // Annotations listeners and handlers
     useEffect(() => {
         if (!userInfo?.username) return;
 
@@ -126,28 +129,6 @@ function WebQuizSidePanelComponent() {
             // console.log(' Annotation Change');
         }
     }, [annotationData]);
-
-
-    // get user info from parent iframehost
-    useEffect(() => {
-        // send request to parent for user info
-        window.parent.postMessage({ type: 'request-user-info'}, '*');
-
-        // Listen for response
-        const handleMessage = (event) => {
-            if (event.data.type === 'user-info') {
-                console.log('✅ Viewer > Received user info >>>:', event.data.payload);
-                setUserInfo(event.data.payload);
-            }
-        };
-
-        window.addEventListener('message', handleMessage);
-
-        // Cleanup listener on unmount
-        return () => {
-            window.removeEventListener('message', handleMessage);
-        };
-    }, []);
 
     // wait for all annotations to be loaded, then set to locked if user role is 'admin'
     useEffect(() => {
@@ -217,22 +198,12 @@ function WebQuizSidePanelComponent() {
 
 
 
-    //=====================
-    // const refreshData = () => {
-    //     const lo_annotationStats = getAnnotationsStats();
-    //     setAnnotationData(lo_annotationStats);
-
-    //     return lo_annotationStats; // ensures stats are updated before continuing
-    // };
-
     ////////////////////////////////////////////
     ////////////////////////////////////////////
     return (
         <div className="text-white w-full text-center">
         <BtnComponent
             baseUrl={API_BASE_URL}
-            userInfo={userInfo} 
-            annotationData={annotationData}
             setAnnotationsLoaded={setAnnotationsLoaded}
             setIsSaved={setIsSaved}
             studyInfo={studyInfo}

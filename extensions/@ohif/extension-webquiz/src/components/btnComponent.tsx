@@ -6,12 +6,12 @@ import { AnnotationStats } from './components/annotationStats';
 import { useSystem } from '@ohif/core';
 import { EyeIcon, EyeOffIcon } from '../utils/CreateCustomIcon';
 import Select from 'react-select';
+import { setUserInfo, getUserInfo } from './../../../../../modes/@ohif/mode-webquiz/src/userInfoService';
+
 
 
 interface BtnComponentProps {
   baseUrl: string,
-  userInfo: any;
-  annotationData: AnnotationStats[];
   setAnnotationsLoaded: (value: boolean) => void;
   setIsSaved: (value: boolean) => void;
   studyInfo: any;
@@ -19,8 +19,6 @@ interface BtnComponentProps {
 
 const BtnComponent: React.FC<BtnComponentProps> = ( {
   baseUrl,
-  userInfo,
-  annotationData,
   setAnnotationsLoaded,
   setIsSaved,
   studyInfo
@@ -29,6 +27,7 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
   const [listOfUsersAnnotations, setListOfUsersAnnotations] = useState(null);
   const measurementListRef = useRef([]);
   const patientName = studyInfo?.patientName || null;
+  const userInfo = getUserInfo();
 
   const handleUploadAnnotationsClick = () => {
 
@@ -101,7 +100,9 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
     fetchAnnotationsFromDB();
   }, [userInfo, patientName]);
 
-      
+  // Set up GUI so the user can click on an annotation in the panel list
+  //    and have the image jump to the corresponding slice
+  //    also - set up a visibility icon for each annotation
   const { servicesManager } = useSystem();
   const { measurementService } = servicesManager.services;
   const { viewportGridService } = servicesManager.services;
@@ -228,16 +229,6 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
             })}
           </ul>
         </div>
-        {/* <div>
-          <h3>UIDs</h3>
-          <ul>
-            {annotationData.map((m, index) => (
-              <li key={index}>
-                {m.uid || `Index ${index + 1}`}
-              </li>
-            ))}
-          </ul>
-        </div> */}
       </div>
   );
 }

@@ -3,6 +3,7 @@ import { id } from './id';
 import initToolGroups from './initToolGroups';
 import toolbarButtons from './toolbarButtons';
 import { hotkeys } from '@ohif/core';
+import { setUserInfo, getUserInfo, onUserInfoReady } from './userInfoService';
 
 const configs = {
   Length: {},
@@ -144,8 +145,9 @@ function modeFactory({ modeConfiguration }) {
       //=============================
       //Primary tools are based on the user's role
       //  - admins are not allowed to add or change annotations created by the MeasurementTools
+      //  - request user info from server and wait for 'ready'
 
-      // Send request to parent to get the user info
+      // Send request to parent iframehost to get the user info
       window.parent.postMessage({ type: 'request-user-info' }, '*');
 
       // Listen for response
@@ -153,6 +155,17 @@ function modeFactory({ modeConfiguration }) {
         if (event.data.type === 'user-info') {
           const userInfo = event.data.payload;
           console.log('✅ Mode > Received user info:', userInfo);
+          setUserInfo(userInfo);    // to be available globally
+
+          // Clean up listener
+          window.removeEventListener('message', handleMessage);
+        }
+      };
+
+      window.addEventListener('message', handleMessage);
+
+      // React when userInfo is ready - in case there is a delay from server
+      onUserInfoReady(userInfo => {
 
           const commonPrimaryTools = [
             'Zoom',
@@ -171,12 +184,8 @@ function modeFactory({ modeConfiguration }) {
 
           toolbarService.updateSection(toolbarService.sections.primary, primaryTools);
 
-          // Clean up listener
-          window.removeEventListener('message', handleMessage);
-        }
-      };
+      });
 
-      window.addEventListener('message', handleMessage);
       //=============================
 
     },  // end onModeEnter
