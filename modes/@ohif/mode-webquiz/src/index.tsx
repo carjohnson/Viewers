@@ -46,6 +46,7 @@ function modeFactory({ modeConfiguration }) {
     displayName: 'Liver Study',
 
     onModeEnter:({servicesManager, extensionManager, commandsManager }: withAppTypes) => {
+
       const { measurementService, toolbarService, toolGroupService, customizationService } =
         servicesManager.services;
 
@@ -55,17 +56,6 @@ function modeFactory({ modeConfiguration }) {
       initToolGroups(extensionManager, toolGroupService, commandsManager);
 
       toolbarService.register(toolbarButtons);
-      toolbarService.updateSection(toolbarService.sections.primary, [
-        'MeasurementTools',
-        'Zoom',
-        'Pan',
-        'TrackballRotate',
-        'WindowLevel',
-        'Capture',
-        'Layout',
-        'Crosshairs',
-        'MoreTools',
-      ]);
 
       toolbarService.updateSection(toolbarService.sections.viewportActionMenu.topLeft, [
         'orientationMenu',
@@ -151,8 +141,45 @@ function modeFactory({ modeConfiguration }) {
       ]);
       toolbarService.updateSection('BrushTools', ['Brush', 'Eraser', 'Threshold']);
 
-    
-    },
+      //=============================
+      //Primary tools are based on the user's role
+      //  - admins are not allowed to add or change annotations created by the MeasurementTools
+
+      // Send request to parent to get the user info
+      window.parent.postMessage({ type: 'request-user-info' }, '*');
+
+      // Listen for response
+      const handleMessage = event => {
+        if (event.data.type === 'user-info') {
+          const userInfo = event.data.payload;
+          console.log('✅ Mode > Received user info:', userInfo);
+
+          const commonPrimaryTools = [
+            'Zoom',
+            'Pan',
+            'TrackballRotate',
+            'WindowLevel',
+            'Capture',
+            'Layout',
+            'Crosshairs',
+            'MoreTools',
+          ];
+
+          const primaryTools = userInfo.role === 'admin'
+            ? commonPrimaryTools
+            : ['MeasurementTools', ...commonPrimaryTools];
+
+          toolbarService.updateSection(toolbarService.sections.primary, primaryTools);
+
+          // Clean up listener
+          window.removeEventListener('message', handleMessage);
+        }
+      };
+
+      window.addEventListener('message', handleMessage);
+      //=============================
+
+    },  // end onModeEnter
 
     onModeExit: ({ servicesManager }: withAppTypes) => {
       const {

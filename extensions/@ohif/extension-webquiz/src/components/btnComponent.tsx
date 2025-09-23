@@ -12,6 +12,7 @@ interface BtnComponentProps {
   baseUrl: string,
   userInfo: any;
   annotationData: AnnotationStats[];
+  setAnnotationsLoaded: (value: boolean) => void;
   setIsSaved: (value: boolean) => void;
   studyInfo: any;
 }
@@ -20,6 +21,7 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
   baseUrl,
   userInfo,
   annotationData,
+  setAnnotationsLoaded,
   setIsSaved,
   studyInfo
 }) => {
@@ -92,7 +94,7 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
           });
         });
 
-
+        setAnnotationsLoaded(true);
         window.parent.postMessage({
           type: 'update-legend',
           legend: legend

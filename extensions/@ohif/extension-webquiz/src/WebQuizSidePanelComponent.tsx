@@ -11,6 +11,9 @@ import { usePatientInfo } from '@ohif/extension-default';
 import { API_BASE_URL } from './config/config';
 import { AnnotationStats } from './components/annotationStats';
 import { debounce } from './utils/debounce';
+import { useSystem } from '@ohif/core';
+
+
 
 /**
  *  Creating a React component to be used as a side panel in OHIF.
@@ -24,8 +27,27 @@ function WebQuizSidePanelComponent() {
     const [annotationData, setAnnotationData] = useState<AnnotationStats[]>([]);
     const [userInfo, setUserInfo] = useState(null);
     const [isSaved, setIsSaved] = useState(true);
-    console.log("🔍 API Base URL:", API_BASE_URL);
+    const [annotationsLoaded, setAnnotationsLoaded] = useState(false);
 
+    console.log("🔍 API Base URL:", API_BASE_URL);
+    const { servicesManager } = useSystem();
+    const toolbarService = servicesManager.services.toolbarService;
+    const toolGroupService = servicesManager.services.toolGroupService;
+
+    const measurementTools = toolbarService.getButtonSection('MeasurementTools');
+
+
+    const toolGroupIds = toolGroupService.getToolGroupIds();
+
+    toolGroupIds.forEach(id => {
+    const group = toolGroupService.getToolGroup(id);
+    // console.log(`🧠 ToolGroup ID: ${id}`);
+    // console.log('🧠  group', group)
+
+
+    });
+    const config = toolGroupService.getToolConfiguration('default', 'Length');
+    console.log('🔍 Length tool config:', config);
     // ---------------------------------------------
     // Hook Setup for Study Metadata
     // ---------------------------------------------
@@ -63,8 +85,9 @@ function WebQuizSidePanelComponent() {
     //>>>>> for debug <<<<<
     // console.log('🧠 useStudyInfo() returned:', studyInfoFromHook);
     // console.log('📦 Zustand store currently holds:', studyInfo);
-    
-    // Annotations listeners
+
+
+// Annotations listeners
     useEffect(() => {
         if (!userInfo?.username) return;
 
@@ -73,26 +96,36 @@ function WebQuizSidePanelComponent() {
                 console.warn("⚠️ Username not available yet. Skipping label assignment.");
                 return;
             }
-            setTimeout(() => {
-                const measurementIndex = getLastIndexStored() + 1;
-                const customLabel = `${userInfo.username}_${measurementIndex}`;
+            // if (userInfo.role === 'admin') {
+            //     console.warn('Admins are not allowed to add annotations.');
+            //     return;
+            // } else {
+                setTimeout(() => {
+                    const measurementIndex = getLastIndexStored() + 1;
+                    const customLabel = `${userInfo.username}_${measurementIndex}`;
 
-                const { annotation } = event.detail;
-                if (annotation.data.label === "") {
-                    annotation.data.label = customLabel;
-                }
-            }, 200);  // give measurement service time to render proper labels
-            debouncedUpdateStats(); // wait for system to settle after add
+                    const { annotation } = event.detail;
+                    if (annotation.data.label === "") {
+                        annotation.data.label = customLabel;
+                    }
+                }, 200);  // give measurement service time to render proper labels
 
-        };
-
+                debouncedUpdateStats(); // wait for system to settle after add
+            // };
+        }
+        
         // delay acquiring stats to let ohif complete the add of the annotation
         const debouncedUpdateStats = debounce(() => {
             setAnnotationData(getAnnotationsStats());
         }, 100);
 
         const handleAnnotationChange = () => {
-            debouncedUpdateStats();
+            if (userInfo.role === 'admin') {
+                console.warn('Admins are not allowed to modify annotations.');
+                return;
+            } else {
+                debouncedUpdateStats();
+            }
         };        
 
 
@@ -101,7 +134,6 @@ function WebQuizSidePanelComponent() {
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, handleAnnotationChange);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, handleAnnotationChange);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, handleAnnotationChange);
-
 
         // Cleanup on unmount
         return() => {
@@ -173,6 +205,7 @@ function WebQuizSidePanelComponent() {
                     uid,
                 });
             }
+
         });
 
         return lo_annotationStats;
@@ -217,6 +250,7 @@ function WebQuizSidePanelComponent() {
             baseUrl={API_BASE_URL}
             userInfo={userInfo} 
             annotationData={annotationData}
+            setAnnotationsLoaded={setAnnotationsLoaded}
             setIsSaved={setIsSaved}
             studyInfo={studyInfo}
         />
