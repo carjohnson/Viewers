@@ -1,7 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Button } from '@ohif/ui-next';
 import { annotation } from '@cornerstonejs/tools';
-import { AnnotationStats } from './components/annotationStats';
 
 import { useSystem } from '@ohif/core';
 import { EyeIcon, EyeOffIcon } from '../utils/CreateCustomIcon';
@@ -23,26 +22,39 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
   setIsSaved,
   studyInfo
 }) => {
- 
+
+  const { servicesManager } = useSystem();
+  const { measurementService } = servicesManager.services;
+  const { viewportGridService } = servicesManager.services;
+  const activeViewportId = viewportGridService.getActiveViewportId();
+  const measurementList = measurementService.getMeasurements();
+  const [visibilityMap, setVisibilityMap] = useState<Record<string, boolean>>({});
+  const [selectionMap, setSelectionMap] = useState<Record<string, number>>({});
   const [listOfUsersAnnotations, setListOfUsersAnnotations] = useState(null);
   const measurementListRef = useRef([]);
   const patientName = studyInfo?.patientName || null;
   const userInfo = getUserInfo();
 
+  // ========================= Handles =======================
   const handleUploadAnnotationsClick = () => {
 
-    // refresh the annotation data before posting
-    // segmentation data is refreshed automatically through segmentation service
-    // const [freshMeasurementData, freshVolumeData] = refreshData();
     const allAnnotations = annotation.state.getAllAnnotations();
-    measurementListRef.current = [...allAnnotations];
-    
-    console.log("Number of annotation objects:", measurementListRef.current.length)
+    const annotationsWithStats = [];
+    allAnnotations.forEach((ann) => {
+      const uid = ann.annotationUID;
+      const selectedScore = selectionMap[uid];
+      if (ann.data?.cachedStats && Object.keys(ann.data.cachedStats).length > 0) {
+        if (typeof selectedScore === 'number') {
+          (ann as any).suspicionScore = selectedScore;
+          annotationsWithStats.push(ann);
+        }
+      }
+    });
+
+    measurementListRef.current = [...annotationsWithStats];
 
     window.parent.postMessage({
       type: 'annotations', 
-      // measurementdata   : freshMeasurementData,
-      // segmentationdata  : freshVolumeData,
       annotationObjects : measurementListRef.current,
       patientid         : patientName
     }, '*');
@@ -68,6 +80,27 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
         const { payload: annotationsList, legend } = await response.json();
         setListOfUsersAnnotations(annotationsList);
 
+        // ~~~~~~~~~~~~
+        // extract the suspicion scores from the list of annotations
+        const newSelectionMap = {};
+
+        annotationsList.forEach(({ data }) => {
+          data.forEach(annotationObj => {
+            if (
+              annotationObj &&
+              typeof annotationObj.annotationUID === 'string' &&
+              annotationObj.annotationUID.length > 0 &&
+              typeof annotationObj.suspicionScore === 'number'
+            ) {
+              newSelectionMap[annotationObj.annotationUID] = annotationObj.suspicionScore;
+            }
+          });
+        });
+
+        setSelectionMap(newSelectionMap);
+
+        // ~~~~~~~~~~~~
+        // use the cornerstone tools to add each annotation to the image
         annotationsList.forEach(({ data, color }) => {
           data.forEach(annotationObj => {
             if (
@@ -100,16 +133,10 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
     fetchAnnotationsFromDB();
   }, [userInfo, patientName]);
 
+  // ========================= GUI Functions =======================
   // Set up GUI so the user can click on an annotation in the panel list
   //    and have the image jump to the corresponding slice
   //    also - set up a visibility icon for each annotation
-  const { servicesManager } = useSystem();
-  const { measurementService } = servicesManager.services;
-  const { viewportGridService } = servicesManager.services;
-  const activeViewportId = viewportGridService.getActiveViewportId();
-  const measurementList = measurementService.getMeasurements();
-  const [visibilityMap, setVisibilityMap] = useState<Record<string, boolean>>({});
-  const [selectionMap, setSelectionMap] = useState<Record<string, string>>({});
 
   const handleMeasurementClick = (measurementId: string) => {
     const ohifAnnotation = annotation.state.getAnnotation(measurementId);
@@ -132,22 +159,20 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
     }));
   };
 
-  const handleDropdownChange = (uid: string, value: string) => {
+  const handleDropdownChange = (uid: string, value: number) => {
     setSelectionMap(prev => ({
       ...prev,
       [uid]: value,
     }));
-
-    console.log(`Selected "${value}" for UID ${uid}`);
-    // Eventually: send to backend or store in annotation.data
+    // console.log(`Selected "${value}" for UID ${uid}`);
   };  
 
   const scoreOptions = [
-    { value: '1', label: 'definitely benign' },
-    { value: '2', label: 'probably benign' },
-    { value: '3', label: 'indeterminent' },
-    { value: '4', label: 'probably metastatic' },
-    { value: '5', label: 'definitely metastatic' },
+    { value: 1, label: '1' },
+    { value: 2, label: '2' },
+    { value: 3, label: '3' },
+    { value: 4, label: '4' },
+    { value: 5, label: '5' },
   ];
 
   return (
@@ -159,6 +184,7 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
         <br></br>
         <div>
           <h3>Annotations</h3>
+          <h4 style={{ textAlign: 'left' }}>Score</h4>
           <ul>
             {measurementList.map((measurement, index) => {
               const uid = measurement.uid;
@@ -182,7 +208,7 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
                     onChange={(selectedOption) =>
                       handleDropdownChange(measurement.uid, selectedOption?.value)
                     }
-                    getOptionLabel={(e) => e.value}
+                    getOptionLabel={(e) => e.label}
                     styles={{
                       control: (base) => ({
                         ...base,
