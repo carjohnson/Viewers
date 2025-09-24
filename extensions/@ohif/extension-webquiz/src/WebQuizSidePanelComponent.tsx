@@ -7,10 +7,12 @@ import { annotation } from '@cornerstonejs/tools';
 import { useStudyInfoStore } from './stores/useStudyInfoStore';
 import { useStudyInfo } from './hooks/useStudyInfo';
 import { usePatientInfo } from '@ohif/extension-default';
-// import { forEach } from 'platform/core/src/utils/hierarchicalListUtils';
 import { API_BASE_URL } from './config/config';
 import { AnnotationStats } from './components/annotationStats';
 import { debounce } from './utils/debounce';
+import { setUserInfo, getUserInfo } from './../../../../modes/@ohif/mode-webquiz/src/userInfoService';
+
+
 
 /**
  *  Creating a React component to be used as a side panel in OHIF.
@@ -22,9 +24,15 @@ function WebQuizSidePanelComponent() {
     //  component needs to be subscribed to those updates
 
     const [annotationData, setAnnotationData] = useState<AnnotationStats[]>([]);
-    const [userInfo, setUserInfo] = useState(null);
+    // const [userInfo, setUserInfo] = useState(null);
     const [isSaved, setIsSaved] = useState(true);
-    console.log("🔍 API Base URL:", API_BASE_URL);
+    const [annotationsLoaded, setAnnotationsLoaded] = useState(false);
+
+    const userInfo = getUserInfo();
+
+
+    // console.log("🔍 API Base URL:", API_BASE_URL);
+
 
     // ---------------------------------------------
     // Hook Setup for Study Metadata
@@ -63,8 +71,9 @@ function WebQuizSidePanelComponent() {
     //>>>>> for debug <<<<<
     // console.log('🧠 useStudyInfo() returned:', studyInfoFromHook);
     // console.log('📦 Zustand store currently holds:', studyInfo);
-    
-    // Annotations listeners
+
+
+    // Annotations listeners and handlers
     useEffect(() => {
         if (!userInfo?.username) return;
 
@@ -82,10 +91,10 @@ function WebQuizSidePanelComponent() {
                     annotation.data.label = customLabel;
                 }
             }, 200);  // give measurement service time to render proper labels
+
             debouncedUpdateStats(); // wait for system to settle after add
-
-        };
-
+        }
+        
         // delay acquiring stats to let ohif complete the add of the annotation
         const debouncedUpdateStats = debounce(() => {
             setAnnotationData(getAnnotationsStats());
@@ -101,7 +110,6 @@ function WebQuizSidePanelComponent() {
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, handleAnnotationChange);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, handleAnnotationChange);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, handleAnnotationChange);
-
 
         // Cleanup on unmount
         return() => {
@@ -122,28 +130,16 @@ function WebQuizSidePanelComponent() {
         }
     }, [annotationData]);
 
-
-    // get user info from parent iframehost
+    // wait for all annotations to be loaded, then set to locked if user role is 'admin'
     useEffect(() => {
-        // send request to parent for user info
-        window.parent.postMessage({ type: 'request-user-info'}, '*');
+        if (!annotationsLoaded || userInfo?.role !== 'admin') return;
 
-        // Listen for response
-        const handleMessage = (event) => {
-            if (event.data.type === 'user-info') {
-                console.log('✅ Viewer > Received user info >>>:', event.data.payload);
-                setUserInfo(event.data.payload);
-            }
-        };
+        annotation.state.getAllAnnotations().forEach(ann => {
+            ann.isLocked = true;
+        });
 
-        window.addEventListener('message', handleMessage);
-
-        // Cleanup listener on unmount
-        return () => {
-            window.removeEventListener('message', handleMessage);
-        };
-    }, []);
-
+        console.log('🔒 All annotations locked for admin user:', userInfo.username);
+    }, [userInfo, annotationsLoaded]);
 
     ////////////////////////////////////////////
     //=====================
@@ -173,6 +169,7 @@ function WebQuizSidePanelComponent() {
                     uid,
                 });
             }
+
         });
 
         return lo_annotationStats;
@@ -201,37 +198,16 @@ function WebQuizSidePanelComponent() {
 
 
 
-    //=====================
-    const refreshData = () => {
-        const lo_annotationStats = getAnnotationsStats();
-        setAnnotationData(lo_annotationStats);
-
-        return lo_annotationStats; // ensures stats are updated before continuing
-    };
-
     ////////////////////////////////////////////
     ////////////////////////////////////////////
     return (
         <div className="text-white w-full text-center">
         <BtnComponent
             baseUrl={API_BASE_URL}
-            userInfo={userInfo} 
-            annotationData={annotationData}
+            setAnnotationsLoaded={setAnnotationsLoaded}
             setIsSaved={setIsSaved}
             studyInfo={studyInfo}
         />
-        {/* {userInfo && (
-            <div>
-                <div>User Name: {userInfo.username}</div>
-                <div>User Role: {userInfo.role}</div>
-            </div>
-        )}
-        {studyInfo?.patientName && studyInfo?.studyUID && (
-            <div>
-                <div>Patient Name: {studyInfo.patientName}</div>
-                <div>StudyUID: {studyInfo.studyUID}</div>
-            </div>
-        )} */}
         </div>
     );    
 
