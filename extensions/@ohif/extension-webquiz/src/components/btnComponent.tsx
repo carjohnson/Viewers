@@ -6,7 +6,8 @@ import { useSystem } from '@ohif/core';
 import { EyeIcon, EyeOffIcon } from '../utils/CreateCustomIcon';
 import Select from 'react-select';
 import { setUserInfo, getUserInfo } from './../../../../../modes/@ohif/mode-webquiz/src/userInfoService';
-
+import { useAnnotationPosting } from '../hooks/useAnnotationPosting';
+import { handleDropdownChange } from '../handlers/dropdownHandlers';
 
 
 interface BtnComponentProps {
@@ -46,48 +47,12 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
   // ========================= Handles =======================
 
   // ======== post annotations to DB
-  const handleUploadAnnotationsClick = () => {
-    const allAnnotations = annotation.state.getAllAnnotations();
 
-    // Filter valid annotations
-    const validAnnotations = allAnnotations.filter(
-      ann => ann.data?.cachedStats && Object.keys(ann.data.cachedStats).length > 0
-    );
+  const triggerPost = useAnnotationPosting({
+    patientName,
+    measurementListRef,
+    setIsSaved });
 
-    // Validate scores and prepare post payload
-    const annotationsWithStats = [];
-    const invalidUIDsMissingScore = [];
-
-    validAnnotations.forEach((ann) => {
-      const uid = ann.annotationUID;
-      const selectedScore = selectionMap[uid]; // use current state directly
-
-      if (typeof selectedScore === 'number' && selectedScore >= 1 && selectedScore <= 5) {
-        (ann as any).suspicionScore = selectedScore;
-        annotationsWithStats.push(ann);
-      } else {
-        invalidUIDsMissingScore.push(uid);
-      }
-    });
-
-    // Update ref for post
-    measurementListRef.current = [...annotationsWithStats];
-
-    // Warn if needed
-    if (invalidUIDsMissingScore.length > 0) {
-      alert('⚠️ Please select a valid suspicion score (1–5) for all measurements before submitting.');
-      return;
-    }
-
-    // Post to server
-    window.parent.postMessage({
-      type: 'annotations',
-      annotationObjects: measurementListRef.current,
-      patientid: patientName
-    }, '*');
-
-    setIsSaved(true);
-  };
 
   // ======== fetch annotations from DB based on user role
   useEffect(() => {
@@ -169,14 +134,17 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
     }));
   };
 
-  const handleDropdownChange = (uid: string, value: number) => {
-    setSelectionMap(prev => ({
-      ...prev,
-      [uid]: value,
-    }));
-    // console.log(`Selected "${value}" for UID ${uid}`);
-  };  
 
+const onDropdownChange = (uid: string, value: number) => {
+  handleDropdownChange({
+    uid,
+    value,
+    selectionMap,
+    setSelectionMap,
+    triggerPost,
+    annotation,
+  });
+};
   
   // ========================= Helper Functions =======================
   const updateSelectionMap= (lAnnotations) => {
@@ -207,7 +175,17 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
       <div>
         <br></br>
         <br></br>
-        <Button onClick={handleUploadAnnotationsClick}>Submit measurements</Button>
+        <Button
+          onClick={() =>
+            triggerPost({
+              allAnnotations: annotation.state.getAllAnnotations(),
+              selectionMap,
+            })
+          }
+        >
+          Submit measurements
+        </Button>
+
         <br></br>
         <br></br>
         <div>
@@ -233,9 +211,10 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
                   <Select
                     options={scoreOptions}
                     value={scoreOptions.find(opt => opt.value === selectionMap[measurement.uid])}
-                    onChange={(selectedOption) =>
-                      handleDropdownChange(measurement.uid, selectedOption?.value)
-                    }
+                    // onChange={(selectedOption) =>
+                    //   handleDropdownChange(measurement.uid, selectedOption?.value)
+                    // }
+                    onChange={(option) => onDropdownChange(uid, option.value)}
                     getOptionLabel={(e) => e.label}
                     styles={{
                       control: (base) => ({

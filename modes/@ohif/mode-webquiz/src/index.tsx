@@ -257,7 +257,8 @@ function modeFactory({ modeConfiguration }) {
             props: {
               leftPanels: [ ohif.thumbnailList],
               leftPanelResizable: true,
-              rightPanels: [ '@ohif/extension-webquiz.panelModule.webquiz', cornerstone.segmentation, cornerstone.measurements ],
+              // rightPanels: [ '@ohif/extension-webquiz.panelModule.webquiz', cornerstone.segmentation, cornerstone.measurements ],
+              rightPanels: [ '@ohif/extension-webquiz.panelModule.webquiz' ],
               rightPanelResizable: true,
               viewports: [
                 {
