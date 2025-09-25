@@ -35,33 +35,61 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
   const patientName = studyInfo?.patientName || null;
   const userInfo = getUserInfo();
 
-  // ========================= Handles =======================
-  const handleUploadAnnotationsClick = () => {
+  const scoreOptions = [
+    { value: 1, label: '1' },
+    { value: 2, label: '2' },
+    { value: 3, label: '3' },
+    { value: 4, label: '4' },
+    { value: 5, label: '5' },
+  ];
 
+  // ========================= Handles =======================
+
+  // ======== post annotations to DB
+  const handleUploadAnnotationsClick = () => {
     const allAnnotations = annotation.state.getAllAnnotations();
+
+    // Filter valid annotations
+    const validAnnotations = allAnnotations.filter(
+      ann => ann.data?.cachedStats && Object.keys(ann.data.cachedStats).length > 0
+    );
+
+    // Validate scores and prepare post payload
     const annotationsWithStats = [];
-    allAnnotations.forEach((ann) => {
+    const invalidUIDsMissingScore = [];
+
+    validAnnotations.forEach((ann) => {
       const uid = ann.annotationUID;
-      const selectedScore = selectionMap[uid];
-      if (ann.data?.cachedStats && Object.keys(ann.data.cachedStats).length > 0) {
-        if (typeof selectedScore === 'number') {
-          (ann as any).suspicionScore = selectedScore;
-          annotationsWithStats.push(ann);
-        }
+      const selectedScore = selectionMap[uid]; // use current state directly
+
+      if (typeof selectedScore === 'number' && selectedScore >= 1 && selectedScore <= 5) {
+        (ann as any).suspicionScore = selectedScore;
+        annotationsWithStats.push(ann);
+      } else {
+        invalidUIDsMissingScore.push(uid);
       }
     });
 
+    // Update ref for post
     measurementListRef.current = [...annotationsWithStats];
 
-    window.parent.postMessage({
-      type: 'annotations', 
-      annotationObjects : measurementListRef.current,
-      patientid         : patientName
-    }, '*');
-    setIsSaved(true);
-  }
+    // Warn if needed
+    if (invalidUIDsMissingScore.length > 0) {
+      alert('⚠️ Please select a valid suspicion score (1–5) for all measurements before submitting.');
+      return;
+    }
 
-  // get annotations from database based on user role
+    // Post to server
+    window.parent.postMessage({
+      type: 'annotations',
+      annotationObjects: measurementListRef.current,
+      patientid: patientName
+    }, '*');
+
+    setIsSaved(true);
+  };
+
+  // ======== fetch annotations from DB based on user role
   useEffect(() => {
     // only run when userInfo and patientName are available
     if (!userInfo?.username || !patientName) return;
@@ -80,26 +108,8 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
         const { payload: annotationsList, legend } = await response.json();
         setListOfUsersAnnotations(annotationsList);
 
-        // ~~~~~~~~~~~~
-        // extract the suspicion scores from the list of annotations
-        const newSelectionMap = {};
+        updateSelectionMap(annotationsList);
 
-        annotationsList.forEach(({ data }) => {
-          data.forEach(annotationObj => {
-            if (
-              annotationObj &&
-              typeof annotationObj.annotationUID === 'string' &&
-              annotationObj.annotationUID.length > 0 &&
-              typeof annotationObj.suspicionScore === 'number'
-            ) {
-              newSelectionMap[annotationObj.annotationUID] = annotationObj.suspicionScore;
-            }
-          });
-        });
-
-        setSelectionMap(newSelectionMap);
-
-        // ~~~~~~~~~~~~
         // use the cornerstone tools to add each annotation to the image
         annotationsList.forEach(({ data, color }) => {
           data.forEach(annotationObj => {
@@ -167,13 +177,31 @@ const BtnComponent: React.FC<BtnComponentProps> = ( {
     // console.log(`Selected "${value}" for UID ${uid}`);
   };  
 
-  const scoreOptions = [
-    { value: 1, label: '1' },
-    { value: 2, label: '2' },
-    { value: 3, label: '3' },
-    { value: 4, label: '4' },
-    { value: 5, label: '5' },
-  ];
+  
+  // ========================= Helper Functions =======================
+  const updateSelectionMap= (lAnnotations) => {
+    // extract the suspicion scores from the list of annotations
+    const newSelectionMap = {};
+
+    lAnnotations.forEach(({ data }) => {
+      data.forEach(annotationObj => {
+        if (
+          annotationObj &&
+          typeof annotationObj.annotationUID === 'string' &&
+          annotationObj.annotationUID.length > 0 &&
+          typeof annotationObj.suspicionScore === 'number'
+        ) {
+          newSelectionMap[annotationObj.annotationUID] = annotationObj.suspicionScore;
+        }
+      });
+    });
+
+    setSelectionMap(newSelectionMap);
+    return newSelectionMap;   // if immediate result is needed
+  }
+
+
+  // ========================= Render =======================
 
   return (
       <div>
