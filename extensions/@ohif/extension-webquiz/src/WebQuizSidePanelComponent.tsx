@@ -13,6 +13,12 @@ import { getAnnotationsStats } from './utils/annotationUtils';
 import { debounce } from './utils/debounce';
 import { setUserInfo, getUserInfo } from './../../../../modes/@ohif/mode-webquiz/src/userInfoService';
 import { getLastIndexStored } from './utils/annotationUtils';
+import { useAnnotationPosting } from './hooks/useAnnotationPosting';
+import { fetchAnnotationsFromDB } from './handlers/fetchAnnotations';
+import { handleDropdownChange } from './handlers/dropdownHandlers';
+import { handleMeasurementClick, toggleVisibility } from './handlers/guiHandlers';
+import { useSystem } from '@ohif/core';
+import { AnnotationList } from './components/AnnotationList';
 
 
 
@@ -31,10 +37,14 @@ function WebQuizSidePanelComponent() {
     const [isSaved, setIsSaved] = useState(true);
     const [annotationsLoaded, setAnnotationsLoaded] = useState(false);
     
+    const [visibilityMap, setVisibilityMap] = useState<Record<string, boolean>>({});
+    const [selectionMap, setSelectionMap] = useState<Record<string, number>>({});
+    const [listOfUsersAnnotations, setListOfUsersAnnotations] = useState(null);
+    const measurementListRef = useRef([]);    
 
     const userInfo = getUserInfo();
-
     // console.log("🔍 API Base URL:", API_BASE_URL);
+
     const scoreOptions = [
         { value: 1, label: '1' },
         { value: 2, label: '2' },
@@ -60,6 +70,7 @@ function WebQuizSidePanelComponent() {
     const { patientInfo } = usePatientInfo();
     const studyInfoFromHook = useStudyInfo();
     const { studyInfo, setStudyInfo } = useStudyInfoStore();
+    const patientName = patientInfo?.PatientName;
 
 
     useEffect(() => {
@@ -152,17 +163,88 @@ function WebQuizSidePanelComponent() {
         console.log('🔒 All annotations locked for admin user:', userInfo.username);
     }, [userInfo, annotationsLoaded]);
 
+    // ======== fetch annotations from DB based on user role
+    useEffect(() => {
+        if (!userInfo?.username || !patientName) return;
+
+        fetchAnnotationsFromDB({
+        userInfo,
+        patientName,
+        baseUrl: API_BASE_URL,
+        setListOfUsersAnnotations,
+        setSelectionMap,
+        annotation,
+        setAnnotationsLoaded,
+        });
+    }, [userInfo, patientName]);
+
 
     ////////////////////////////////////////////
+    // ======== post annotations to DB
+    const triggerPost = useAnnotationPosting({
+        patientName,
+        measurementListRef,
+        setIsSaved });
+
+
+////////////////////////////////////////////////////////////
+    const { servicesManager } = useSystem();
+    const { measurementService } = servicesManager.services;
+    const { viewportGridService } = servicesManager.services;
+    const activeViewportId = viewportGridService.getActiveViewportId();
+    const measurementList = measurementService.getMeasurements();        
+
+    const onMeasurementClick = (id: string) =>
+        handleMeasurementClick({ measurementId: id, annotation, measurementService, activeViewportId });
+
+    const onToggleVisibility = (uid: string) =>
+        toggleVisibility({ uid, visibilityMap, setVisibilityMap, measurementService });
+
+    const onDropdownChange = (uid: string, value: number) => {
+        handleDropdownChange({
+        uid,
+        value,
+        selectionMap,
+        setSelectionMap,
+        triggerPost,
+        annotation,
+        });
+    };        
     ////////////////////////////////////////////
     return (
         <div className="text-white w-full text-center">
-        <BtnComponent
+        {/* <BtnComponent
             baseUrl={API_BASE_URL}
             setAnnotationsLoaded={setAnnotationsLoaded}
             setIsSaved={setIsSaved}
             studyInfo={studyInfo}
-        />
+            visibilityMap={visibilityMap}
+            setVisibilityMap={setVisibilityMap}
+            selectionMap={selectionMap}
+            setSelectionMap={setSelectionMap}
+            listOfUsersAnnotations={listOfUsersAnnotations}
+            setListOfUsersAnnotations={setListOfUsersAnnotations}
+            measurementListRef={measurementListRef}
+            userInfo={userInfo}
+            scoreOptions={scoreOptions}
+            patientName={patientInfo.PatientName}
+            triggerPost={triggerPost}
+            onMeasurementClick={onMeasurementClick}
+            onToggleVisibility={onToggleVisibility}
+            onDropdownChange={onDropdownChange}
+            measurementList={measurementList}
+            ></BtnComponent> */}
+            <AnnotationList
+                measurementList={measurementList}
+                selectionMap={selectionMap}
+                visibilityMap={visibilityMap}
+                scoreOptions={scoreOptions}
+                onDropdownChange={onDropdownChange}
+                onMeasurementClick={onMeasurementClick}
+                onToggleVisibility={onToggleVisibility}
+                triggerPost={triggerPost}
+                annotation={annotation}
+            />
         </div>
     );    
 
