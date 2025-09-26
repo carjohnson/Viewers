@@ -19,7 +19,7 @@ export const postAnnotations = ({
 
     validAnnotations.forEach((ann) => {
       const uid = ann.annotationUID;
-      const selectedScore = selectionMap[uid]; // use current state directly
+      const selectedScore = selectionMap[uid]; // use current state
 
       if (typeof selectedScore === 'number' && selectedScore >= 1 && selectedScore <= 5) {
         (ann as any).suspicionScore = selectedScore;

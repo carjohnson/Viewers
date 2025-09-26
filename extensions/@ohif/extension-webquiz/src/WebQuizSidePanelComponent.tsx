@@ -8,9 +8,12 @@ import { useStudyInfoStore } from './stores/useStudyInfoStore';
 import { useStudyInfo } from './hooks/useStudyInfo';
 import { usePatientInfo } from '@ohif/extension-default';
 import { API_BASE_URL } from './config/config';
-import { AnnotationStats } from './components/annotationStats';
+import { AnnotationStats } from './models/AnnotationStats';
+import { getAnnotationsStats } from './utils/annotationUtils';
 import { debounce } from './utils/debounce';
 import { setUserInfo, getUserInfo } from './../../../../modes/@ohif/mode-webquiz/src/userInfoService';
+import { getLastIndexStored } from './utils/annotationUtils';
+
 
 
 
@@ -27,11 +30,18 @@ function WebQuizSidePanelComponent() {
     // const [userInfo, setUserInfo] = useState(null);
     const [isSaved, setIsSaved] = useState(true);
     const [annotationsLoaded, setAnnotationsLoaded] = useState(false);
+    
 
     const userInfo = getUserInfo();
 
-
     // console.log("🔍 API Base URL:", API_BASE_URL);
+    const scoreOptions = [
+        { value: 1, label: '1' },
+        { value: 2, label: '2' },
+        { value: 3, label: '3' },
+        { value: 4, label: '4' },
+        { value: 5, label: '5' },
+    ];
 
 
     // ---------------------------------------------
@@ -83,12 +93,13 @@ function WebQuizSidePanelComponent() {
                 return;
             }
             setTimeout(() => {
-                const measurementIndex = getLastIndexStored() + 1;
+                const allAnnotations = annotation.state.getAllAnnotations();
+                const measurementIndex = getLastIndexStored(allAnnotations) + 1;
                 const customLabel = `${userInfo.username}_${measurementIndex}`;
 
-                const { annotation } = event.detail;
-                if (annotation.data.label === "") {
-                    annotation.data.label = customLabel;
+                const { annotation: newAnnotation } = event.detail;
+                if (newAnnotation.data.label === "") {
+                    newAnnotation.data.label = customLabel;
                 }
             }, 200);  // give measurement service time to render proper labels
 
@@ -140,62 +151,6 @@ function WebQuizSidePanelComponent() {
 
         console.log('🔒 All annotations locked for admin user:', userInfo.username);
     }, [userInfo, annotationsLoaded]);
-
-    ////////////////////////////////////////////
-    //=====================
-    // helper functions
-    //=====================
-    ////////////////////////////////////////////
-
-    //=====================
-    // function to get list of all cached annotation stats
-    //  also store the annotation uid
-    const getAnnotationsStats = (): AnnotationStats[] => {
-        const lo_annotationStats: AnnotationStats[] = [];
-        const allAnnotations = annotation.state.getAllAnnotations();
-
-        allAnnotations.forEach((ann, index) => {
-            const stats = ann.data?.cachedStats as AnnotationStats;
-            const uid = ann.annotationUID;
-
-            if (
-                stats &&
-                Object.keys(stats).length > 0 &&
-                uid &&
-                !lo_annotationStats.some(existing => existing.uid === uid)
-            ) {
-                lo_annotationStats.push({
-                    ...stats,
-                    uid,
-                });
-            }
-
-        });
-
-        return lo_annotationStats;
-    };
-
-    //=====================
-    // function to get the last index used when adding annotations
-    const getLastIndexStored = (): number => {
-        let iLastIndex = 0;
-        const allAnnotations = annotation.state.getAllAnnotations();
-
-        allAnnotations.forEach((oAnnotation, index) => {
-        // console.log("🧩 Annotation object:", oAnnotation);
-        const sLabel = oAnnotation?.data?.label;
-            if (sLabel) {
-                let iCurrentIndex = parseInt(sLabel.split('_').pop() ?? "0", 10);
-                if (isNaN(iCurrentIndex)) {
-                    iCurrentIndex = 99
-                }
-                iLastIndex = Math.max(iLastIndex, iCurrentIndex);
-            }
-        });
-
-        return iLastIndex;
-    };
-
 
 
     ////////////////////////////////////////////
