@@ -1,8 +1,10 @@
 // src/utils/annotationUtils.ts
 import { AnnotationStats } from '../models/AnnotationStats';
 import { annotation } from '@cornerstonejs/tools';
+import { debounce } from './debounce';
 
 
+///////////////////////////////////////////////////////////
 export const buildSelectionMap = (lAnnotations: any[]) => {
   const newSelectionMap: Record<string, number> = {};
 
@@ -22,6 +24,7 @@ export const buildSelectionMap = (lAnnotations: any[]) => {
   return newSelectionMap;
 };
 
+//=========================================================
 // function to get list of all cached annotation stats
 //  also store the annotation uid
 export const getAnnotationsStats = (
@@ -47,8 +50,18 @@ export const getAnnotationsStats = (
   return lo_annotationStats;
 };
 
-// src/utils/annotationUtils.ts
+//=========================================================
+// debounced wrapper for getAnnotationStats
+// delay acquiring stats to let ohif complete the add of the annotation
+export const createDebouncedStatsUpdater = (
+  setAnnotationData: (data: any) => void
+) =>
+  debounce(() => {
+    setAnnotationData(getAnnotationsStats());
+  }, 100);
 
+
+//=========================================================
 export const getLastIndexStored = (allAnnotations: any[]): number => {
   let iLastIndex = 0;
 
@@ -65,3 +78,4 @@ export const getLastIndexStored = (allAnnotations: any[]): number => {
 
   return iLastIndex;
 };
+

@@ -1,4 +1,7 @@
 // src/handlers/dropdownHandlers.ts
+
+import { setUserInfo, getUserInfo } from './../../../../../modes/@ohif/mode-webquiz/src/userInfoService';
+
 export const handleDropdownChange = ({
   uid,
   value,
@@ -14,13 +17,19 @@ export const handleDropdownChange = ({
   triggerPost: (args: { allAnnotations: any; selectionMap: Record<string, number> }) => void;
   annotation: any;
 }) => {
-  const updatedMap = { ...selectionMap, [uid]: value };
-  setSelectionMap(updatedMap);
+  const userInfo = getUserInfo();
+   if (userInfo.role === 'admin') {
+      alert('Admins are not allowed to modify annotations.');
+      return;
+  } else {
+    const updatedMap = { ...selectionMap, [uid]: value };
+    setSelectionMap(updatedMap);
 
-  const allAnnotations = annotation.state.getAllAnnotations?.() || [];
+    const allAnnotations = annotation.state.getAllAnnotations?.() || [];
 
-  triggerPost({
-    allAnnotations,
-    selectionMap: updatedMap,
-  });
+    triggerPost({
+      allAnnotations,
+      selectionMap: updatedMap,
+    });
+}
 };

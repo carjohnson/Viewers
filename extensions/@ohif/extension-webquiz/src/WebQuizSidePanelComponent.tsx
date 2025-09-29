@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef } from 'react';
-import BtnComponent from './components/btnComponent';
 
 import * as cornerstone from '@cornerstonejs/core';
 import * as cornerstoneTools from '@cornerstonejs/tools';
@@ -9,16 +8,16 @@ import { useStudyInfo } from './hooks/useStudyInfo';
 import { usePatientInfo } from '@ohif/extension-default';
 import { API_BASE_URL } from './config/config';
 import { AnnotationStats } from './models/AnnotationStats';
-import { getAnnotationsStats } from './utils/annotationUtils';
-import { debounce } from './utils/debounce';
 import { setUserInfo, getUserInfo } from './../../../../modes/@ohif/mode-webquiz/src/userInfoService';
-import { getLastIndexStored } from './utils/annotationUtils';
 import { useAnnotationPosting } from './hooks/useAnnotationPosting';
 import { fetchAnnotationsFromDB } from './handlers/fetchAnnotations';
 import { handleDropdownChange } from './handlers/dropdownHandlers';
 import { handleMeasurementClick, toggleVisibility } from './handlers/guiHandlers';
 import { useSystem } from '@ohif/core';
 import { AnnotationList } from './components/AnnotationList';
+import { handleAnnotationAdd, handleAnnotationChange } from './handlers/annotationEventHandlers';
+import { createDebouncedStatsUpdater } from './utils/annotationUtils';
+
 
 
 
@@ -33,17 +32,21 @@ function WebQuizSidePanelComponent() {
     //  component needs to be subscribed to those updates
 
     const [annotationData, setAnnotationData] = useState<AnnotationStats[]>([]);
-    // const [userInfo, setUserInfo] = useState(null);
     const [isSaved, setIsSaved] = useState(true);
     const [annotationsLoaded, setAnnotationsLoaded] = useState(false);
     
     const [visibilityMap, setVisibilityMap] = useState<Record<string, boolean>>({});
     const [selectionMap, setSelectionMap] = useState<Record<string, number>>({});
     const [listOfUsersAnnotations, setListOfUsersAnnotations] = useState(null);
+    //=========================================================
+    const { servicesManager } = useSystem();
+    const { measurementService } = servicesManager.services;
+    const { viewportGridService } = servicesManager.services;
+    const activeViewportId = viewportGridService.getActiveViewportId();
+    const measurementList = measurementService.getMeasurements(); 
     const measurementListRef = useRef([]);    
 
     const userInfo = getUserInfo();
-    // console.log("🔍 API Base URL:", API_BASE_URL);
 
     const scoreOptions = [
         { value: 1, label: '1' },
@@ -73,6 +76,7 @@ function WebQuizSidePanelComponent() {
     const patientName = patientInfo?.PatientName;
 
 
+    //=========================================================
     useEffect(() => {
         if (!studyInfoFromHook?.studyUID || !patientInfo?.PatientName) {
             console.log('⏳ Waiting for full study info...');
@@ -93,58 +97,27 @@ function WebQuizSidePanelComponent() {
     // console.log('🧠 useStudyInfo() returned:', studyInfoFromHook);
     // console.log('📦 Zustand store currently holds:', studyInfo);
 
-
-    // Annotations listeners and handlers
+    //=========================================================
+    // add listeners with handlers
     useEffect(() => {
-        if (!userInfo?.username) return;
+        const debouncedUpdateStats = createDebouncedStatsUpdater(setAnnotationData);
+        const wrappedAnnotationAddHandler = (event: any) => handleAnnotationAdd({ event, setIsSaved, debouncedUpdateStats  });
+        const wrappedAnnotationChangeHandler = (event: any) => handleAnnotationAdd({ event, setIsSaved, debouncedUpdateStats  });
 
-        const handleAnnotationAdd = (event) => {
-            if (!userInfo?.username) {
-                console.warn("⚠️ Username not available yet. Skipping label assignment.");
-                return;
-            }
-            setTimeout(() => {
-                const allAnnotations = annotation.state.getAllAnnotations();
-                const measurementIndex = getLastIndexStored(allAnnotations) + 1;
-                const customLabel = `${userInfo.username}_${measurementIndex}`;
+        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_ADDED, wrappedAnnotationAddHandler);
+        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangeHandler);
+        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationChangeHandler);
+        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, wrappedAnnotationChangeHandler);
 
-                const { annotation: newAnnotation } = event.detail;
-                if (newAnnotation.data.label === "") {
-                    newAnnotation.data.label = customLabel;
-                }
-            }, 200);  // give measurement service time to render proper labels
-
-            debouncedUpdateStats(); // wait for system to settle after add
+        return () => {
+          cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_ADDED, wrappedAnnotationAddHandler);
+          cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangeHandler);
+          cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationChangeHandler);
+          cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, wrappedAnnotationChangeHandler);
         }
-        
-        // delay acquiring stats to let ohif complete the add of the annotation
-        const debouncedUpdateStats = debounce(() => {
-            setAnnotationData(getAnnotationsStats());
-        }, 100);
+    }, []);
 
-        const handleAnnotationChange = () => {
-            debouncedUpdateStats();
-        };        
-
-
-        // Register listeners
-        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_ADDED, handleAnnotationAdd);
-        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, handleAnnotationChange);
-        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, handleAnnotationChange);
-        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, handleAnnotationChange);
-
-        // Cleanup on unmount
-        return() => {
-            cornerstone.eventTarget.removeEventListener(cornerstoneTools.Enums.Events.ANNOTATION_ADDED, handleAnnotationAdd);
-            cornerstone.eventTarget.removeEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, handleAnnotationChange);
-            cornerstone.eventTarget.removeEventListener(cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, handleAnnotationChange);
-            cornerstone.eventTarget.removeEventListener(cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, handleAnnotationChange);
-        }
-    }, [userInfo] );
-
-
-    //=====================
-    // watch for changes to the state properties
+    //=========================================================
     useEffect(() => {
         if (annotationData.length > 0) {
             setIsSaved(false);
@@ -152,6 +125,8 @@ function WebQuizSidePanelComponent() {
         }
     }, [annotationData]);
 
+    //=========================================================
+    // watch for changes to the state properties
     // wait for all annotations to be loaded, then set to locked if user role is 'admin'
     useEffect(() => {
         if (!annotationsLoaded || userInfo?.role !== 'admin') return;
@@ -163,6 +138,7 @@ function WebQuizSidePanelComponent() {
         console.log('🔒 All annotations locked for admin user:', userInfo.username);
     }, [userInfo, annotationsLoaded]);
 
+    //=========================================================
     // ======== fetch annotations from DB based on user role
     useEffect(() => {
         if (!userInfo?.username || !patientName) return;
@@ -179,27 +155,22 @@ function WebQuizSidePanelComponent() {
     }, [userInfo, patientName]);
 
 
-    ////////////////////////////////////////////
+    //=========================================================
     // ======== post annotations to DB
     const triggerPost = useAnnotationPosting({
         patientName,
         measurementListRef,
         setIsSaved });
 
-
-////////////////////////////////////////////////////////////
-    const { servicesManager } = useSystem();
-    const { measurementService } = servicesManager.services;
-    const { viewportGridService } = servicesManager.services;
-    const activeViewportId = viewportGridService.getActiveViewportId();
-    const measurementList = measurementService.getMeasurements();        
-
+    //=========================================================
     const onMeasurementClick = (id: string) =>
         handleMeasurementClick({ measurementId: id, annotation, measurementService, activeViewportId });
 
+    //=========================================================
     const onToggleVisibility = (uid: string) =>
         toggleVisibility({ uid, visibilityMap, setVisibilityMap, measurementService });
 
+    //=========================================================
     const onDropdownChange = (uid: string, value: number) => {
         handleDropdownChange({
         uid,
@@ -210,9 +181,13 @@ function WebQuizSidePanelComponent() {
         annotation,
         });
     };        
+    
+    
+    //=========================================================
     ////////////////////////////////////////////
     return (
         <div className="text-white w-full text-center">
+
         {/* <BtnComponent
             baseUrl={API_BASE_URL}
             setAnnotationsLoaded={setAnnotationsLoaded}
@@ -234,6 +209,7 @@ function WebQuizSidePanelComponent() {
             onDropdownChange={onDropdownChange}
             measurementList={measurementList}
             ></BtnComponent> */}
+
             <AnnotationList
                 measurementList={measurementList}
                 selectionMap={selectionMap}
