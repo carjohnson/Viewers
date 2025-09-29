@@ -101,8 +101,16 @@ function WebQuizSidePanelComponent() {
     // add listeners with handlers
     useEffect(() => {
         const debouncedUpdateStats = createDebouncedStatsUpdater(setAnnotationData);
-        const wrappedAnnotationAddHandler = (event: any) => handleAnnotationAdd({ event, setIsSaved, debouncedUpdateStats  });
-        const wrappedAnnotationChangeHandler = (event: any) => handleAnnotationAdd({ event, setIsSaved, debouncedUpdateStats  });
+        const wrappedAnnotationAddHandler = (event: any) => handleAnnotationAdd({
+            event,
+            setIsSaved,
+            debouncedUpdateStats,
+         });
+        const wrappedAnnotationChangeHandler = (event: any) => handleAnnotationChange({
+            event,
+            setIsSaved,
+            debouncedUpdateStats,
+        });
 
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_ADDED, wrappedAnnotationAddHandler);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangeHandler);
