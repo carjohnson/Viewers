@@ -1,12 +1,12 @@
 // // src/handlers/fetchAnnotations.ts
-import { buildSelectionMap } from '../utils/annotationUtils';
+import { buildDropdownSelectionMapFromFetched } from '../utils/annotationUtils';
 
 export const fetchAnnotationsFromDB = async ({
   userInfo,
   patientName,
   baseUrl,
   setListOfUsersAnnotations,
-  setSelectionMap,
+  setDropdownSelectionMap,
   annotation,
   setAnnotationsLoaded,
 }: {
@@ -14,7 +14,7 @@ export const fetchAnnotationsFromDB = async ({
   patientName: string;
   baseUrl: string;
   setListOfUsersAnnotations: (list: any[]) => void;
-  setSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   annotation: any;
   setAnnotationsLoaded: (loaded: boolean) => void;
 }) => {
@@ -32,8 +32,8 @@ export const fetchAnnotationsFromDB = async ({
 
     setListOfUsersAnnotations(annotationsList);
 
-    const newMap = buildSelectionMap(annotationsList);
-    setSelectionMap(newMap);
+    const newMap = buildDropdownSelectionMapFromFetched(annotationsList);
+    setDropdownSelectionMap(newMap);
 
     annotationsList.forEach(({ data, color }) => {
       data.forEach(annotationObj => {

@@ -5,19 +5,19 @@ import { EyeIcon, EyeOffIcon } from '../utils/CreateCustomIcon';
 
 type Props = {
   measurementList: any[];
-  selectionMap: Record<string, number>;
+  dropdownSelectionMap: Record<string, number>;
   visibilityMap: Record<string, boolean>;
   scoreOptions: { value: number; label: string }[];
   onDropdownChange: (uid: string, value: number) => void;
   onMeasurementClick: (uid: string) => void;
   onToggleVisibility: (uid: string) => void;
-  triggerPost: (args: { allAnnotations: any[]; selectionMap: Record<string, number> }) => void;
+  triggerPost: (args: { allAnnotations: any[]; dropdownSelectionMap: Record<string, number> }) => void;
   annotation: any;
 };
 
 export const AnnotationList = ({
   measurementList,
-  selectionMap,
+  dropdownSelectionMap,
   visibilityMap,
   scoreOptions,
   onDropdownChange,
@@ -34,7 +34,7 @@ export const AnnotationList = ({
         onClick={() =>
           triggerPost({
             allAnnotations: annotation.state.getAllAnnotations(),
-            selectionMap,
+            dropdownSelectionMap,
           })
         }
       >
@@ -63,7 +63,7 @@ export const AnnotationList = ({
               >
                 <Select
                   options={scoreOptions}
-                  value={scoreOptions.find(opt => opt.value === selectionMap[uid])}
+                  value={scoreOptions.find(opt => opt.value === dropdownSelectionMap[uid])}
                   onChange={(option) => onDropdownChange(uid, option.value)}
                   getOptionLabel={(e) => e.label}
                   styles={{

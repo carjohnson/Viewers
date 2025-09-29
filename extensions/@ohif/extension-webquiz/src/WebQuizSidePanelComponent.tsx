@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 
 import * as cornerstone from '@cornerstonejs/core';
 import * as cornerstoneTools from '@cornerstonejs/tools';
@@ -36,7 +36,7 @@ function WebQuizSidePanelComponent() {
     const [annotationsLoaded, setAnnotationsLoaded] = useState(false);
     
     const [visibilityMap, setVisibilityMap] = useState<Record<string, boolean>>({});
-    const [selectionMap, setSelectionMap] = useState<Record<string, number>>({});
+    const [dropdownSelectionMap, setDropdownSelectionMap] = useState<Record<string, number>>({});
     const [listOfUsersAnnotations, setListOfUsersAnnotations] = useState(null);
     //=========================================================
     const { servicesManager } = useSystem();
@@ -100,6 +100,11 @@ function WebQuizSidePanelComponent() {
     //=========================================================
     // add listeners with handlers
     useEffect(() => {
+        if (!patientName) {
+            console.log('⏳ Waiting for patientName before setting up listeners...');
+            return;
+        }
+
         const debouncedUpdateStats = createDebouncedStatsUpdater(setAnnotationData);
         const wrappedAnnotationAddHandler = (event: any) => handleAnnotationAdd({
             event,
@@ -110,6 +115,9 @@ function WebQuizSidePanelComponent() {
             event,
             setIsSaved,
             debouncedUpdateStats,
+            dropdownSelectionMap,
+            setDropdownSelectionMap,
+            triggerPost,
         });
 
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_ADDED, wrappedAnnotationAddHandler);
@@ -123,7 +131,7 @@ function WebQuizSidePanelComponent() {
           cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationChangeHandler);
           cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, wrappedAnnotationChangeHandler);
         }
-    }, []);
+    }, [patientName]);
 
     //=========================================================
     useEffect(() => {
@@ -156,7 +164,7 @@ function WebQuizSidePanelComponent() {
         patientName,
         baseUrl: API_BASE_URL,
         setListOfUsersAnnotations,
-        setSelectionMap,
+        setDropdownSelectionMap,
         annotation,
         setAnnotationsLoaded,
         });
@@ -165,10 +173,22 @@ function WebQuizSidePanelComponent() {
 
     //=========================================================
     // ======== post annotations to DB
-    const triggerPost = useAnnotationPosting({
-        patientName,
-        measurementListRef,
-        setIsSaved });
+    // const triggerPost = useAnnotationPosting({
+    //     patientName,
+    //     measurementListRef,
+    //     setIsSaved });
+
+    // Memorize the trigger for POST to make sure all handlers who use the post
+    //      access it once the patientName is available 
+    const triggerPost = useMemo(() => {
+        if (!patientName) return null;
+
+        return useAnnotationPosting({
+            patientName,
+            measurementListRef,
+            setIsSaved,
+        });
+    }, [patientName, measurementListRef, setIsSaved]);
 
     //=========================================================
     const onMeasurementClick = (id: string) =>
@@ -179,16 +199,31 @@ function WebQuizSidePanelComponent() {
         toggleVisibility({ uid, visibilityMap, setVisibilityMap, measurementService });
 
     //=========================================================
+    // const onDropdownChange = (uid: string, value: number) => {
+    //     handleDropdownChange({
+    //     uid,
+    //     value,
+    //     dropdownSelectionMap,
+    //     setDropdownSelectionMap,
+    //     triggerPost,
+    //     annotation,
+    //     });
+    // };    
     const onDropdownChange = (uid: string, value: number) => {
+        if (!triggerPost) {
+            console.warn('⏳ triggerPost not ready yet — skipping dropdown change post');
+            return;
+        }
+
         handleDropdownChange({
-        uid,
-        value,
-        selectionMap,
-        setSelectionMap,
-        triggerPost,
-        annotation,
+            uid,
+            value,
+            dropdownSelectionMap,
+            setDropdownSelectionMap,
+            triggerPost,
+            annotation,
         });
-    };        
+    };    
     
     
     //=========================================================
@@ -220,7 +255,7 @@ function WebQuizSidePanelComponent() {
 
             <AnnotationList
                 measurementList={measurementList}
-                selectionMap={selectionMap}
+                dropdownSelectionMap={dropdownSelectionMap}
                 visibilityMap={visibilityMap}
                 scoreOptions={scoreOptions}
                 onDropdownChange={onDropdownChange}

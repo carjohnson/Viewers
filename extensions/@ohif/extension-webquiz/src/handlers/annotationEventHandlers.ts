@@ -1,7 +1,7 @@
 // annotationEventHandlers.ts
 
 import { annotation } from '@cornerstonejs/tools';
-import { getLastIndexStored } from './../utils/annotationUtils';
+import { getLastIndexStored, buildDropdownSelectionMapFromState } from './../utils/annotationUtils';
 import { getUserInfo } from '../../../../../modes/@ohif/mode-webquiz/src/userInfoService';
 
 
@@ -36,17 +36,46 @@ export const handleAnnotationAdd = ({
 
 
 //=========================================================
+// export const handleAnnotationChange = ({
+//   event,
+//   setIsSaved,
+//   debouncedUpdateStats,
+// }: {
+//   event: any;
+//   setIsSaved: (value: boolean) => void;
+//   debouncedUpdateStats: () => void;
+// }) => {
+//     setIsSaved(false);
+//     debouncedUpdateStats();
+// };
+
+
 export const handleAnnotationChange = ({
   event,
   setIsSaved,
   debouncedUpdateStats,
+  dropdownSelectionMap,
+  setDropdownSelectionMap,
+  triggerPost,
 }: {
   event: any;
   setIsSaved: (value: boolean) => void;
   debouncedUpdateStats: () => void;
+  dropdownSelectionMap: Record<string, number>;
+  setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  triggerPost: (args: { allAnnotations: any[]; dropdownSelectionMap: Record<string, number> }) => void;
+
 }) => {
     setIsSaved(false);
     debouncedUpdateStats();
+    const allAnnotations = annotation.state.getAllAnnotations?.() || [];
+    console.log('********** Annotations: ', allAnnotations);
+    const newMap = buildDropdownSelectionMapFromState(allAnnotations);
+    console.log('******** New map :', newMap);
+    setDropdownSelectionMap(newMap);
+    triggerPost({
+      allAnnotations,
+      dropdownSelectionMap: newMap,
+    });
 };
-
 

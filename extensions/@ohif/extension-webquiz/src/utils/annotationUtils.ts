@@ -4,11 +4,11 @@ import { annotation } from '@cornerstonejs/tools';
 import { debounce } from './debounce';
 
 
-///////////////////////////////////////////////////////////
-export const buildSelectionMap = (lAnnotations: any[]) => {
-  const newSelectionMap: Record<string, number> = {};
+//=========================================================
+export const buildDropdownSelectionMapFromFetched = (lFetchedAnnotations: any[]) => {
+  const newDropdownSelectionMap: Record<string, number> = {};
 
-  lAnnotations.forEach(({ data }) => {
+  lFetchedAnnotations.forEach(({ data }) => {
     data.forEach(annotationObj => {
       if (
         annotationObj &&
@@ -16,12 +16,30 @@ export const buildSelectionMap = (lAnnotations: any[]) => {
         annotationObj.annotationUID.length > 0 &&
         typeof annotationObj.suspicionScore === 'number'
       ) {
-        newSelectionMap[annotationObj.annotationUID] = annotationObj.suspicionScore;
+        newDropdownSelectionMap[annotationObj.annotationUID] = annotationObj.suspicionScore;
       }
     });
   });
 
-  return newSelectionMap;
+  return newDropdownSelectionMap;
+};
+
+//=========================================================
+export const buildDropdownSelectionMapFromState = (annotations: any[]) => {
+  const newDropdownSelectionMap: Record<string, number> = {};
+
+  annotations.forEach(annotationObj => {
+    const { annotationUID, suspicionScore } = annotationObj;
+
+    if (
+      typeof annotationUID === 'string' &&
+      annotationUID.length > 0 &&
+      typeof suspicionScore === 'number'
+    ) {
+      newDropdownSelectionMap[annotationUID] = suspicionScore;
+    }
+  });
+  return newDropdownSelectionMap;
 };
 
 //=========================================================

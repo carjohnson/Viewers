@@ -7,10 +7,12 @@ export const useAnnotationPosting = ({
   measurementListRef,
   setIsSaved,
 }) => {
-  return ({ allAnnotations, selectionMap }) => {
+      console.log('🧠 patientName being sent:', patientName);
+
+  return ({ allAnnotations, dropdownSelectionMap }) => {
     postAnnotations({
       allAnnotations,
-      selectionMap,
+      dropdownSelectionMap,
       patientName,
       measurementListRef,
       setIsSaved,
