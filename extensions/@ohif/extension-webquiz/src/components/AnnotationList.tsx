@@ -2,6 +2,7 @@
 import React from 'react';
 import Select from 'react-select';
 import { EyeIcon, EyeOffIcon } from '../utils/CreateCustomIcon';
+import { TriggerPostArgs } from '../models/TriggerPostArgs';
 
 type Props = {
   measurementList: any[];
@@ -11,7 +12,7 @@ type Props = {
   onDropdownChange: (uid: string, value: number) => void;
   onMeasurementClick: (uid: string) => void;
   onToggleVisibility: (uid: string) => void;
-  triggerPost: (args: { allAnnotations: any[]; dropdownSelectionMap: Record<string, number> }) => void;
+  triggerPost: (args: TriggerPostArgs) => void;
   annotation: any;
 };
 
@@ -28,7 +29,7 @@ export const AnnotationList = ({
 }: Props) => {
   return (
     <div>
-      <br />
+      {/* <br />
       <br />
       <button
         onClick={() =>
@@ -42,7 +43,7 @@ export const AnnotationList = ({
       </button>
 
       <br />
-      <br />
+      <br /> */}
       <div>
         <h3>Annotations</h3>
         <h4 style={{ textAlign: 'left' }}>Score</h4>

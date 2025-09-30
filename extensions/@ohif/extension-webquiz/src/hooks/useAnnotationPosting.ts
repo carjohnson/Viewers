@@ -7,15 +7,15 @@ export const useAnnotationPosting = ({
   measurementListRef,
   setIsSaved,
 }) => {
-      console.log('🧠 patientName being sent:', patientName);
-
-  return ({ allAnnotations, dropdownSelectionMap }) => {
+  return ({ allAnnotations, dropdownSelectionMap, suppressAlert, pendingAlertUIDsRef  }) => {
     postAnnotations({
       allAnnotations,
       dropdownSelectionMap,
       patientName,
       measurementListRef,
       setIsSaved,
+      suppressAlert,
+      pendingAlertUIDsRef,
     });
   };
 };

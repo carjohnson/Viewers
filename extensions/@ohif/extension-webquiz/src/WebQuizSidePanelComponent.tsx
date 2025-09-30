@@ -8,6 +8,7 @@ import { useStudyInfo } from './hooks/useStudyInfo';
 import { usePatientInfo } from '@ohif/extension-default';
 import { API_BASE_URL } from './config/config';
 import { AnnotationStats } from './models/AnnotationStats';
+import { TriggerPostArgs } from './models/TriggerPostArgs';
 import { setUserInfo, getUserInfo } from './../../../../modes/@ohif/mode-webquiz/src/userInfoService';
 import { useAnnotationPosting } from './hooks/useAnnotationPosting';
 import { fetchAnnotationsFromDB } from './handlers/fetchAnnotations';
@@ -45,6 +46,7 @@ function WebQuizSidePanelComponent() {
     const activeViewportId = viewportGridService.getActiveViewportId();
     const measurementList = measurementService.getMeasurements(); 
     const measurementListRef = useRef([]);    
+    const pendingAlertUIDsRef = useRef<string[]>([]);
 
     const userInfo = getUserInfo();
 
@@ -110,26 +112,29 @@ function WebQuizSidePanelComponent() {
             event,
             setIsSaved,
             debouncedUpdateStats,
+            setDropdownSelectionMap,
+            triggerPost,
+            pendingAlertUIDsRef,
          });
         const wrappedAnnotationChangeHandler = (event: any) => handleAnnotationChange({
             event,
             setIsSaved,
             debouncedUpdateStats,
-            dropdownSelectionMap,
             setDropdownSelectionMap,
             triggerPost,
+            pendingAlertUIDsRef,
         });
 
-        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_ADDED, wrappedAnnotationAddHandler);
+        // cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_ADDED, wrappedAnnotationAddHandler);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangeHandler);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationChangeHandler);
-        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, wrappedAnnotationChangeHandler);
+        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, wrappedAnnotationAddHandler);
 
         return () => {
-          cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_ADDED, wrappedAnnotationAddHandler);
+        //   cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_ADDED, wrappedAnnotationAddHandler);
           cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangeHandler);
           cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationChangeHandler);
-          cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, wrappedAnnotationChangeHandler);
+          cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, wrappedAnnotationAddHandler);
         }
     }, [patientName]);
 
@@ -173,13 +178,8 @@ function WebQuizSidePanelComponent() {
 
     //=========================================================
     // ======== post annotations to DB
-    // const triggerPost = useAnnotationPosting({
-    //     patientName,
-    //     measurementListRef,
-    //     setIsSaved });
-
-    // Memorize the trigger for POST to make sure all handlers who use the post
-    //      access it once the patientName is available 
+    // Memorize the trigger for POST to make sure all handlers who use
+    //      triggerPost access it once the patientName is available 
     const triggerPost = useMemo(() => {
         if (!patientName) return null;
 
@@ -199,16 +199,6 @@ function WebQuizSidePanelComponent() {
         toggleVisibility({ uid, visibilityMap, setVisibilityMap, measurementService });
 
     //=========================================================
-    // const onDropdownChange = (uid: string, value: number) => {
-    //     handleDropdownChange({
-    //     uid,
-    //     value,
-    //     dropdownSelectionMap,
-    //     setDropdownSelectionMap,
-    //     triggerPost,
-    //     annotation,
-    //     });
-    // };    
     const onDropdownChange = (uid: string, value: number) => {
         if (!triggerPost) {
             console.warn('⏳ triggerPost not ready yet — skipping dropdown change post');
@@ -221,6 +211,7 @@ function WebQuizSidePanelComponent() {
             dropdownSelectionMap,
             setDropdownSelectionMap,
             triggerPost,
+            pendingAlertUIDsRef,
             annotation,
         });
     };    
@@ -230,29 +221,6 @@ function WebQuizSidePanelComponent() {
     ////////////////////////////////////////////
     return (
         <div className="text-white w-full text-center">
-
-        {/* <BtnComponent
-            baseUrl={API_BASE_URL}
-            setAnnotationsLoaded={setAnnotationsLoaded}
-            setIsSaved={setIsSaved}
-            studyInfo={studyInfo}
-            visibilityMap={visibilityMap}
-            setVisibilityMap={setVisibilityMap}
-            selectionMap={selectionMap}
-            setSelectionMap={setSelectionMap}
-            listOfUsersAnnotations={listOfUsersAnnotations}
-            setListOfUsersAnnotations={setListOfUsersAnnotations}
-            measurementListRef={measurementListRef}
-            userInfo={userInfo}
-            scoreOptions={scoreOptions}
-            patientName={patientInfo.PatientName}
-            triggerPost={triggerPost}
-            onMeasurementClick={onMeasurementClick}
-            onToggleVisibility={onToggleVisibility}
-            onDropdownChange={onDropdownChange}
-            measurementList={measurementList}
-            ></BtnComponent> */}
-
             <AnnotationList
                 measurementList={measurementList}
                 dropdownSelectionMap={dropdownSelectionMap}
