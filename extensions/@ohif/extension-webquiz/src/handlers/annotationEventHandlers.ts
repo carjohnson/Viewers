@@ -30,32 +30,91 @@ export const handleAnnotationAdd = ({
 
   setTimeout(() => {
     const allAnnotations = annotation.state.getAllAnnotations();
-    // const measurementIndex = getLastIndexStored(allAnnotations) + 1;
-    // const customLabel = `${userInfo.username}_${measurementIndex}`;
+    const measurementIndex = getLastIndexStored(allAnnotations) + 1;
+    const customLabel = `${userInfo.username}_${measurementIndex}`;
 
-    // const { annotation: newAnnotation } = event.detail;
-    // if (newAnnotation.data.label === "") {
-    //   newAnnotation.data.label = customLabel;
-    // }
+    const { annotation: newAnnotation } = event.detail;
+    if (newAnnotation.data.label === "") {
+      newAnnotation.data.label = customLabel;
+    }
 
     // auto save the new annotation
     const newMap = buildDropdownSelectionMapFromState(allAnnotations);
     setDropdownSelectionMap(newMap);
     // delay triggerPost to allow n seconds before alert to select a score
     setTimeout(() => {
+
         triggerPost({
             allAnnotations,
             dropdownSelectionMap: newMap,
             suppressAlert: false,
             pendingAlertUIDsRef,
         });
-        }, 4000);
+        }, 5000);
     }, 200);
     debouncedUpdateStats(); // wait for system to settle after add
 };
 
 
+//=========================================================
 export const handleAnnotationChange = ({
+  event,
+  setIsSaved,
+  debouncedUpdateStats,
+  setDropdownSelectionMap,
+  triggerPost,
+  pendingAlertUIDsRef,
+}: {
+  event: any;
+  setIsSaved: (value: boolean) => void;
+  debouncedUpdateStats: () => void;
+  setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  triggerPost: (args: TriggerPostArgs) => void;
+  pendingAlertUIDsRef: React.RefObject<string[]>;
+}) => {
+  setIsSaved(false);
+    debouncedUpdateStats();
+    const allAnnotations = annotation.state.getAllAnnotations?.() || [];
+
+
+    const userInfo = getUserInfo();
+    if (!userInfo?.username) {
+        console.warn("⚠️ Username not available yet. Skipping label assignment.");
+        return;
+    }
+    const measurementIndex = getLastIndexStored(allAnnotations) + 1;
+    const customLabel = `${userInfo.username}_${measurementIndex}`;
+
+    const { annotation: changedAnnotation , bContinueDelay = false } = event.detail;
+    if (!changedAnnotation) return; // no annotation guard - just exit
+
+    if (changedAnnotation.data.label === "" ) {
+      changedAnnotation.data.label = customLabel;
+    }
+
+    const newMap = buildDropdownSelectionMapFromState(allAnnotations);
+    setDropdownSelectionMap(newMap);
+
+    const iMSecsDelay =
+        typeof changedAnnotation.suspicionScore !== 'number' ||
+        changedAnnotation.suspicionScore < 1 ||
+        changedAnnotation.suspicionScore > 5 || bContinueDelay
+            ? 5000
+            : 0;
+
+    setTimeout(() => {
+    triggerPost({
+        allAnnotations,
+        dropdownSelectionMap: newMap,
+        suppressAlert: false,
+        pendingAlertUIDsRef,
+    });
+    }, iMSecsDelay);   
+};
+
+//=========================================================
+// no time delay when deleting a measurement
+export const handleAnnotationRemove = ({
   event,
   setIsSaved,
   debouncedUpdateStats,
@@ -74,30 +133,13 @@ export const handleAnnotationChange = ({
     debouncedUpdateStats();
     const allAnnotations = annotation.state.getAllAnnotations?.() || [];
 
-
-      const userInfo = getUserInfo();
-  if (!userInfo?.username) {
-    console.warn("⚠️ Username not available yet. Skipping label assignment.");
-    return;
-  }
-    const measurementIndex = getLastIndexStored(allAnnotations) + 1;
-    const customLabel = `${userInfo.username}_${measurementIndex}`;
-
-    const { annotation: newAnnotation } = event.detail;
-    if (newAnnotation.data.label === "") {
-      newAnnotation.data.label = customLabel;
-    }
-
     const newMap = buildDropdownSelectionMapFromState(allAnnotations);
     setDropdownSelectionMap(newMap);
 
-    setTimeout(() => {
     triggerPost({
         allAnnotations,
         dropdownSelectionMap: newMap,
-        suppressAlert: false,
+        suppressAlert: true,
         pendingAlertUIDsRef,
     });
-    }, 4000); // ⏳ Give the UI/state time to settle    
 };
-

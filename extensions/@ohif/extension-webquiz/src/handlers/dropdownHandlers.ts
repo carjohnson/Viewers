@@ -27,24 +27,13 @@ export const handleDropdownChange = ({
   } else {
     const updatedMap = { ...dropdownSelectionMap, [uid]: value };
     setDropdownSelectionMap(updatedMap);
+    console.log('********* Pending Alert UIDs Ref:', pendingAlertUIDsRef);
 
-    const allAnnotations = annotation.state.getAllAnnotations?.() || [];
-
-    // triggerPost({
-    //   allAnnotations,
-    //   dropdownSelectionMap: updatedMap,
-    //   suppressAlert: false,
-    //   pendingAlertUIDsRef 
-    // });
-    setDropdownSelectionMap(updatedMap);
-
-    setTimeout(() => {
-      triggerPost({
-        allAnnotations: annotation.state.getAllAnnotations(),
-        dropdownSelectionMap: updatedMap,
-        suppressAlert: false,
-        pendingAlertUIDsRef,
-      });
-    }, 3000); // ⏳ Give user time to interact
+    triggerPost({
+      allAnnotations: annotation.state.getAllAnnotations(),
+      dropdownSelectionMap: updatedMap,
+      suppressAlert: true,
+      pendingAlertUIDsRef,
+    });
 }
 };
