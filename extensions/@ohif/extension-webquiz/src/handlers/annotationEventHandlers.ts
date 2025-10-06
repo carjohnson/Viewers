@@ -72,6 +72,7 @@ export const handleAnnotationChange = ({
   triggerPost: (args: TriggerPostArgs) => void;
   pendingAlertUIDsRef: React.RefObject<string[]>;
 }) => {
+  console.log('**********  Event handler Changed fired **********')
   setIsSaved(false);
     debouncedUpdateStats();
     const allAnnotations = annotation.state.getAllAnnotations?.() || [];
@@ -95,12 +96,13 @@ export const handleAnnotationChange = ({
     const newMap = buildDropdownSelectionMapFromState(allAnnotations);
     setDropdownSelectionMap(newMap);
 
-    const iMSecsDelay =
-        typeof changedAnnotation.suspicionScore !== 'number' ||
-        changedAnnotation.suspicionScore < 1 ||
-        changedAnnotation.suspicionScore > 5 || bContinueDelay
-            ? 5000
-            : 0;
+    const isScoreValid =
+      typeof changedAnnotation.suspicionScore === 'number' &&
+      changedAnnotation.suspicionScore >= 1 &&
+      changedAnnotation.suspicionScore <= 5;
+
+    const iMSecsDelay = !isScoreValid || bContinueDelay ? 5000 : 0;
+
 
     setTimeout(() => {
     triggerPost({

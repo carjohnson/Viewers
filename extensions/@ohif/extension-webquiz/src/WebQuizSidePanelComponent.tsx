@@ -40,8 +40,7 @@ function WebQuizSidePanelComponent() {
     const [listOfUsersAnnotations, setListOfUsersAnnotations] = useState(null);
     //=========================================================
     const { servicesManager } = useSystem();
-    const { measurementService } = servicesManager.services;
-    const { viewportGridService } = servicesManager.services;
+    const { measurementService, viewportGridService } = servicesManager.services;
     const activeViewportId = viewportGridService.getActiveViewportId();
     const measurementList = measurementService.getMeasurements(); 
     const measurementListRef = useRef([]);    
@@ -148,7 +147,6 @@ function WebQuizSidePanelComponent() {
     useEffect(() => {
         if (annotationData.length > 0) {
             setIsSaved(false);
-            // console.log(' Annotation Change');
         }
     }, [annotationData]);
 
