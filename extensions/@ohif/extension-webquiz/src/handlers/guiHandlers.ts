@@ -1,4 +1,7 @@
 // src/handlers/guiHandlers.ts
+import * as cornerstone from '@cornerstonejs/core';
+import * as cornerstoneTools from '@cornerstonejs/tools';
+import { annotation } from '@cornerstonejs/tools';
 
 // Set up GUI so the user can click on an annotation in the panel list
 //    and have the image jump to the corresponding slice
@@ -43,3 +46,46 @@ export const toggleVisibility = ({
     [uid]: newVisibility,
   }));
 };
+
+export const closeScoreModal = ({
+  activeUID,
+  selectedScore,
+  setSelectedScore,
+  setDropdownSelectionMap,
+  setShowScoreModal,
+}:{
+  activeUID: string,
+  selectedScore: number | null;
+  setSelectedScore: (score: number | null) => void;
+  setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  setShowScoreModal:  (modalWindow: boolean) => void;
+}) => {
+
+  if (selectedScore !== null && activeUID) {
+    setDropdownSelectionMap(prev => ({
+      ...prev,
+      [activeUID]: selectedScore,
+    }));
+  }
+  setShowScoreModal(false);
+  setSelectedScore(null);
+
+  const allAnnotations = annotation.state.getAllAnnotations();
+  const activeAnnotationObject = allAnnotations.find(
+    ann => ann.annotationUID === activeUID
+  );
+  if (activeAnnotationObject?.data) {
+    activeAnnotationObject.data.suspicionScore = selectedScore;
+  }
+  console.log('📣 Dispatching modified annotation:', activeAnnotationObject);
+
+  cornerstone.eventTarget.dispatchEvent({
+    type: cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED,
+    detail: {
+      annotation: activeAnnotationObject,
+      bContinueDelay: true,
+    },
+  });
+
+};
+

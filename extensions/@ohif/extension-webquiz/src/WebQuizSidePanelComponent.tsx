@@ -12,13 +12,13 @@ import { setUserInfo, getUserInfo } from './../../../../modes/@ohif/mode-webquiz
 import { useAnnotationPosting } from './hooks/useAnnotationPosting';
 import { fetchAnnotationsFromDB } from './handlers/fetchAnnotations';
 import { handleDropdownChange } from './handlers/dropdownHandlers';
-import { handleMeasurementClick, toggleVisibility } from './handlers/guiHandlers';
+import { handleMeasurementClick, toggleVisibility, closeScoreModal } from './handlers/guiHandlers';
 import { useSystem } from '@ohif/core';
 import { AnnotationList } from './components/AnnotationList';
+import { ScoreModal } from './components/ScoreModal';
 import { handleAnnotationAdd, handleAnnotationChange, handleAnnotationRemove } from './handlers/annotationEventHandlers';
 import { createDebouncedStatsUpdater } from './utils/annotationUtils';
-
-
+import { createDebouncedModalTrigger } from './utils/annotationUtils';
 
 
 
@@ -37,6 +37,9 @@ function WebQuizSidePanelComponent() {
     
     const [visibilityMap, setVisibilityMap] = useState<Record<string, boolean>>({});
     const [dropdownSelectionMap, setDropdownSelectionMap] = useState<Record<string, number>>({});
+    const [showScoreModal, setShowScoreModal] = useState(false);
+    const [selectedScore, setSelectedScore] = useState<number | null>(null);
+    const [activeUID, setActiveUID] = useState<string | null>(null);
     const [listOfUsersAnnotations, setListOfUsersAnnotations] = useState(null);
     //=========================================================
     const { servicesManager } = useSystem();
@@ -106,6 +109,7 @@ function WebQuizSidePanelComponent() {
         }
 
         const debouncedUpdateStats = createDebouncedStatsUpdater(setAnnotationData);
+        const debouncedShowScoreModal = createDebouncedModalTrigger(setShowScoreModal);
         const wrappedAnnotationAddHandler = (event: any) => handleAnnotationAdd({
             event,
             setIsSaved,
@@ -119,8 +123,11 @@ function WebQuizSidePanelComponent() {
             setIsSaved,
             debouncedUpdateStats,
             setDropdownSelectionMap,
+            setShowScoreModal,
             triggerPost,
             pendingAlertUIDsRef,
+            debouncedShowScoreModal,
+            setActiveUID,
         });
         const wrappedAnnotationRemovedHandler = (event: any) => handleAnnotationRemove({
             event,
@@ -203,6 +210,16 @@ function WebQuizSidePanelComponent() {
         toggleVisibility({ uid, visibilityMap, setVisibilityMap, measurementService });
 
     //=========================================================
+    const onCloseScoreModal = () =>
+    closeScoreModal({
+        activeUID,
+        selectedScore,
+        setSelectedScore,
+        setDropdownSelectionMap,
+        setShowScoreModal,
+    });
+
+    //=========================================================
     const onDropdownChange = (uid: string, value: number) => {
         if (!triggerPost) {
             console.warn('⏳ triggerPost not ready yet — skipping dropdown change post');
@@ -235,6 +252,13 @@ function WebQuizSidePanelComponent() {
                 onToggleVisibility={onToggleVisibility}
                 triggerPost={triggerPost}
                 annotation={annotation}
+            />
+            <ScoreModal
+                isOpen={showScoreModal}
+                scoreOptions={scoreOptions}
+                selectedScore={selectedScore}
+                setSelectedScore={setSelectedScore}
+                onClose={onCloseScoreModal}
             />
         </div>
     );    

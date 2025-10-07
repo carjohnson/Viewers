@@ -62,21 +62,26 @@ export const handleAnnotationChange = ({
   setIsSaved,
   debouncedUpdateStats,
   setDropdownSelectionMap,
+  setShowScoreModal,
   triggerPost,
   pendingAlertUIDsRef,
+  debouncedShowScoreModal,
+  setActiveUID,
 }: {
   event: any;
   setIsSaved: (value: boolean) => void;
   debouncedUpdateStats: () => void;
   setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  setShowScoreModal: (modalWindow: boolean) => void;
   triggerPost: (args: TriggerPostArgs) => void;
   pendingAlertUIDsRef: React.RefObject<string[]>;
+  debouncedShowScoreModal: () => void;
+  setActiveUID: (activeUID: string | null) => void;
 }) => {
-  console.log('**********  Event handler Changed fired **********')
   setIsSaved(false);
-    debouncedUpdateStats();
-    const allAnnotations = annotation.state.getAllAnnotations?.() || [];
-
+  debouncedUpdateStats();
+  const allAnnotations = annotation.state.getAllAnnotations?.() || [];
+  console.log('🔁 Re-fired ANNOTATION_MODIFIED for UID:', event.detail.annotation.annotationUID);
 
     const userInfo = getUserInfo();
     if (!userInfo?.username) {
@@ -91,15 +96,19 @@ export const handleAnnotationChange = ({
 
     if (changedAnnotation.data.label === "" ) {
       changedAnnotation.data.label = customLabel;
+      setActiveUID(changedAnnotation.annotationUID);
+      debouncedShowScoreModal();
     }
 
+    console.log('📦 changedAnnotation before map:', changedAnnotation);
     const newMap = buildDropdownSelectionMapFromState(allAnnotations);
     setDropdownSelectionMap(newMap);
+    console.log('📊 dropdownSelectionMap before post:', newMap);
 
     const isScoreValid =
-      typeof changedAnnotation.suspicionScore === 'number' &&
-      changedAnnotation.suspicionScore >= 1 &&
-      changedAnnotation.suspicionScore <= 5;
+      typeof changedAnnotation.data.suspicionScore === 'number' &&
+      changedAnnotation.data.suspicionScore >= 1 &&
+      changedAnnotation.data.suspicionScore <= 5;
 
     const iMSecsDelay = !isScoreValid || bContinueDelay ? 5000 : 0;
 

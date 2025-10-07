@@ -14,9 +14,9 @@ export const buildDropdownSelectionMapFromFetched = (lFetchedAnnotations: any[])
         annotationObj &&
         typeof annotationObj.annotationUID === 'string' &&
         annotationObj.annotationUID.length > 0 &&
-        typeof annotationObj.suspicionScore === 'number'
+        typeof annotationObj.data.suspicionScore === 'number'
       ) {
-        newDropdownSelectionMap[annotationObj.annotationUID] = annotationObj.suspicionScore;
+        newDropdownSelectionMap[annotationObj.annotationUID] = annotationObj.data.suspicionScore;
       }
     });
   });
@@ -29,7 +29,8 @@ export const buildDropdownSelectionMapFromState = (annotations: any[]) => {
   const newDropdownSelectionMap: Record<string, number> = {};
 
   annotations.forEach(annotationObj => {
-    const { annotationUID, suspicionScore } = annotationObj;
+    const { annotationUID, data } = annotationObj;
+    const suspicionScore = data?.suspicionScore;
 
     if (
       typeof annotationUID === 'string' &&
@@ -78,6 +79,15 @@ export const createDebouncedStatsUpdater = (
     setAnnotationData(getAnnotationsStats());
   }, 100);
 
+//=========================================================
+// debounced wrapper for modal trigger
+// delay showing modal to ensure annotations have settled
+export const createDebouncedModalTrigger = (
+  setShowScoreModal: (show: boolean) => void
+) =>
+  debounce(() => {
+    setShowScoreModal(true);
+  }, 300);
 
 //=========================================================
 export const getLastIndexStored = (allAnnotations: any[]): number => {
