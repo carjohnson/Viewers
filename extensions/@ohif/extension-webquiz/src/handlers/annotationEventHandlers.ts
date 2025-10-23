@@ -67,6 +67,7 @@ export const handleAnnotationChange = ({
   pendingAlertUIDsRef,
   debouncedShowScoreModal,
   setActiveUID,
+  pendingAnnotationUIDRef,
 }: {
   event: any;
   setIsSaved: (value: boolean) => void;
@@ -77,6 +78,7 @@ export const handleAnnotationChange = ({
   pendingAlertUIDsRef: React.RefObject<string[]>;
   debouncedShowScoreModal: () => void;
   setActiveUID: (activeUID: string | null) => void;
+  pendingAnnotationUIDRef: React.MutableRefObject<string | null>;
 }) => {
   setIsSaved(false);
   debouncedUpdateStats();
@@ -94,10 +96,9 @@ export const handleAnnotationChange = ({
     const { annotation: changedAnnotation , bContinueDelay = false } = event.detail;
     if (!changedAnnotation) return; // no annotation guard - just exit
 
-    if (changedAnnotation.data.label === "" ) {
+    if (changedAnnotation.data.label === "") {
       changedAnnotation.data.label = customLabel;
-      setActiveUID(changedAnnotation.annotationUID);
-      debouncedShowScoreModal();
+      pendingAnnotationUIDRef.current = changedAnnotation.annotationUID;
     }
 
     console.log('📦 changedAnnotation before map:', changedAnnotation);

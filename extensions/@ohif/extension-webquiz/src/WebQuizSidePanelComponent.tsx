@@ -41,6 +41,11 @@ function WebQuizSidePanelComponent() {
     const [selectedScore, setSelectedScore] = useState<number | null>(null);
     const [activeUID, setActiveUID] = useState<string | null>(null);
     const [listOfUsersAnnotations, setListOfUsersAnnotations] = useState(null);
+
+    // ensure debounced definitions are stable across renders using useMemo
+    const debouncedUpdateStats = useMemo(() => createDebouncedStatsUpdater(setAnnotationData), [setAnnotationData]);
+    const debouncedShowScoreModal = useMemo(() => createDebouncedModalTrigger(setShowScoreModal), [setShowScoreModal]);
+
     //=========================================================
     const { servicesManager } = useSystem();
     const { measurementService, viewportGridService } = servicesManager.services;
@@ -48,6 +53,7 @@ function WebQuizSidePanelComponent() {
     const measurementList = measurementService.getMeasurements(); 
     const measurementListRef = useRef([]);    
     const pendingAlertUIDsRef = useRef<string[]>([]);
+    const pendingAnnotationUIDRef = useRef<string | null>(null);
 
     const userInfo = getUserInfo();
 
@@ -108,8 +114,6 @@ function WebQuizSidePanelComponent() {
             return;
         }
 
-        const debouncedUpdateStats = createDebouncedStatsUpdater(setAnnotationData);
-        const debouncedShowScoreModal = createDebouncedModalTrigger(setShowScoreModal);
         const wrappedAnnotationAddHandler = (event: any) => handleAnnotationAdd({
             event,
             setIsSaved,
@@ -128,6 +132,7 @@ function WebQuizSidePanelComponent() {
             pendingAlertUIDsRef,
             debouncedShowScoreModal,
             setActiveUID,
+            pendingAnnotationUIDRef,
         });
         const wrappedAnnotationRemovedHandler = (event: any) => handleAnnotationRemove({
             event,
@@ -148,7 +153,26 @@ function WebQuizSidePanelComponent() {
           cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationRemovedHandler);
           cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, wrappedAnnotationChangeHandler);
         }
+
     }, [patientName]);
+
+    //=========================================================
+    useEffect(() => {
+        const handleMouseUp = () => {
+            const uid = pendingAnnotationUIDRef.current;
+            if (uid) {
+            setActiveUID(uid);
+                debouncedShowScoreModal();
+                pendingAnnotationUIDRef.current = null;
+            }
+        };
+
+        window.addEventListener('mouseup', handleMouseUp);
+        return () => {
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, []);
+
 
     //=========================================================
     useEffect(() => {
