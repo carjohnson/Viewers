@@ -1,0 +1,67 @@
+.annotation-group {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 200px);
+  min-height: 0; /* CRITICAL for fitting into the parent container*/
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 0.5rem;
+  margin: 1rem 0;
+  /* outline: 2px solid red; */
+}
+
+.annotation-group legend {
+  font-weight: bold;
+  padding: 0 0.5rem;
+}
+
+.annotation-scroll {
+  flex-grow: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 0.5rem;
+  /* outline: 2px solid blue; */
+}
+
+.annotation-item {
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-bottom: 1px solid #ccc;
+
+}
+
+.annotation-label {
+  max-height: 500px;
+  cursor: pointer;
+  padding-left: 0.5rem;
+}
+
+.annotation-visibility {
+  margin-left: auto;
+  cursor: pointer;
+  padding-left: 0.5rem;
+}
+
+.annotation-controls {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+.toggle-all-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  padding-right: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.toggle-all-button {
+  background-color: #333;
+  color: white;
+  border: 1px solid #ccc;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}

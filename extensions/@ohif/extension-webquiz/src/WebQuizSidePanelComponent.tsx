@@ -14,7 +14,7 @@ import { fetchAnnotationsFromDB } from './handlers/fetchAnnotations';
 import { handleDropdownChange } from './handlers/dropdownHandlers';
 import { handleMeasurementClick, toggleVisibility, closeScoreModal } from './handlers/guiHandlers';
 import { useSystem } from '@ohif/core';
-import { AnnotationList } from './components/AnnotationList';
+import { AnnotationList } from './components/AnnotationList/AnnotationList';
 import { ScoreModal } from './components/ScoreModal';
 import { handleAnnotationAdd, handleAnnotationChange, handleAnnotationRemove } from './handlers/annotationEventHandlers';
 import { createDebouncedStatsUpdater } from './utils/annotationUtils';
@@ -271,7 +271,15 @@ function WebQuizSidePanelComponent() {
     //=========================================================
     ////////////////////////////////////////////
     return (
-        <div className="text-white w-full text-center">
+            <div style={{
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                }}
+             >
+            <div className="text-white w-full text-center"
+                 style={{ flexGrow: 1, minHeight: 0 }}
+            >
             <AnnotationList
                 measurementList={measurementList}
                 dropdownSelectionMap={dropdownSelectionMap}
@@ -283,15 +291,16 @@ function WebQuizSidePanelComponent() {
                 triggerPost={triggerPost}
                 annotation={annotation}
             />
+            </div>
             <ScoreModal
-                isOpen={showScoreModal}
-                scoreOptions={scoreOptions}
-                selectedScore={selectedScore}
-                setSelectedScore={setSelectedScore}
-                onClose={onCloseScoreModal}
+            isOpen={showScoreModal}
+            scoreOptions={scoreOptions}
+            selectedScore={selectedScore}
+            setSelectedScore={setSelectedScore}
+            onClose={onCloseScoreModal}
             />
         </div>
-    );    
+    );
 
 }
 
