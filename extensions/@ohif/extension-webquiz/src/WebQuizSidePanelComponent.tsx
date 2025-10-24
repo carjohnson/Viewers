@@ -19,6 +19,8 @@ import { ScoreModal } from './components/ScoreModal';
 import { handleAnnotationAdd, handleAnnotationChange, handleAnnotationRemove } from './handlers/annotationEventHandlers';
 import { createDebouncedStatsUpdater } from './utils/annotationUtils';
 import { createDebouncedModalTrigger } from './utils/annotationUtils';
+import { buildDropdownSelectionMapFromState } from './utils/annotationUtils';
+
 
 
 
@@ -34,7 +36,6 @@ function WebQuizSidePanelComponent() {
     const [annotationData, setAnnotationData] = useState<AnnotationStats[]>([]);
     const [isSaved, setIsSaved] = useState(true);
     const [annotationsLoaded, setAnnotationsLoaded] = useState(false);
-    
     const [visibilityMap, setVisibilityMap] = useState<Record<string, boolean>>({});
     const [dropdownSelectionMap, setDropdownSelectionMap] = useState<Record<string, number>>({});
     const [showScoreModal, setShowScoreModal] = useState(false);
@@ -42,17 +43,17 @@ function WebQuizSidePanelComponent() {
     const [activeUID, setActiveUID] = useState<string | null>(null);
     const [listOfUsersAnnotations, setListOfUsersAnnotations] = useState(null);
 
+    //~~~~~~~~~~~~~~~~~
     // ensure debounced definitions are stable across renders using useMemo
     const debouncedUpdateStats = useMemo(() => createDebouncedStatsUpdater(setAnnotationData), [setAnnotationData]);
     const debouncedShowScoreModal = useMemo(() => createDebouncedModalTrigger(setShowScoreModal), [setShowScoreModal]);
 
-    //=========================================================
+    //~~~~~~~~~~~~~~~~~
     const { servicesManager } = useSystem();
     const { measurementService, viewportGridService } = servicesManager.services;
     const activeViewportId = viewportGridService.getActiveViewportId();
     const measurementList = measurementService.getMeasurements(); 
     const measurementListRef = useRef([]);    
-    const pendingAlertUIDsRef = useRef<string[]>([]);
     const pendingAnnotationUIDRef = useRef<string | null>(null);
 
     const userInfo = getUserInfo();
@@ -120,7 +121,6 @@ function WebQuizSidePanelComponent() {
             debouncedUpdateStats,
             setDropdownSelectionMap,
             triggerPost,
-            pendingAlertUIDsRef,
          });
         const wrappedAnnotationChangeHandler = (event: any) => handleAnnotationChange({
             event,
@@ -129,7 +129,6 @@ function WebQuizSidePanelComponent() {
             setDropdownSelectionMap,
             setShowScoreModal,
             triggerPost,
-            pendingAlertUIDsRef,
             debouncedShowScoreModal,
             setActiveUID,
             pendingAnnotationUIDRef,
@@ -140,7 +139,6 @@ function WebQuizSidePanelComponent() {
             debouncedUpdateStats,
             setDropdownSelectionMap,
             triggerPost,
-            pendingAlertUIDsRef,
         });
         // cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_ADDED, wrappedAnnotationAddHandler);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangeHandler);
@@ -195,7 +193,7 @@ function WebQuizSidePanelComponent() {
     }, [userInfo, annotationsLoaded]);
 
     //=========================================================
-    // ======== fetch annotations from DB based on user role
+    // ~~~~~~ fetch annotations from DB based on user role
     useEffect(() => {
         if (!userInfo?.username || !patientName) return;
 
@@ -212,7 +210,7 @@ function WebQuizSidePanelComponent() {
 
 
     //=========================================================
-    // ======== post annotations to DB
+    // ~~~~~~ post annotations to DB
     // Memorize the trigger for POST to make sure all handlers who use
     //      triggerPost access it once the patientName is available 
     const triggerPost = useMemo(() => {
@@ -256,12 +254,20 @@ function WebQuizSidePanelComponent() {
             dropdownSelectionMap,
             setDropdownSelectionMap,
             triggerPost,
-            pendingAlertUIDsRef,
             annotation,
         });
     };    
     
-    
+    //=========================================================
+    // when the extension is 
+    // collapsed and reloaded. Then the scores can be 're-fetched' from the database
+    useEffect(() => {
+        const allAnnotations = annotation.state.getAllAnnotations?.() || [];
+        const newMap = buildDropdownSelectionMapFromState(allAnnotations);
+        setDropdownSelectionMap(newMap);
+    }, []);
+
+
     //=========================================================
     ////////////////////////////////////////////
     return (

@@ -9,7 +9,6 @@ export const handleDropdownChange = ({
   dropdownSelectionMap,
   setDropdownSelectionMap,
   triggerPost,
-  pendingAlertUIDsRef,
   annotation,
 }: {
   uid: string;
@@ -17,7 +16,6 @@ export const handleDropdownChange = ({
   dropdownSelectionMap: Record<string, number>;
   setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   triggerPost: (args: TriggerPostArgs) => void;
-  pendingAlertUIDsRef: React.RefObject<string[]>;
   annotation: any;
 }) => {
   const userInfo = getUserInfo();
@@ -27,13 +25,10 @@ export const handleDropdownChange = ({
   } else {
     const updatedMap = { ...dropdownSelectionMap, [uid]: value };
     setDropdownSelectionMap(updatedMap);
-    console.log('********* Pending Alert UIDs Ref:', pendingAlertUIDsRef);
 
     triggerPost({
       allAnnotations: annotation.state.getAllAnnotations(),
       dropdownSelectionMap: updatedMap,
-      suppressAlert: true,
-      pendingAlertUIDsRef,
     });
 }
 };

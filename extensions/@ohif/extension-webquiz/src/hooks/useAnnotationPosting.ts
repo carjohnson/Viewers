@@ -7,15 +7,13 @@ export const useAnnotationPosting = ({
   measurementListRef,
   setIsSaved,
 }) => {
-  return ({ allAnnotations, dropdownSelectionMap, suppressAlert, pendingAlertUIDsRef  }) => {
+  return ({ allAnnotations, dropdownSelectionMap  }) => {
     postAnnotations({
       allAnnotations,
       dropdownSelectionMap,
       patientName,
       measurementListRef,
       setIsSaved,
-      suppressAlert,
-      pendingAlertUIDsRef,
     });
   };
 };

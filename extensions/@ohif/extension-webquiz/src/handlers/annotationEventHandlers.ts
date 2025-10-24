@@ -13,14 +13,12 @@ export const handleAnnotationAdd = ({
   debouncedUpdateStats,
   setDropdownSelectionMap,
   triggerPost,
-  pendingAlertUIDsRef,
 }: {
   event: any;
   setIsSaved: (value: boolean) => void;
   debouncedUpdateStats: () => void;
   setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   triggerPost: (args: TriggerPostArgs) => void;
-  pendingAlertUIDsRef: React.RefObject<string[]>;
 }) => {
   const userInfo = getUserInfo();
   if (!userInfo?.username) {
@@ -47,8 +45,6 @@ export const handleAnnotationAdd = ({
         triggerPost({
             allAnnotations,
             dropdownSelectionMap: newMap,
-            suppressAlert: false,
-            pendingAlertUIDsRef,
         });
         }, 5000);
     }, 200);
@@ -64,7 +60,6 @@ export const handleAnnotationChange = ({
   setDropdownSelectionMap,
   setShowScoreModal,
   triggerPost,
-  pendingAlertUIDsRef,
   debouncedShowScoreModal,
   setActiveUID,
   pendingAnnotationUIDRef,
@@ -75,7 +70,6 @@ export const handleAnnotationChange = ({
   setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   setShowScoreModal: (modalWindow: boolean) => void;
   triggerPost: (args: TriggerPostArgs) => void;
-  pendingAlertUIDsRef: React.RefObject<string[]>;
   debouncedShowScoreModal: () => void;
   setActiveUID: (activeUID: string | null) => void;
   pendingAnnotationUIDRef: React.MutableRefObject<string | null>;
@@ -111,17 +105,14 @@ export const handleAnnotationChange = ({
       changedAnnotation.data.suspicionScore >= 1 &&
       changedAnnotation.data.suspicionScore <= 5;
 
-    const iMSecsDelay = !isScoreValid || bContinueDelay ? 5000 : 0;
+    if (!isScoreValid || bContinueDelay) {
+      setTimeout(() => {
+        triggerPost({ allAnnotations, dropdownSelectionMap: newMap });
+      }, 500);
+    } else {
+      triggerPost({ allAnnotations, dropdownSelectionMap: newMap });
+    }
 
-
-    setTimeout(() => {
-    triggerPost({
-        allAnnotations,
-        dropdownSelectionMap: newMap,
-        suppressAlert: false,
-        pendingAlertUIDsRef,
-    });
-    }, iMSecsDelay);   
 };
 
 //=========================================================
@@ -132,26 +123,24 @@ export const handleAnnotationRemove = ({
   debouncedUpdateStats,
   setDropdownSelectionMap,
   triggerPost,
-  pendingAlertUIDsRef,
 }: {
   event: any;
   setIsSaved: (value: boolean) => void;
   debouncedUpdateStats: () => void;
   setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   triggerPost: (args: TriggerPostArgs) => void;
-  pendingAlertUIDsRef: React.RefObject<string[]>;
 }) => {
     setIsSaved(false);
     debouncedUpdateStats();
-    const allAnnotations = annotation.state.getAllAnnotations?.() || [];
+    setTimeout(() => {
+      const allAnnotations = annotation.state.getAllAnnotations?.() || [];
+      const newMap = buildDropdownSelectionMapFromState(allAnnotations);
+      setDropdownSelectionMap(newMap);
 
-    const newMap = buildDropdownSelectionMapFromState(allAnnotations);
-    setDropdownSelectionMap(newMap);
+      triggerPost({
+          allAnnotations,
+          dropdownSelectionMap: newMap,
+      });
+    }, 0);
 
-    triggerPost({
-        allAnnotations,
-        dropdownSelectionMap: newMap,
-        suppressAlert: true,
-        pendingAlertUIDsRef,
-    });
 };
