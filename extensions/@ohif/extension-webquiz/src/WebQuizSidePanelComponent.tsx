@@ -1,5 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
-import BtnComponent from './components/btnComponent';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 
 import * as cornerstone from '@cornerstonejs/core';
 import * as cornerstoneTools from '@cornerstonejs/tools';
@@ -8,9 +7,20 @@ import { useStudyInfoStore } from './stores/useStudyInfoStore';
 import { useStudyInfo } from './hooks/useStudyInfo';
 import { usePatientInfo } from '@ohif/extension-default';
 import { API_BASE_URL } from './config/config';
-import { AnnotationStats } from './components/annotationStats';
-import { debounce } from './utils/debounce';
+import { AnnotationStats } from './models/AnnotationStats';
 import { setUserInfo, getUserInfo } from './../../../../modes/@ohif/mode-webquiz/src/userInfoService';
+import { useAnnotationPosting } from './hooks/useAnnotationPosting';
+import { fetchAnnotationsFromDB } from './handlers/fetchAnnotations';
+import { handleDropdownChange } from './handlers/dropdownHandlers';
+import { handleMeasurementClick, toggleVisibility, closeScoreModal } from './handlers/guiHandlers';
+import { useSystem } from '@ohif/core';
+import { AnnotationList } from './components/AnnotationList';
+import { ScoreModal } from './components/ScoreModal';
+import { handleAnnotationAdd, handleAnnotationChange, handleAnnotationRemove } from './handlers/annotationEventHandlers';
+import { createDebouncedStatsUpdater } from './utils/annotationUtils';
+import { createDebouncedModalTrigger } from './utils/annotationUtils';
+import { buildDropdownSelectionMapFromState } from './utils/annotationUtils';
+
 
 
 
@@ -24,14 +34,37 @@ function WebQuizSidePanelComponent() {
     //  component needs to be subscribed to those updates
 
     const [annotationData, setAnnotationData] = useState<AnnotationStats[]>([]);
-    // const [userInfo, setUserInfo] = useState(null);
     const [isSaved, setIsSaved] = useState(true);
     const [annotationsLoaded, setAnnotationsLoaded] = useState(false);
+    const [visibilityMap, setVisibilityMap] = useState<Record<string, boolean>>({});
+    const [dropdownSelectionMap, setDropdownSelectionMap] = useState<Record<string, number>>({});
+    const [showScoreModal, setShowScoreModal] = useState(false);
+    const [selectedScore, setSelectedScore] = useState<number | null>(null);
+    const [activeUID, setActiveUID] = useState<string | null>(null);
+    const [listOfUsersAnnotations, setListOfUsersAnnotations] = useState(null);
+
+    //~~~~~~~~~~~~~~~~~
+    // ensure debounced definitions are stable across renders using useMemo
+    const debouncedUpdateStats = useMemo(() => createDebouncedStatsUpdater(setAnnotationData), [setAnnotationData]);
+    const debouncedShowScoreModal = useMemo(() => createDebouncedModalTrigger(setShowScoreModal), [setShowScoreModal]);
+
+    //~~~~~~~~~~~~~~~~~
+    const { servicesManager } = useSystem();
+    const { measurementService, viewportGridService } = servicesManager.services;
+    const activeViewportId = viewportGridService.getActiveViewportId();
+    const measurementList = measurementService.getMeasurements(); 
+    const measurementListRef = useRef([]);    
+    const pendingAnnotationUIDRef = useRef<string | null>(null);
 
     const userInfo = getUserInfo();
 
-
-    // console.log("🔍 API Base URL:", API_BASE_URL);
+    const scoreOptions = [
+        { value: 1, label: '1' },
+        { value: 2, label: '2' },
+        { value: 3, label: '3' },
+        { value: 4, label: '4' },
+        { value: 5, label: '5' },
+    ];
 
 
     // ---------------------------------------------
@@ -50,8 +83,10 @@ function WebQuizSidePanelComponent() {
     const { patientInfo } = usePatientInfo();
     const studyInfoFromHook = useStudyInfo();
     const { studyInfo, setStudyInfo } = useStudyInfoStore();
+    const patientName = patientInfo?.PatientName;
 
 
+    //=========================================================
     useEffect(() => {
         if (!studyInfoFromHook?.studyUID || !patientInfo?.PatientName) {
             console.log('⏳ Waiting for full study info...');
@@ -72,64 +107,80 @@ function WebQuizSidePanelComponent() {
     // console.log('🧠 useStudyInfo() returned:', studyInfoFromHook);
     // console.log('📦 Zustand store currently holds:', studyInfo);
 
-
-    // Annotations listeners and handlers
+    //=========================================================
+    // add listeners with handlers
     useEffect(() => {
-        if (!userInfo?.username) return;
+        if (!patientName) {
+            console.log('⏳ Waiting for patientName before setting up listeners...');
+            return;
+        }
 
-        const handleAnnotationAdd = (event) => {
-            if (!userInfo?.username) {
-                console.warn("⚠️ Username not available yet. Skipping label assignment.");
-                return;
+        const wrappedAnnotationAddHandler = (event: any) => handleAnnotationAdd({
+            event,
+            setIsSaved,
+            debouncedUpdateStats,
+            setDropdownSelectionMap,
+            triggerPost,
+         });
+        const wrappedAnnotationChangeHandler = (event: any) => handleAnnotationChange({
+            event,
+            setIsSaved,
+            debouncedUpdateStats,
+            setDropdownSelectionMap,
+            setShowScoreModal,
+            triggerPost,
+            debouncedShowScoreModal,
+            setActiveUID,
+            pendingAnnotationUIDRef,
+        });
+        const wrappedAnnotationRemovedHandler = (event: any) => handleAnnotationRemove({
+            event,
+            setIsSaved,
+            debouncedUpdateStats,
+            setDropdownSelectionMap,
+            triggerPost,
+        });
+        // cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_ADDED, wrappedAnnotationAddHandler);
+        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangeHandler);
+        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationRemovedHandler);
+        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, wrappedAnnotationChangeHandler);
+
+        return () => {
+        //   cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_ADDED, wrappedAnnotationAddHandler);
+          cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangeHandler);
+          cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationRemovedHandler);
+          cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, wrappedAnnotationChangeHandler);
+        }
+
+    }, [patientName]);
+
+    //=========================================================
+    useEffect(() => {
+        const handleMouseUp = () => {
+            const uid = pendingAnnotationUIDRef.current;
+            if (uid) {
+            setActiveUID(uid);
+                debouncedShowScoreModal();
+                pendingAnnotationUIDRef.current = null;
             }
-            setTimeout(() => {
-                const measurementIndex = getLastIndexStored() + 1;
-                const customLabel = `${userInfo.username}_${measurementIndex}`;
+        };
 
-                const { annotation } = event.detail;
-                if (annotation.data.label === "") {
-                    annotation.data.label = customLabel;
-                }
-            }, 200);  // give measurement service time to render proper labels
-
-            debouncedUpdateStats(); // wait for system to settle after add
-        }
-        
-        // delay acquiring stats to let ohif complete the add of the annotation
-        const debouncedUpdateStats = debounce(() => {
-            setAnnotationData(getAnnotationsStats());
-        }, 100);
-
-        const handleAnnotationChange = () => {
-            debouncedUpdateStats();
-        };        
+        window.addEventListener('mouseup', handleMouseUp);
+        return () => {
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, []);
 
 
-        // Register listeners
-        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_ADDED, handleAnnotationAdd);
-        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, handleAnnotationChange);
-        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, handleAnnotationChange);
-        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, handleAnnotationChange);
-
-        // Cleanup on unmount
-        return() => {
-            cornerstone.eventTarget.removeEventListener(cornerstoneTools.Enums.Events.ANNOTATION_ADDED, handleAnnotationAdd);
-            cornerstone.eventTarget.removeEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, handleAnnotationChange);
-            cornerstone.eventTarget.removeEventListener(cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, handleAnnotationChange);
-            cornerstone.eventTarget.removeEventListener(cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, handleAnnotationChange);
-        }
-    }, [userInfo] );
-
-
-    //=====================
-    // watch for changes to the state properties
+    //=========================================================
     useEffect(() => {
         if (annotationData.length > 0) {
             setIsSaved(false);
-            // console.log(' Annotation Change');
         }
     }, [annotationData]);
 
+    //=========================================================
+    // watch for changes to the state properties
     // wait for all annotations to be loaded, then set to locked if user role is 'admin'
     useEffect(() => {
         if (!annotationsLoaded || userInfo?.role !== 'admin') return;
@@ -141,73 +192,104 @@ function WebQuizSidePanelComponent() {
         console.log('🔒 All annotations locked for admin user:', userInfo.username);
     }, [userInfo, annotationsLoaded]);
 
-    ////////////////////////////////////////////
-    //=====================
-    // helper functions
-    //=====================
-    ////////////////////////////////////////////
+    //=========================================================
+    // ~~~~~~ fetch annotations from DB based on user role
+    useEffect(() => {
+        if (!userInfo?.username || !patientName) return;
 
-    //=====================
-    // function to get list of all cached annotation stats
-    //  also store the annotation uid
-    const getAnnotationsStats = (): AnnotationStats[] => {
-        const lo_annotationStats: AnnotationStats[] = [];
-        const allAnnotations = annotation.state.getAllAnnotations();
-
-        allAnnotations.forEach((ann, index) => {
-            const stats = ann.data?.cachedStats as AnnotationStats;
-            const uid = ann.annotationUID;
-
-            if (
-                stats &&
-                Object.keys(stats).length > 0 &&
-                uid &&
-                !lo_annotationStats.some(existing => existing.uid === uid)
-            ) {
-                lo_annotationStats.push({
-                    ...stats,
-                    uid,
-                });
-            }
-
+        fetchAnnotationsFromDB({
+        userInfo,
+        patientName,
+        baseUrl: API_BASE_URL,
+        setListOfUsersAnnotations,
+        setDropdownSelectionMap,
+        annotation,
+        setAnnotationsLoaded,
         });
+    }, [userInfo, patientName]);
 
-        return lo_annotationStats;
-    };
 
-    //=====================
-    // function to get the last index used when adding annotations
-    const getLastIndexStored = (): number => {
-        let iLastIndex = 0;
-        const allAnnotations = annotation.state.getAllAnnotations();
+    //=========================================================
+    // ~~~~~~ post annotations to DB
+    // Memorize the trigger for POST to make sure all handlers who use
+    //      triggerPost access it once the patientName is available 
+    const triggerPost = useMemo(() => {
+        if (!patientName) return null;
 
-        allAnnotations.forEach((oAnnotation, index) => {
-        // console.log("🧩 Annotation object:", oAnnotation);
-        const sLabel = oAnnotation?.data?.label;
-            if (sLabel) {
-                let iCurrentIndex = parseInt(sLabel.split('_').pop() ?? "0", 10);
-                if (isNaN(iCurrentIndex)) {
-                    iCurrentIndex = 99
-                }
-                iLastIndex = Math.max(iLastIndex, iCurrentIndex);
-            }
+        return useAnnotationPosting({
+            patientName,
+            measurementListRef,
+            setIsSaved,
         });
+    }, [patientName, measurementListRef, setIsSaved]);
 
-        return iLastIndex;
-    };
+    //=========================================================
+    const onMeasurementClick = (id: string) =>
+        handleMeasurementClick({ measurementId: id, annotation, measurementService, activeViewportId });
+
+    //=========================================================
+    const onToggleVisibility = (uid: string) =>
+        toggleVisibility({ uid, visibilityMap, setVisibilityMap, measurementService });
+
+    //=========================================================
+    const onCloseScoreModal = () =>
+    closeScoreModal({
+        activeUID,
+        selectedScore,
+        setSelectedScore,
+        setDropdownSelectionMap,
+        setShowScoreModal,
+    });
+
+    //=========================================================
+    const onDropdownChange = (uid: string, value: number) => {
+        if (!triggerPost) {
+            console.warn('⏳ triggerPost not ready yet — skipping dropdown change post');
+            return;
+        }
+
+        handleDropdownChange({
+            uid,
+            value,
+            dropdownSelectionMap,
+            setDropdownSelectionMap,
+            triggerPost,
+            annotation,
+        });
+    };    
+    
+    //=========================================================
+    // when the extension is 
+    // collapsed and reloaded. Then the scores can be 're-fetched' from the database
+    useEffect(() => {
+        const allAnnotations = annotation.state.getAllAnnotations?.() || [];
+        const newMap = buildDropdownSelectionMapFromState(allAnnotations);
+        setDropdownSelectionMap(newMap);
+    }, []);
 
 
-
-    ////////////////////////////////////////////
+    //=========================================================
     ////////////////////////////////////////////
     return (
         <div className="text-white w-full text-center">
-        <BtnComponent
-            baseUrl={API_BASE_URL}
-            setAnnotationsLoaded={setAnnotationsLoaded}
-            setIsSaved={setIsSaved}
-            studyInfo={studyInfo}
-        />
+            <AnnotationList
+                measurementList={measurementList}
+                dropdownSelectionMap={dropdownSelectionMap}
+                visibilityMap={visibilityMap}
+                scoreOptions={scoreOptions}
+                onDropdownChange={onDropdownChange}
+                onMeasurementClick={onMeasurementClick}
+                onToggleVisibility={onToggleVisibility}
+                triggerPost={triggerPost}
+                annotation={annotation}
+            />
+            <ScoreModal
+                isOpen={showScoreModal}
+                scoreOptions={scoreOptions}
+                selectedScore={selectedScore}
+                setSelectedScore={setSelectedScore}
+                onClose={onCloseScoreModal}
+            />
         </div>
     );    
 
