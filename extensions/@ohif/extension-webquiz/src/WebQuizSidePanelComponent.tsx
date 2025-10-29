@@ -16,7 +16,7 @@ import { handleMeasurementClick, toggleVisibility, closeScoreModal } from './han
 import { useSystem } from '@ohif/core';
 import { AnnotationList } from './components/AnnotationList/AnnotationList';
 import { ScoreModal } from './components/ScoreModal';
-import { handleAnnotationAdd, handleAnnotationChange, handleAnnotationRemove } from './handlers/annotationEventHandlers';
+import { handleAnnotationChange, handleAnnotationRemove } from './handlers/annotationEventHandlers';
 import { createDebouncedStatsUpdater } from './utils/annotationUtils';
 import { createDebouncedModalTrigger } from './utils/annotationUtils';
 import { buildDropdownSelectionMapFromState } from './utils/annotationUtils';
@@ -115,13 +115,6 @@ function WebQuizSidePanelComponent() {
             return;
         }
 
-        const wrappedAnnotationAddHandler = (event: any) => handleAnnotationAdd({
-            event,
-            setIsSaved,
-            debouncedUpdateStats,
-            setDropdownSelectionMap,
-            triggerPost,
-         });
         const wrappedAnnotationChangeHandler = (event: any) => handleAnnotationChange({
             event,
             setIsSaved,
@@ -133,6 +126,7 @@ function WebQuizSidePanelComponent() {
             setActiveUID,
             pendingAnnotationUIDRef,
         });
+
         const wrappedAnnotationRemovedHandler = (event: any) => handleAnnotationRemove({
             event,
             setIsSaved,
@@ -140,13 +134,11 @@ function WebQuizSidePanelComponent() {
             setDropdownSelectionMap,
             triggerPost,
         });
-        // cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_ADDED, wrappedAnnotationAddHandler);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangeHandler);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationRemovedHandler);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, wrappedAnnotationChangeHandler);
 
         return () => {
-        //   cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_ADDED, wrappedAnnotationAddHandler);
           cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangeHandler);
           cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationRemovedHandler);
           cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, wrappedAnnotationChangeHandler);

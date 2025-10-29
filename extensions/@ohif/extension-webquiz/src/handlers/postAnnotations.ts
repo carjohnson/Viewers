@@ -1,9 +1,4 @@
-import * as cornerstone from '@cornerstonejs/core';
-import { Enums } from '@cornerstonejs/tools';
-import { arraysEqual } from '../utils/dataUtils';
-import { annotation } from '@cornerstonejs/tools';
-
-
+// src/handlers/postAnnotations.ts
 // ======== post annotations to Server
 export const postAnnotations = ({
     allAnnotations,

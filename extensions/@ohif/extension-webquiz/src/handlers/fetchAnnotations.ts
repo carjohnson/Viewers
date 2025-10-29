@@ -1,4 +1,4 @@
-// // src/handlers/fetchAnnotations.ts
+// src/handlers/fetchAnnotations.ts
 import { buildDropdownSelectionMapFromFetched } from '../utils/annotationUtils';
 
 export const fetchAnnotationsFromDB = async ({

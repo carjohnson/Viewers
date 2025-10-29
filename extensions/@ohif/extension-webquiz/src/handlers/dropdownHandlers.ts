@@ -30,5 +30,5 @@ export const handleDropdownChange = ({
       allAnnotations: annotation.state.getAllAnnotations(),
       dropdownSelectionMap: updatedMap,
     });
-}
+  }
 };
