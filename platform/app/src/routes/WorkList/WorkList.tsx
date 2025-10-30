@@ -246,6 +246,15 @@ function WorkList({
     return !isEqual(filterValues, defaultFilterValues);
   };
 
+
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  const mockStudyStatusMap  = {
+    '1613192914.239053053316326170422028743544372735497': 'done',
+    '1.2.840.113619.2.5.1762583153.215519.978957063.78': 'wip',
+  };
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
   const rollingPageNumberMod = Math.floor(101 / resultsPerPage);
   const rollingPageNumber = (pageNumber - 1) % rollingPageNumberMod;
   const offset = resultsPerPage * rollingPageNumber;
@@ -294,10 +303,36 @@ function WorkList({
       );
     };
 
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const status = mockStudyStatusMap[studyInstanceUid] || 'new';
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
     return {
       dataCY: `studyRow-${studyInstanceUid}`,
       clickableCY: studyInstanceUid,
       row: [
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        {
+          key: 'status',
+          content: (
+            <span
+              className={`text-center text-lg font-semibold ${
+                status === 'done'
+                  ? 'text-green-400'
+                  : status === 'wip'
+                  ? 'text-yellow-400'
+                  : 'text-red-400'
+              }`}
+            >
+              {status === 'done' ? '✅' : status === 'wip' ? '🟡' : '❌'}
+            </span>
+          ),
+          title: status === 'done' ? 'Completed' : status === 'wip' ? 'In Progress' : 'New',
+          gridCol: 2,
+        },
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
         {
           key: 'patientName',
           content: patientName ? makeCopyTooltipCell(patientName) : null,

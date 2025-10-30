@@ -87,14 +87,14 @@ function modeFactory({ modeConfiguration }) {
 
       toolbarService.updateSection('MeasurementTools', [
         'Length',
-        'Bidirectional',
-        'ArrowAnnotate',
-        'EllipticalROI',
-        'RectangleROI',
-        'CircleROI',
-        'PlanarFreehandROI',
-        'SplineROI',
-        'LivewireContour',
+        // 'Bidirectional',
+        // 'ArrowAnnotate',
+        // 'EllipticalROI',
+        // 'RectangleROI',
+        // 'CircleROI',
+        // 'PlanarFreehandROI',
+        // 'SplineROI',
+        // 'LivewireContour',
       ]);
 
       toolbarService.updateSection('MoreTools', [

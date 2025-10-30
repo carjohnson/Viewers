@@ -21,7 +21,7 @@ import { createDebouncedStatsUpdater } from './utils/annotationUtils';
 import { createDebouncedModalTrigger } from './utils/annotationUtils';
 import { buildDropdownSelectionMapFromState } from './utils/annotationUtils';
 
-
+import MarkSeriesCompletedButton from './components/MarkSeriesCompletedButton';
 
 
 /**
@@ -42,6 +42,7 @@ function WebQuizSidePanelComponent() {
     const [selectedScore, setSelectedScore] = useState<number | null>(null);
     const [activeUID, setActiveUID] = useState<string | null>(null);
     const [listOfUsersAnnotations, setListOfUsersAnnotations] = useState(null);
+    const [isSeriesAnnotationsCompleted, setSeriesAnnotationsCompleted] = useState(false);
 
     //~~~~~~~~~~~~~~~~~
     // ensure debounced definitions are stable across renders using useMemo
@@ -88,7 +89,10 @@ function WebQuizSidePanelComponent() {
 
     //=========================================================
     useEffect(() => {
-        if (!studyInfoFromHook?.studyUID || !patientInfo?.PatientName) {
+        if (!studyInfoFromHook?.studyUID ||
+            !studyInfoFromHook?.seriesUID ||
+            !patientInfo?.PatientName
+        ) {
             console.log('⏳ Waiting for full study info...');
             return;
         }
@@ -99,7 +103,7 @@ function WebQuizSidePanelComponent() {
             patientId: patientInfo.PatientID,
         };
 
-        console.log('✅ Setting full study info in Zustand:', fullInfo);
+        // console.log('✅ Setting full study info in Zustand:', fullInfo);
         setStudyInfo(fullInfo);
     }, [studyInfoFromHook, patientInfo]);
 
@@ -267,8 +271,19 @@ function WebQuizSidePanelComponent() {
                     height: '100%',
                     display: 'flex',
                     flexDirection: 'column',
+                    overflowX: 'hidden',
+                    padding: '0 0.5rem',
                 }}
              >
+            <MarkSeriesCompletedButton
+                studyInstanceUID={studyInfoFromHook?.studyUID}
+                seriesInstanceUID={studyInfoFromHook?.seriesUID}
+                completed={isSeriesAnnotationsCompleted}
+                setCompleted={setSeriesAnnotationsCompleted}
+                onMarkCompleted={(studyUID, seriesUID) => {
+                console.log(`🧠 Study ${studyUID}, Series ${seriesUID} marked as completed`);
+                }}
+            />
             <div className="text-white w-full text-center"
                  style={{ flexGrow: 1, minHeight: 0 }}
             >
