@@ -51,14 +51,12 @@ export function useStudyInfo() {
       }
 
       const studyUID = firstDisplaySet.StudyInstanceUID ?? null;
-      const seriesUID = firstDisplaySet.SeriesInstanceUID ?? null;
       const imageId = firstDisplaySet.images[0].imageId;
       const imagePlaneModule = metaData.get('imagePlaneModule', imageId);
       const frameUID = imagePlaneModule?.frameOfReferenceUID ?? null;
 
       const info = {
         studyUID,
-        seriesUID,
         frameUID,
       };
 

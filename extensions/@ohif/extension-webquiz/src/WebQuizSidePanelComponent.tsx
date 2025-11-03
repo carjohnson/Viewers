@@ -11,6 +11,7 @@ import { AnnotationStats } from './models/AnnotationStats';
 import { setUserInfo, getUserInfo } from './../../../../modes/@ohif/mode-webquiz/src/userInfoService';
 import { useAnnotationPosting } from './hooks/useAnnotationPosting';
 import { fetchAnnotationsFromDB } from './handlers/fetchAnnotations';
+import { validateSeriesFromDB } from './handlers/validateSeriesHandler';
 import { handleDropdownChange } from './handlers/dropdownHandlers';
 import { handleMeasurementClick, toggleVisibility, closeScoreModal } from './handlers/guiHandlers';
 import { useSystem } from '@ohif/core';
@@ -23,6 +24,8 @@ import { buildDropdownSelectionMapFromState } from './utils/annotationUtils';
 
 import MarkSeriesCompletedButton from './components/MarkSeriesCompletedButton';
 
+
+import { useViewportGrid } from '@ohif/ui-next';
 
 /**
  *  Creating a React component to be used as a side panel in OHIF.
@@ -43,6 +46,7 @@ function WebQuizSidePanelComponent() {
     const [activeUID, setActiveUID] = useState<string | null>(null);
     const [listOfUsersAnnotations, setListOfUsersAnnotations] = useState(null);
     const [isSeriesAnnotationsCompleted, setSeriesAnnotationsCompleted] = useState(false);
+    const [seriesInstanceUID, setSeriesInstanceUID] = useState<string | null>(null);
 
     //~~~~~~~~~~~~~~~~~
     // ensure debounced definitions are stable across renders using useMemo
@@ -90,7 +94,6 @@ function WebQuizSidePanelComponent() {
     //=========================================================
     useEffect(() => {
         if (!studyInfoFromHook?.studyUID ||
-            !studyInfoFromHook?.seriesUID ||
             !patientInfo?.PatientName
         ) {
             console.log('⏳ Waiting for full study info...');
@@ -110,6 +113,106 @@ function WebQuizSidePanelComponent() {
     //>>>>> for debug <<<<<
     // console.log('🧠 useStudyInfo() returned:', studyInfoFromHook);
     // console.log('📦 Zustand store currently holds:', studyInfo);
+
+    //=========================================================
+    // This effect validates the series against the project
+    //      The database holds the list of studyUIDs and the seriesUIDs within
+    //      the study that are part of the project.
+    //      The user is supposed to annotate only specific series
+
+    // useEffect(() => {
+    // const { cornerstoneViewportService, viewportGridService } = servicesManager.services;
+
+    // const handler = async ({ displaySetInstanceUID }) => {
+
+    //     const activeViewportId = viewportGridService.getActiveViewportId();
+    //     const state = viewportGridService.getState();
+
+    //     const activeViewport = state.viewports.get(activeViewportId);
+    //     displaySetInstanceUID = activeViewport.displaySetInstanceUIDs;
+
+    //     const displaySetService = servicesManager.services.displaySetService;
+    //     const displaySetUIDs = viewportGridService.getDisplaySetsUIDsForViewport(activeViewportId);
+    //     const viewportDisplaySets = displaySetUIDs.map(uid =>
+    //         displaySetService.getDisplaySetByUID(uid)
+    //         );
+
+    //     const seriesUID = viewportDisplaySets[0].instances[0].SeriesInstanceUID;
+    //     setSeriesInstanceUID(seriesUID);
+
+    //     // console.log(' **** Series UID: ', seriesUID);
+    //     // console.log('📸 Viewport event fired:', displaySetInstanceUID);
+
+    //     if (!studyInfo?.studyUID || !seriesUID) return;
+
+    //     const result = await validateSeriesFromDB({
+    //         baseUrl: API_BASE_URL,
+    //         studyUID: studyInfoFromHook.studyUID,
+    //         seriesUID: seriesUID,
+    //     });
+
+    //     if (!result?.isValid) {
+    //         alert('❌ Series not part of project! Select a different series.');
+    //     } else {
+    //         console.log('✅ Series validated');
+    //     }
+
+    // };
+
+    // const subscription = cornerstoneViewportService.subscribe(
+    //     'event::cornerstoneViewportService:viewportDataChanged',
+    //     handler
+    // );
+
+    // return () => {
+    //     subscription.unsubscribe();
+    // };
+    // }, [studyInfo]);
+
+    useEffect(() => {
+    const { cornerstoneViewportService, viewportGridService, displaySetService } = servicesManager.services;
+
+    const validateCurrentSeries = async () => {
+        const activeViewportId = viewportGridService.getActiveViewportId();
+        const displaySetUIDs = viewportGridService.getDisplaySetsUIDsForViewport(activeViewportId);
+        const viewportDisplaySets = displaySetUIDs.map(uid =>
+        displaySetService.getDisplaySetByUID(uid)
+        );
+
+        const seriesUID = viewportDisplaySets?.[0]?.instances?.[0]?.SeriesInstanceUID;
+        if (!studyInfo?.studyUID || !seriesUID) return;
+
+        setSeriesInstanceUID(seriesUID); // ✅ update state for rest of component
+
+        const result = await validateSeriesFromDB({
+        baseUrl: API_BASE_URL,
+        studyUID: studyInfo.studyUID,
+        seriesUID,
+        });
+
+        if (!result?.isValid) {
+        alert('❌ Series not part of project! Select a different series.');
+        } else {
+        console.log(`✅ Series ${seriesUID} validated`);
+        }
+    };
+
+    // Run once when studyInfo is ready
+    if (studyInfo?.studyUID) {
+        validateCurrentSeries();
+    }
+
+    // Subscribe to viewport changes
+    const subscription = cornerstoneViewportService.subscribe(
+        'event::cornerstoneViewportService:viewportDataChanged',
+        validateCurrentSeries
+    );
+
+    return () => {
+        subscription.unsubscribe();
+    };
+    }, [studyInfo]);
+
 
     //=========================================================
     // add listeners with handlers
@@ -277,11 +380,11 @@ function WebQuizSidePanelComponent() {
              >
             <MarkSeriesCompletedButton
                 studyInstanceUID={studyInfoFromHook?.studyUID}
-                seriesInstanceUID={studyInfoFromHook?.seriesUID}
+                seriesInstanceUID={seriesInstanceUID}
                 completed={isSeriesAnnotationsCompleted}
                 setCompleted={setSeriesAnnotationsCompleted}
-                onMarkCompleted={(studyUID, seriesUID) => {
-                console.log(`🧠 Study ${studyUID}, Series ${seriesUID} marked as completed`);
+                onMarkCompleted={(studyUID, seriesInstanceUID) => {
+                console.log(`🧠 Study ${studyUID}, Series ${seriesInstanceUID} marked as completed`);
                 }}
             />
             <div className="text-white w-full text-center"

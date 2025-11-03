@@ -3,7 +3,6 @@
  *
  * Centralizes access to:
  * - studyUID: Unique identifier for the current study
- * - seriesUID: Unique identifier for the current series
  * - frameUID: Frame of reference UID from the image plane module
  * - patientName: Patient's full name (from patientInfo service)
  * - patientId: Patient's ID (from patientInfo service)
@@ -28,7 +27,6 @@ type StudyInfo = {
   patientName?: string;
   patientId?: string;
   studyUID?: string;
-  seriesUID?: string;
   frameUID?: string;
 };
 
