@@ -11,7 +11,6 @@ import { AnnotationStats } from './models/AnnotationStats';
 import { setUserInfo, getUserInfo, onUserInfoReady } from './../../../../modes/@ohif/mode-webquiz/src/userInfoService';
 import { useAnnotationPosting } from './hooks/useAnnotationPosting';
 import { fetchAnnotationsFromDB } from './handlers/fetchAnnotations';
-import { validateSeriesFromDB } from './handlers/validateSeriesHandler';
 import { handleDropdownChange } from './handlers/dropdownHandlers';
 import { handleMeasurementClick, toggleVisibility, closeScoreModal } from './handlers/guiHandlers';
 import { useSystem } from '@ohif/core';
@@ -23,7 +22,10 @@ import { createDebouncedModalTrigger } from './utils/annotationUtils';
 import { buildDropdownSelectionMapFromState } from './utils/annotationUtils';
 
 import MarkSeriesCompletedButton from './components/MarkSeriesCompletedButton';
+import { useSeriesValidation } from './hooks/useSeriesValidation';
+import { useCurrentSeriesUID } from './hooks/useCurrentSeriesUID';
 import { postStudyProgress } from './handlers/studyProgressHandlers';
+import { ModalComponent } from './components/ModalComponent';
 
 
 import { useViewportGrid } from '@ohif/ui-next';
@@ -47,9 +49,18 @@ function WebQuizSidePanelComponent() {
     const [activeUID, setActiveUID] = useState<string | null>(null);
     const [listOfUsersAnnotations, setListOfUsersAnnotations] = useState(null);
     const [isSeriesAnnotationsCompleted, setSeriesAnnotationsCompleted] = useState(false);
-    const [seriesInstanceUID, setSeriesInstanceUID] = useState<string | null>(null);
+    const isSeriesValidRef = useRef<boolean | null>(null);
 
 
+    //~~~~~~~~~~~~~~~~~
+    const [modalInfo, setModalInfo] = useState<null | { title: string; message: string }>(null);
+    const showModal = ({ title, message }: { title: string; message: string }) => {
+    setModalInfo({ title, message });
+    };
+
+    const closeModal = () => {
+    setModalInfo(null);
+    };
 
     //~~~~~~~~~~~~~~~~~
     // ensure debounced definitions are stable across renders using useMemo
@@ -63,6 +74,7 @@ function WebQuizSidePanelComponent() {
     const measurementList = measurementService.getMeasurements(); 
     const measurementListRef = useRef([]);    
     const pendingAnnotationUIDRef = useRef<string | null>(null);
+    const { cornerstoneViewportService, displaySetService } = servicesManager.services;
 
 
     const scoreOptions = [
@@ -94,6 +106,20 @@ function WebQuizSidePanelComponent() {
 
     const userInfo = getUserInfo();
 
+    const seriesInstanceUID = useCurrentSeriesUID({
+        viewportGridService,
+        displaySetService,
+        cornerstoneViewportService,
+        studyUID: studyInfo?.studyUID,
+    });    
+
+    const isSeriesValid = useSeriesValidation({
+        studyUID: studyInfo?.studyUID,
+        seriesUID: seriesInstanceUID,
+    });
+
+
+
     //=========================================================
     useEffect(() => {
         if (!studyInfoFromHook?.studyUID ||
@@ -122,65 +148,40 @@ function WebQuizSidePanelComponent() {
     //      The database holds the list of studyUIDs and the seriesUIDs within
     //      the study that are part of the project.
     //      The user is supposed to annotate only specific series
-
     useEffect(() => {
-    const { cornerstoneViewportService, viewportGridService, displaySetService } = servicesManager.services;
+        isSeriesValidRef.current = isSeriesValid;
+    }, [isSeriesValid]);
 
-    const validateCurrentSeries = async () => {
-        const activeViewportId = viewportGridService.getActiveViewportId();
-        const displaySetUIDs = viewportGridService.getDisplaySetsUIDsForViewport(activeViewportId);
-        const viewportDisplaySets = displaySetUIDs.map(uid =>
-        displaySetService.getDisplaySetByUID(uid)
-        );
+    //=========================================================
 
-        const seriesUID = viewportDisplaySets?.[0]?.instances?.[0]?.SeriesInstanceUID;
-        if (!studyInfo?.studyUID || !seriesUID) return;
 
-        setSeriesInstanceUID(seriesUID); // ✅ update state for rest of component
 
-        const result = await validateSeriesFromDB({
-        baseUrl: API_BASE_URL,
-        studyUID: studyInfo.studyUID,
-        seriesUID,
+    //=========================================================
+    useEffect(() => {
+    const postProgress = async () => {
+        if (isSeriesValid && studyInfo?.studyUID && seriesInstanceUID) {
+        console.log(`✅ Series ${seriesInstanceUID} validated`);
+
+        const progressResult = await postStudyProgress({
+            baseUrl: API_BASE_URL,
+            username: userInfo.username,
+            studyUID: studyInfo.studyUID,
+            seriesUID: seriesInstanceUID,
+            status: 'wip',
         });
 
-        if (!result?.isValid) {
-            alert('❌ Series not part of project! Select a different series.');
+        if (progressResult?.error) {
+            console.warn('⚠️ Failed to post progress:', progressResult.error);
         } else {
-            console.log(`✅ Series ${seriesUID} validated`);
-
-            const progressResult = await postStudyProgress({
-                baseUrl: API_BASE_URL,
-                username: userInfo.username,
-                studyUID: studyInfo.studyUID,
-                seriesUID,
-                status: 'wip',
-            });
-
-            if (progressResult?.error) {
-                console.warn('⚠️ Failed to post progress:', progressResult.error);
-            } else {
-                console.log(`📌 Progress posted for ${seriesUID}`);
-            }
+            console.log(`📌 Progress posted for ${seriesInstanceUID}`);
+        }
+        } else if (isSeriesValid === false) {
+        console.log(`❌ Series ${seriesInstanceUID} is not valid for this project`);
         }
     };
 
-    // Run once when studyInfo is ready
-    if (studyInfo?.studyUID) {
-        validateCurrentSeries();
-    }
-
-    // Subscribe to viewport changes
-    const subscription = cornerstoneViewportService.subscribe(
-        'event::cornerstoneViewportService:viewportDataChanged',
-        validateCurrentSeries
-    );
-
-    return () => {
-        subscription.unsubscribe();
-    };
-    }, [studyInfo]);
-
+    postProgress();
+    }, [isSeriesValid, studyInfo?.studyUID, seriesInstanceUID]);    
 
     //=========================================================
     // add listeners with handlers
@@ -222,20 +223,31 @@ function WebQuizSidePanelComponent() {
     }, [patientName]);
 
     //=========================================================
+
     useEffect(() => {
         const handleMouseUp = () => {
-            const uid = pendingAnnotationUIDRef.current;
-            if (uid) {
-            setActiveUID(uid);
-                debouncedShowScoreModal();
-                pendingAnnotationUIDRef.current = null;
-            }
-        };
+        const uid = pendingAnnotationUIDRef.current;
+        if (!uid) return;
 
-        window.addEventListener('mouseup', handleMouseUp);
-        return () => {
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
+        if (isSeriesValidRef.current === false) {
+        console.warn('🚫 Series is invalid. Blocking annotation finalization.');
+        showModal({
+            title: 'Invalid Series',
+            message: 'This series is not part of the project. Please select a valid one before annotating.',
+        });
+        pendingAnnotationUIDRef.current = null;
+        return;
+        }
+
+        setActiveUID(uid);
+        debouncedShowScoreModal();
+        pendingAnnotationUIDRef.current = null;
+    };
+
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+        window.removeEventListener('mouseup', handleMouseUp);
+    };
     }, []);
 
 
@@ -379,7 +391,14 @@ function WebQuizSidePanelComponent() {
             setSelectedScore={setSelectedScore}
             onClose={onCloseScoreModal}
             />
-        </div>
+            {modalInfo && (
+            <ModalComponent
+                title={modalInfo.title}
+                message={modalInfo.message}
+                onClose={closeModal}
+            />
+            )}
+            </div>
     );
 
 }
