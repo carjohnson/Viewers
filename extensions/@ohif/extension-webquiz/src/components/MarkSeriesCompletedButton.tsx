@@ -1,7 +1,11 @@
 import React from 'react';
 import { Button } from '@ohif/ui'; // or your preferred button source
+import { postStudyProgress } from '../handlers/studyProgressHandlers';
+import {UserInfo} from '../models/UserInfo'
 
 type Props = {
+  baseUrl: string;
+  getUserInfo: () => UserInfo | null;
   studyInstanceUID: string;
   seriesInstanceUID: string;
   completed: boolean;
@@ -10,19 +14,38 @@ type Props = {
 };
 
 const MarkSeriesCompletedButton: React.FC<Props> = ({
+  baseUrl,
+  getUserInfo,
   studyInstanceUID,
   seriesInstanceUID,
   completed,
   setCompleted,
   onMarkCompleted,
 }) => {
-  const handleClick = () => {
+  const handleClick = async() => {
     console.log(`📬 Marking study ${studyInstanceUID} and series ${seriesInstanceUID} as completed`);
     if (onMarkCompleted) {
       onMarkCompleted(studyInstanceUID, seriesInstanceUID);
     }
     setCompleted(true);
-    // TODO: Replace with actual POST to backend
+
+    const userInfo = getUserInfo();
+    
+    const progressResult = await postStudyProgress({
+        baseUrl,
+        username: userInfo.username,
+        studyUID: studyInstanceUID,
+        seriesUID: seriesInstanceUID,
+        status: 'done',
+    });
+
+    if (progressResult?.error) {
+        console.warn('⚠️ Failed to post progress:', progressResult.error);
+    } else {
+        console.log(`📌 Progress posted for ${seriesInstanceUID}`);
+    }
+
+
   };
 
   return (

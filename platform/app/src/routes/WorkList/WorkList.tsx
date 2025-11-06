@@ -40,6 +40,14 @@ import { Types } from '@ohif/ui';
 
 import { preserveQueryParameters, preserveQueryStrings } from '../../utils/preserveQueryParameters';
 
+import { setUserInfo, getUserInfo, onUserInfoReady } from './../../../../../modes/@ohif/mode-webquiz/src/userInfoService';
+import { API_BASE_URL } from './../../../../../extensions/@ohif/extension-webquiz/src/config/config';
+import { fetchStudyListFromDB, fetchStudyProgressFromDB } from './../../../../../extensions/@ohif/extension-webquiz/src/handlers/studyProgressHandlers';
+import { fetchSessionUserInfo } from './../../../../../extensions/@ohif/extension-webquiz/src/handlers/fetchSessionInfo';
+import {Study} from './../../../../../extensions/@ohif/extension-webquiz/src/models/Study';
+import {UserInfo} from './../../../../../extensions/@ohif/extension-webquiz/src/models/UserInfo';
+
+
 const PatientInfoVisibility = Types.PatientInfoVisibility;
 
 const { sortBySeriesDate } = utils;
@@ -248,11 +256,66 @@ function WorkList({
 
 
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  const mockStudyStatusMap  = {
-    '1613192914.239053053316326170422028743544372735497': 'done',
-    '1.2.840.113619.2.5.1762583153.215519.978957063.78': 'wip',
-  };
+
+  const [studyList, setStudyList] = useState<Study[]>([]);
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  const [studyStatusMap, setStudyStatusMap] = useState<Record<string, 'new' | 'wip' | 'done'>>({});
+
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  useEffect(() => {
+    const fetchUser = async () => {
+      const user = await fetchSessionUserInfo({ baseUrl: API_BASE_URL });
+      if (user) {
+        setUserInfo(user);
+      }
+    };
+
+    fetchUser();
+  }, []);
+
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  useEffect(() => {
+    const fetchList = async () => {
+      const result = await fetchStudyListFromDB({ baseUrl: API_BASE_URL });
+      if (result && !result.error) {
+        setStudyList(result);
+      } else {
+        console.warn('⚠️ Failed to load study list:', result?.error);
+      }
+    };
+
+    fetchList();
+  }, []);
+
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  useEffect(() => {
+    if (!userInfo || studyList.length === 0) return;
+
+    const fetchAllProgress = async () => {
+      const statusMap: Record<string, 'new' | 'wip' | 'done'> = {};
+
+      for (const study of studyList) {
+        const result = await fetchStudyProgressFromDB({
+          baseUrl: API_BASE_URL,
+          username: userInfo.username,
+          studyUID: study.studyUID,
+        });
+
+        if (result?.study_status) {
+          statusMap[study.studyUID] = result.study_status;
+        }
+      }
+      setStudyStatusMap(statusMap);
+    };
+
+    if (userInfo.username && studyList.length > 0) {
+      fetchAllProgress();
+    }
+  }, [userInfo, studyList]);
+
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
 
 
   const rollingPageNumberMod = Math.floor(101 / resultsPerPage);
@@ -304,7 +367,7 @@ function WorkList({
     };
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    const status = mockStudyStatusMap[studyInstanceUid] || 'new';
+    const status = studyStatusMap[studyInstanceUid] || 'new';
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     return {

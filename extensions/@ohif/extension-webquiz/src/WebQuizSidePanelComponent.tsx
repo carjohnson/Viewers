@@ -8,7 +8,7 @@ import { useStudyInfo } from './hooks/useStudyInfo';
 import { usePatientInfo } from '@ohif/extension-default';
 import { API_BASE_URL } from './config/config';
 import { AnnotationStats } from './models/AnnotationStats';
-import { setUserInfo, getUserInfo } from './../../../../modes/@ohif/mode-webquiz/src/userInfoService';
+import { setUserInfo, getUserInfo, onUserInfoReady } from './../../../../modes/@ohif/mode-webquiz/src/userInfoService';
 import { useAnnotationPosting } from './hooks/useAnnotationPosting';
 import { fetchAnnotationsFromDB } from './handlers/fetchAnnotations';
 import { validateSeriesFromDB } from './handlers/validateSeriesHandler';
@@ -23,6 +23,7 @@ import { createDebouncedModalTrigger } from './utils/annotationUtils';
 import { buildDropdownSelectionMapFromState } from './utils/annotationUtils';
 
 import MarkSeriesCompletedButton from './components/MarkSeriesCompletedButton';
+import { postStudyProgress } from './handlers/studyProgressHandlers';
 
 
 import { useViewportGrid } from '@ohif/ui-next';
@@ -48,6 +49,8 @@ function WebQuizSidePanelComponent() {
     const [isSeriesAnnotationsCompleted, setSeriesAnnotationsCompleted] = useState(false);
     const [seriesInstanceUID, setSeriesInstanceUID] = useState<string | null>(null);
 
+
+
     //~~~~~~~~~~~~~~~~~
     // ensure debounced definitions are stable across renders using useMemo
     const debouncedUpdateStats = useMemo(() => createDebouncedStatsUpdater(setAnnotationData), [setAnnotationData]);
@@ -61,7 +64,6 @@ function WebQuizSidePanelComponent() {
     const measurementListRef = useRef([]);    
     const pendingAnnotationUIDRef = useRef<string | null>(null);
 
-    const userInfo = getUserInfo();
 
     const scoreOptions = [
         { value: 1, label: '1' },
@@ -90,6 +92,7 @@ function WebQuizSidePanelComponent() {
     const { studyInfo, setStudyInfo } = useStudyInfoStore();
     const patientName = patientInfo?.PatientName;
 
+    const userInfo = getUserInfo();
 
     //=========================================================
     useEffect(() => {
@@ -120,55 +123,6 @@ function WebQuizSidePanelComponent() {
     //      the study that are part of the project.
     //      The user is supposed to annotate only specific series
 
-    // useEffect(() => {
-    // const { cornerstoneViewportService, viewportGridService } = servicesManager.services;
-
-    // const handler = async ({ displaySetInstanceUID }) => {
-
-    //     const activeViewportId = viewportGridService.getActiveViewportId();
-    //     const state = viewportGridService.getState();
-
-    //     const activeViewport = state.viewports.get(activeViewportId);
-    //     displaySetInstanceUID = activeViewport.displaySetInstanceUIDs;
-
-    //     const displaySetService = servicesManager.services.displaySetService;
-    //     const displaySetUIDs = viewportGridService.getDisplaySetsUIDsForViewport(activeViewportId);
-    //     const viewportDisplaySets = displaySetUIDs.map(uid =>
-    //         displaySetService.getDisplaySetByUID(uid)
-    //         );
-
-    //     const seriesUID = viewportDisplaySets[0].instances[0].SeriesInstanceUID;
-    //     setSeriesInstanceUID(seriesUID);
-
-    //     // console.log(' **** Series UID: ', seriesUID);
-    //     // console.log('📸 Viewport event fired:', displaySetInstanceUID);
-
-    //     if (!studyInfo?.studyUID || !seriesUID) return;
-
-    //     const result = await validateSeriesFromDB({
-    //         baseUrl: API_BASE_URL,
-    //         studyUID: studyInfoFromHook.studyUID,
-    //         seriesUID: seriesUID,
-    //     });
-
-    //     if (!result?.isValid) {
-    //         alert('❌ Series not part of project! Select a different series.');
-    //     } else {
-    //         console.log('✅ Series validated');
-    //     }
-
-    // };
-
-    // const subscription = cornerstoneViewportService.subscribe(
-    //     'event::cornerstoneViewportService:viewportDataChanged',
-    //     handler
-    // );
-
-    // return () => {
-    //     subscription.unsubscribe();
-    // };
-    // }, [studyInfo]);
-
     useEffect(() => {
     const { cornerstoneViewportService, viewportGridService, displaySetService } = servicesManager.services;
 
@@ -191,9 +145,23 @@ function WebQuizSidePanelComponent() {
         });
 
         if (!result?.isValid) {
-        alert('❌ Series not part of project! Select a different series.');
+            alert('❌ Series not part of project! Select a different series.');
         } else {
-        console.log(`✅ Series ${seriesUID} validated`);
+            console.log(`✅ Series ${seriesUID} validated`);
+
+            const progressResult = await postStudyProgress({
+                baseUrl: API_BASE_URL,
+                username: userInfo.username,
+                studyUID: studyInfo.studyUID,
+                seriesUID,
+                status: 'wip',
+            });
+
+            if (progressResult?.error) {
+                console.warn('⚠️ Failed to post progress:', progressResult.error);
+            } else {
+                console.log(`📌 Progress posted for ${seriesUID}`);
+            }
         }
     };
 
@@ -379,6 +347,8 @@ function WebQuizSidePanelComponent() {
                 }}
              >
             <MarkSeriesCompletedButton
+                baseUrl={API_BASE_URL}
+                getUserInfo={getUserInfo}
                 studyInstanceUID={studyInfoFromHook?.studyUID}
                 seriesInstanceUID={seriesInstanceUID}
                 completed={isSeriesAnnotationsCompleted}
