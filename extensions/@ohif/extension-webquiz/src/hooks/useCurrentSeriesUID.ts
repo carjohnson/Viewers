@@ -37,12 +37,15 @@ export const useCurrentSeriesUID = ({
       console.warn('⚠️ SeriesInstanceUID not found in display set.');
       return;
     }
-    console.log(' *** Current Display Set:', uid);
     setSeriesUID(uid);
   };
 
+
   useEffect(() => {
     if (!studyUID) return;
+
+    
+    updateSeriesUID();
 
     // Initial hydration delay
     const readySub = viewportGridService.subscribe(

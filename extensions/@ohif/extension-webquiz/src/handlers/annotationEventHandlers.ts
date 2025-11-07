@@ -19,6 +19,7 @@ export const handleAnnotationChange = ({
   debouncedShowScoreModal,
   setActiveUID,
   pendingAnnotationUIDRef,
+  isSeriesValidRef,
 }: {
   event: any;
   setIsSaved: (value: boolean) => void;
@@ -29,9 +30,18 @@ export const handleAnnotationChange = ({
   debouncedShowScoreModal: () => void;
   setActiveUID: (activeUID: string | null) => void;
   pendingAnnotationUIDRef: React.MutableRefObject<string | null>;
+  isSeriesValidRef: React.MutableRefObject<boolean | null>;
 }) => {
   const { annotation: changedAnnotation, bContinueDelay = false } = event.detail;
   if (!changedAnnotation) return;
+  console.log('🔍 Annotation event detail:', event.detail);
+  pendingAnnotationUIDRef.current = changedAnnotation.annotationUID;
+  console.log('🧷 Annotation UID set:', changedAnnotation.annotationUID);
+  
+  if (isSeriesValidRef.current === false) {
+    console.warn('🚫 Annotation created on invalid series. Skipping measurement update.');
+    return;
+  }
 
   const userInfo = getUserInfo();
   if (!userInfo?.username) {

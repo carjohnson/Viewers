@@ -51,15 +51,14 @@ function WebQuizSidePanelComponent() {
     const [isSeriesAnnotationsCompleted, setSeriesAnnotationsCompleted] = useState(false);
     const isSeriesValidRef = useRef<boolean | null>(null);
 
-
     //~~~~~~~~~~~~~~~~~
     const [modalInfo, setModalInfo] = useState<null | { title: string; message: string }>(null);
     const showModal = ({ title, message }: { title: string; message: string }) => {
-    setModalInfo({ title, message });
+        setModalInfo({ title, message });
     };
 
     const closeModal = () => {
-    setModalInfo(null);
+        setModalInfo(null);
     };
 
     //~~~~~~~~~~~~~~~~~
@@ -201,6 +200,7 @@ function WebQuizSidePanelComponent() {
             debouncedShowScoreModal,
             setActiveUID,
             pendingAnnotationUIDRef,
+            isSeriesValidRef,
         });
 
         const wrappedAnnotationRemovedHandler = (event: any) => handleAnnotationRemove({
@@ -224,31 +224,113 @@ function WebQuizSidePanelComponent() {
 
     //=========================================================
 
+    // useEffect(() => {
+    //     const handleMouseUp = () => {
+
+    //     if (isSeriesValidRef.current === false) {
+    //     console.warn('🚫 Series is invalid. Blocking annotation finalization.');
+    //     showModal({
+    //         title: 'Invalid Series',
+    //         message: 'This series is not part of the project. Please select a valid one before annotating.',
+    //     });
+    //     pendingAnnotationUIDRef.current = null;
+    //     return;
+    //     }
+
+    //     const uid = pendingAnnotationUIDRef.current;
+    //     if (!uid) return;
+        
+    //     setActiveUID(uid);
+    //     debouncedShowScoreModal();
+    //     pendingAnnotationUIDRef.current = null;
+    // };
+
+    // window.addEventListener('mouseup', handleMouseUp);
+    // return () => {
+    //     window.removeEventListener('mouseup', handleMouseUp);
+    // };
+    // }, []);
+
+//      useEffect(() => {
+//         const handleMouseUp = () => {
+//   const uid = pendingAnnotationUIDRef.current;
+//     console.log(' *** IN MOUSE UP ...IsSeriesValid, Pending Ann UID:', isSeriesValidRef, uid);
+
+// //     if (suppressModalRef.current) {
+// //         console.log('🛑 Modal suppressed due to measurement click');
+// //         return;
+// //     }
+
+// //   // ✅ Only show modal if an annotation was actually started
+// //    if (uid && isSeriesValidRef.current === false) {
+// //     console.warn('🚫 Series is invalid. Blocking annotation finalization.');
+// //     showModal({
+// //       title: 'Invalid Series',
+// //       message: 'This series is not part of the project. Please select a valid one before annotating.',
+// //     });
+// //     return;
+// //   }
+
+//   if (!uid) return;
+
+//   if (isSeriesValidRef.current === true) {
+//     setActiveUID(uid);
+//     debouncedShowScoreModal();
+//     pendingAnnotationUIDRef.current = null;
+//   }
+// };
+//     window.addEventListener('mouseup', handleMouseUp);
+//     return () => {
+//         window.removeEventListener('mouseup', handleMouseUp);
+//     };
+//     }, []);
+
+    //=========================================================
+
+
     useEffect(() => {
-        const handleMouseUp = () => {
-        const uid = pendingAnnotationUIDRef.current;
-        if (!uid) return;
+    const { measurementService } = servicesManager.services;
 
-        if (isSeriesValidRef.current === false) {
-        console.warn('🚫 Series is invalid. Blocking annotation finalization.');
-        showModal({
+    const handleMeasurementAdded = ({ measurement }) => {
+        setTimeout(() => {
+        const uid = measurement?.uid;
+        const seriesUID = measurement?.referenceSeriesUID;
+
+        console.log('🕒 Delayed MEASUREMENT_ADDED check:', { uid, seriesUID });
+
+        if (
+            uid &&
+            uid === pendingAnnotationUIDRef.current &&
+            isSeriesValidRef.current === false
+        ) {
+            console.warn('🧹 Removing measurement on invalid series:', uid);
+            measurementService.remove(uid);
+
+            showModal({
             title: 'Invalid Series',
-            message: 'This series is not part of the project. Please select a valid one before annotating.',
-        });
-        pendingAnnotationUIDRef.current = null;
-        return;
-        }
+            message:
+                'This series is not part of the project. Please select a valid one before annotating.',
+            });
 
-        setActiveUID(uid);
-        debouncedShowScoreModal();
-        pendingAnnotationUIDRef.current = null;
+            pendingAnnotationUIDRef.current = null;
+        } else {
+            setActiveUID(uid);
+            debouncedShowScoreModal();
+            pendingAnnotationUIDRef.current = null;
+        }
+        }, 50);
     };
 
-    window.addEventListener('mouseup', handleMouseUp);
+    const sub = measurementService.subscribe(
+        measurementService.EVENTS.MEASUREMENT_ADDED,
+        handleMeasurementAdded
+    );
+
     return () => {
-        window.removeEventListener('mouseup', handleMouseUp);
+        sub.unsubscribe();
     };
     }, []);
+
 
 
     //=========================================================
@@ -304,7 +386,12 @@ function WebQuizSidePanelComponent() {
 
     //=========================================================
     const onMeasurementClick = (id: string) =>
-        handleMeasurementClick({ measurementId: id, annotation, measurementService, activeViewportId });
+        handleMeasurementClick({ 
+            measurementId: id,
+            annotation,
+            measurementService,
+            activeViewportId,
+         });
 
     //=========================================================
     const onToggleVisibility = (uid: string) =>
