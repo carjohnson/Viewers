@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+
 
 export const useCurrentSeriesUID = ({
   viewportGridService,
@@ -12,7 +13,8 @@ export const useCurrentSeriesUID = ({
   studyUID: string | null;
 }): string | null => {
   const [seriesUID, setSeriesUID] = useState<string | null>(null);
-
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   const updateSeriesUID = () => {
     const activeViewportId = viewportGridService.getActiveViewportId();
     if (!activeViewportId) {
@@ -35,23 +37,41 @@ export const useCurrentSeriesUID = ({
       console.warn('⚠️ SeriesInstanceUID not found in display set.');
       return;
     }
-
+    console.log(' *** Current Display Set:', uid);
     setSeriesUID(uid);
   };
 
   useEffect(() => {
     if (!studyUID) return;
-    updateSeriesUID(); // initial run
 
-    const subscription = cornerstoneViewportService.subscribe(
-      'event::cornerstoneViewportService:viewportDataChanged',
+    // Initial hydration delay
+    const readySub = viewportGridService.subscribe(
+      viewportGridService.EVENTS.VIEWPORTS_READY,
+      () => {
+        timeoutRef.current = setTimeout(updateSeriesUID, 300);
+      }
+    );
+
+    // Ongoing triggers
+    const dataSub = cornerstoneViewportService.subscribe(
+      cornerstoneViewportService.EVENTS.VIEWPORT_DATA_CHANGED,
+      updateSeriesUID
+    );
+
+    const activeSub = viewportGridService.subscribe(
+      viewportGridService.EVENTS.ACTIVE_VIEWPORT_ID_CHANGED,
       updateSeriesUID
     );
 
     return () => {
-      subscription.unsubscribe();
+      readySub.unsubscribe();
+      dataSub.unsubscribe();
+      activeSub.unsubscribe();
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [studyUID]);
+
+
+}, [studyUID]);
 
   return seriesUID;
 };
