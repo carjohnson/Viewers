@@ -16,7 +16,7 @@ import { handleMeasurementClick, toggleVisibility, closeScoreModal } from './han
 import { useSystem } from '@ohif/core';
 import { AnnotationList } from './components/AnnotationList/AnnotationList';
 import { ScoreModal } from './components/ScoreModal';
-import { handleAnnotationChange, handleAnnotationRemove } from './handlers/annotationEventHandlers';
+import { handleMeasurementAdded, handleAnnotationChange, handleAnnotationRemove } from './handlers/annotationEventHandlers';
 import { createDebouncedStatsUpdater } from './utils/annotationUtils';
 import { createDebouncedModalTrigger } from './utils/annotationUtils';
 import { buildDropdownSelectionMapFromState } from './utils/annotationUtils';
@@ -190,6 +190,19 @@ function WebQuizSidePanelComponent() {
             return;
         }
 
+        const { measurementService } = servicesManager.services;
+
+        const wrappedMeasurementAddedHandler = ({ measurement }: any) => 
+            handleMeasurementAdded({
+                measurement,
+                measurementService,
+                showModal,
+                setActiveUID,
+                debouncedShowScoreModal,
+                pendingAnnotationUIDRef,
+                isSeriesValidRef,
+        });
+
         const wrappedAnnotationChangeHandler = (event: any) => handleAnnotationChange({
             event,
             setIsSaved,
@@ -210,11 +223,14 @@ function WebQuizSidePanelComponent() {
             setDropdownSelectionMap,
             triggerPost,
         });
+
+        const subscription = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_ADDED,wrappedMeasurementAddedHandler);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangeHandler);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationRemovedHandler);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, wrappedAnnotationChangeHandler);
 
         return () => {
+          subscription.unsubscribe();
           cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangeHandler);
           cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationRemovedHandler);
           cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, wrappedAnnotationChangeHandler);
@@ -223,114 +239,6 @@ function WebQuizSidePanelComponent() {
     }, [patientName]);
 
     //=========================================================
-
-    // useEffect(() => {
-    //     const handleMouseUp = () => {
-
-    //     if (isSeriesValidRef.current === false) {
-    //     console.warn('🚫 Series is invalid. Blocking annotation finalization.');
-    //     showModal({
-    //         title: 'Invalid Series',
-    //         message: 'This series is not part of the project. Please select a valid one before annotating.',
-    //     });
-    //     pendingAnnotationUIDRef.current = null;
-    //     return;
-    //     }
-
-    //     const uid = pendingAnnotationUIDRef.current;
-    //     if (!uid) return;
-        
-    //     setActiveUID(uid);
-    //     debouncedShowScoreModal();
-    //     pendingAnnotationUIDRef.current = null;
-    // };
-
-    // window.addEventListener('mouseup', handleMouseUp);
-    // return () => {
-    //     window.removeEventListener('mouseup', handleMouseUp);
-    // };
-    // }, []);
-
-//      useEffect(() => {
-//         const handleMouseUp = () => {
-//   const uid = pendingAnnotationUIDRef.current;
-//     console.log(' *** IN MOUSE UP ...IsSeriesValid, Pending Ann UID:', isSeriesValidRef, uid);
-
-// //     if (suppressModalRef.current) {
-// //         console.log('🛑 Modal suppressed due to measurement click');
-// //         return;
-// //     }
-
-// //   // ✅ Only show modal if an annotation was actually started
-// //    if (uid && isSeriesValidRef.current === false) {
-// //     console.warn('🚫 Series is invalid. Blocking annotation finalization.');
-// //     showModal({
-// //       title: 'Invalid Series',
-// //       message: 'This series is not part of the project. Please select a valid one before annotating.',
-// //     });
-// //     return;
-// //   }
-
-//   if (!uid) return;
-
-//   if (isSeriesValidRef.current === true) {
-//     setActiveUID(uid);
-//     debouncedShowScoreModal();
-//     pendingAnnotationUIDRef.current = null;
-//   }
-// };
-//     window.addEventListener('mouseup', handleMouseUp);
-//     return () => {
-//         window.removeEventListener('mouseup', handleMouseUp);
-//     };
-//     }, []);
-
-    //=========================================================
-
-
-    useEffect(() => {
-    const { measurementService } = servicesManager.services;
-
-    const handleMeasurementAdded = ({ measurement }) => {
-        setTimeout(() => {
-        const uid = measurement?.uid;
-        const seriesUID = measurement?.referenceSeriesUID;
-
-        console.log('🕒 Delayed MEASUREMENT_ADDED check:', { uid, seriesUID });
-
-        if (
-            uid &&
-            uid === pendingAnnotationUIDRef.current &&
-            isSeriesValidRef.current === false
-        ) {
-            console.warn('🧹 Removing measurement on invalid series:', uid);
-            measurementService.remove(uid);
-
-            showModal({
-            title: 'Invalid Series',
-            message:
-                'This series is not part of the project. Please select a valid one before annotating.',
-            });
-
-            pendingAnnotationUIDRef.current = null;
-        } else {
-            setActiveUID(uid);
-            debouncedShowScoreModal();
-            pendingAnnotationUIDRef.current = null;
-        }
-        }, 50);
-    };
-
-    const sub = measurementService.subscribe(
-        measurementService.EVENTS.MEASUREMENT_ADDED,
-        handleMeasurementAdded
-    );
-
-    return () => {
-        sub.unsubscribe();
-    };
-    }, []);
-
 
 
     //=========================================================

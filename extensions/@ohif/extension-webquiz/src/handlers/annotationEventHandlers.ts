@@ -8,6 +8,52 @@ import { TriggerPostArgs } from '../models/TriggerPostArgs';
 
 //=========================================================
 
+export function handleMeasurementAdded({
+  measurement,
+  measurementService,
+  showModal,
+  setActiveUID,
+  debouncedShowScoreModal,
+  pendingAnnotationUIDRef,
+  isSeriesValidRef,
+}: {
+  measurement: any;
+  measurementService: any;
+  showModal: (modalProps: { title: string; message: string }) => void;
+  setActiveUID: (uid: string) => void;
+  debouncedShowScoreModal: () => void;
+  pendingAnnotationUIDRef: React.MutableRefObject<string | null>;
+  isSeriesValidRef: React.MutableRefObject<boolean>;
+}) {
+  setTimeout(() => {
+    const uid = measurement?.uid;
+    const seriesUID = measurement?.referenceSeriesUID;
+
+    console.log('🕒 Delayed MEASUREMENT_ADDED check:', { uid, seriesUID });
+
+    if (
+      uid &&
+      uid === pendingAnnotationUIDRef.current &&
+      isSeriesValidRef.current === false
+    ) {
+      console.warn('🧹 Removing measurement on invalid series:', uid);
+      measurementService.remove(uid);
+
+      showModal({
+        title: 'Invalid Series',
+        message:
+          'This series is not part of the project. Please select a valid one before annotating.',
+      });
+
+      pendingAnnotationUIDRef.current = null;
+    } else {
+      setActiveUID(uid);
+      debouncedShowScoreModal();
+      pendingAnnotationUIDRef.current = null;
+    }
+  }, 50);
+}
+
 //=========================================================
 export const handleAnnotationChange = ({
   event,
