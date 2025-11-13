@@ -11,6 +11,15 @@ type Props = {
   completed: boolean;
   setCompleted: (value:boolean) => void;
   onMarkCompleted?: (studyUID: string, seriesUID: string) => void;
+  showModal: (args: {
+    title: string;
+    message: string;
+    onClose?: () => void;
+    showCancel?: boolean;
+    onCancel?: () => void;
+  }) => void;
+  closeModal: () => void;
+  isSeriesValidRef: React.MutableRefObject<boolean>;
 };
 
 const MarkSeriesCompletedButton: React.FC<Props> = ({
@@ -21,8 +30,38 @@ const MarkSeriesCompletedButton: React.FC<Props> = ({
   completed,
   setCompleted,
   onMarkCompleted,
+  showModal,
+  closeModal,
+  isSeriesValidRef,
 }) => {
-  const handleClick = async() => {
+  const handleClick = () => {
+
+    if (!isSeriesValidRef.current) {
+      console.warn('🚫 Series is not valid—aborting completion');
+      showModal({
+        title: 'Invalid Series',
+        message: 'This series is not to be annotated.',
+        showCancel: false,
+      });
+      return;
+    } else {
+
+      showModal({
+        title: 'Confirm Completion',
+        message: 'Are you sure? No further adjustments can be made.',
+        showCancel: true,
+        onCancel: () => {
+          console.log('❌ Cancelled marking series as completed');
+          closeModal();
+        },
+        onClose: confirmCompletion,
+      });
+    }
+  };
+
+
+  const confirmCompletion = async () => {
+
     console.log(`📬 Marking study ${studyInstanceUID} and series ${seriesInstanceUID} as completed`);
     if (onMarkCompleted) {
       onMarkCompleted(studyInstanceUID, seriesInstanceUID);
@@ -30,23 +69,23 @@ const MarkSeriesCompletedButton: React.FC<Props> = ({
     setCompleted(true);
 
     const userInfo = getUserInfo();
-    
     const progressResult = await postStudyProgress({
-        baseUrl,
-        username: userInfo.username,
-        studyUID: studyInstanceUID,
-        seriesUID: seriesInstanceUID,
-        status: 'done',
+      baseUrl,
+      username: userInfo.username,
+      studyUID: studyInstanceUID,
+      seriesUID: seriesInstanceUID,
+      status: 'done',
     });
 
     if (progressResult?.error) {
-        console.warn('⚠️ Failed to post progress:', progressResult.error);
+      console.warn('⚠️ Failed to post progress:', progressResult.error);
     } else {
-        console.log(`📌 Progress posted for ${seriesInstanceUID}`);
+      console.log(`📌 Progress posted for ${seriesInstanceUID}`);
     }
 
+    closeModal();
 
-  };
+  };  
 
   return (
     <div className="p-2 text-center">

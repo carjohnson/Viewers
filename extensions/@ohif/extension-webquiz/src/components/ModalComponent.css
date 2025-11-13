@@ -31,6 +31,13 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
+.modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+
 .modal-button {
   padding: 8px 16px;
   background-color: #007bff;
@@ -39,7 +46,6 @@
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
-  margin-top: 20px;
 }
 
 .modal-button:hover {

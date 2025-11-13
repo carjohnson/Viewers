@@ -52,9 +52,28 @@ function WebQuizSidePanelComponent() {
     const isSeriesValidRef = useRef<boolean | null>(null);
 
     //~~~~~~~~~~~~~~~~~
-    const [modalInfo, setModalInfo] = useState<null | { title: string; message: string }>(null);
-    const showModal = ({ title, message }: { title: string; message: string }) => {
-        setModalInfo({ title, message });
+    const [modalInfo, setModalInfo] = useState<null | { 
+        title: string;
+        message: string;
+        onClose?: () => void;
+        showCancel?: boolean;
+        onCancel?: () => void;
+    }>(null);
+    const showModal = ({
+        title,
+        message,
+        onClose,
+        showCancel = false,
+        onCancel
+    }: {
+        title: string;
+        message: string;
+        onClose?: () => void;
+        showCancel?: boolean;
+        onCancel?: () => void;
+    }) => {
+        // console.log('📢 showModal called:', { title, message, showCancel, onCancel });
+        setModalInfo({ title, message, onClose, showCancel, onCancel });
     };
 
     const closeModal = () => {
@@ -157,29 +176,29 @@ function WebQuizSidePanelComponent() {
 
     //=========================================================
     useEffect(() => {
-    const postProgress = async () => {
-        if (isSeriesValid && studyInfo?.studyUID && seriesInstanceUID) {
-        console.log(`✅ Series ${seriesInstanceUID} validated`);
+        const postProgress = async () => {
+            if (isSeriesValid && studyInfo?.studyUID && seriesInstanceUID) {
+                console.log(`✅ Series ${seriesInstanceUID} validated`);
 
-        const progressResult = await postStudyProgress({
-            baseUrl: API_BASE_URL,
-            username: userInfo.username,
-            studyUID: studyInfo.studyUID,
-            seriesUID: seriesInstanceUID,
-            status: 'wip',
-        });
+                const progressResult = await postStudyProgress({
+                    baseUrl: API_BASE_URL,
+                    username: userInfo.username,
+                    studyUID: studyInfo.studyUID,
+                    seriesUID: seriesInstanceUID,
+                    status: 'wip',
+                });
 
-        if (progressResult?.error) {
-            console.warn('⚠️ Failed to post progress:', progressResult.error);
-        } else {
-            console.log(`📌 Progress posted for ${seriesInstanceUID}`);
-        }
-        } else if (isSeriesValid === false) {
-        console.log(`❌ Series ${seriesInstanceUID} is not valid for this project`);
-        }
-    };
+                if (progressResult?.error) {
+                    console.warn('⚠️ Failed to post progress:', progressResult.error);
+                } else {
+                    console.log(`📌 Progress posted for ${seriesInstanceUID}`);
+                }
+            } else if (isSeriesValid === false) {
+                console.log(`❌ Series ${seriesInstanceUID} is not valid for this project`);
+            }
+        };
 
-    postProgress();
+        postProgress();
     }, [isSeriesValid, studyInfo?.studyUID, seriesInstanceUID]);    
 
     //=========================================================
@@ -239,7 +258,6 @@ function WebQuizSidePanelComponent() {
     }, [patientName]);
 
     //=========================================================
-
 
     //=========================================================
     useEffect(() => {
@@ -363,6 +381,9 @@ function WebQuizSidePanelComponent() {
                 onMarkCompleted={(studyUID, seriesInstanceUID) => {
                 console.log(`🧠 Study ${studyUID}, Series ${seriesInstanceUID} marked as completed`);
                 }}
+                showModal={showModal}
+                closeModal={closeModal}
+                isSeriesValidRef={isSeriesValidRef}
             />
             <div className="text-white w-full text-center"
                  style={{ flexGrow: 1, minHeight: 0 }}
@@ -387,11 +408,13 @@ function WebQuizSidePanelComponent() {
             onClose={onCloseScoreModal}
             />
             {modalInfo && (
-            <ModalComponent
-                title={modalInfo.title}
-                message={modalInfo.message}
-                onClose={closeModal}
-            />
+                <ModalComponent
+                    title={modalInfo.title}
+                    message={modalInfo.message}
+                    onClose={modalInfo.onClose ?? closeModal}
+                    showCancel={modalInfo.showCancel}
+                    onCancel={modalInfo.onCancel}
+                />
             )}
             </div>
     );

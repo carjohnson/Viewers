@@ -19,7 +19,12 @@ export function handleMeasurementAdded({
 }: {
   measurement: any;
   measurementService: any;
-  showModal: (modalProps: { title: string; message: string }) => void;
+  showModal: (modalProps: {
+    title: string;
+    message: string;
+    showCancel?: boolean;
+    onCancel?: () => void;
+  }) => void;
   setActiveUID: (uid: string) => void;
   debouncedShowScoreModal: () => void;
   pendingAnnotationUIDRef: React.MutableRefObject<string | null>;
@@ -42,8 +47,9 @@ export function handleMeasurementAdded({
       showModal({
         title: 'Invalid Series',
         message:
-          'This series is not part of the project. Please select a valid one before annotating.',
-      });
+          'This series is not to be annotated.',
+          showCancel: false,
+        });
 
       pendingAnnotationUIDRef.current = null;
     } else {
