@@ -24,11 +24,10 @@ import { buildDropdownSelectionMapFromState } from './utils/annotationUtils';
 import MarkSeriesCompletedButton from './components/MarkSeriesCompletedButton';
 import { useSeriesValidation } from './hooks/useSeriesValidation';
 import { useCurrentSeriesUID } from './hooks/useCurrentSeriesUID';
-import { postStudyProgress } from './handlers/studyProgressHandlers';
+import { postStudyProgress, fetchStudyProgressFromDB } from './handlers/studyProgressHandlers';
 import { ModalComponent } from './components/ModalComponent';
+import { useSeriesProgressStatus } from './hooks/useSeriesProgressStatus'
 
-
-import { useViewportGrid } from '@ohif/ui-next';
 
 /**
  *  Creating a React component to be used as a side panel in OHIF.
@@ -50,6 +49,7 @@ function WebQuizSidePanelComponent() {
     const [listOfUsersAnnotations, setListOfUsersAnnotations] = useState(null);
     const [isSeriesAnnotationsCompleted, setSeriesAnnotationsCompleted] = useState(false);
     const isSeriesValidRef = useRef<boolean | null>(null);
+    const [validatedSeriesUID, setValidatedSeriesUID] = useState(null);
 
     //~~~~~~~~~~~~~~~~~
     const [modalInfo, setModalInfo] = useState<null | { 
@@ -132,10 +132,31 @@ function WebQuizSidePanelComponent() {
     });    
 
     const isSeriesValid = useSeriesValidation({
-        studyUID: studyInfo?.studyUID,
-        seriesUID: seriesInstanceUID,
+    studyUID: studyInfo?.studyUID,
+    seriesUID: seriesInstanceUID,
+    onValidated: (uid, valid) => {
+        if (valid) {
+        setValidatedSeriesUID(uid);
+        } else {
+        setValidatedSeriesUID(null);
+        }
+    },
     });
 
+
+    const seriesStatus = useSeriesProgressStatus({
+    baseUrl: API_BASE_URL,
+    username: userInfo?.username,
+    studyUID: studyInfo?.studyUID,
+    seriesUID: seriesInstanceUID,
+    });
+
+    console.log('🔍 seriesStatus:', {
+  seriesStatus,
+  seriesInstanceUID,
+  studyUID: studyInfo?.studyUID,
+  isSeriesAnnotationsCompleted,
+});
 
 
     //=========================================================
@@ -166,40 +187,135 @@ function WebQuizSidePanelComponent() {
     //      The database holds the list of studyUIDs and the seriesUIDs within
     //      the study that are part of the project.
     //      The user is supposed to annotate only specific series
-    useEffect(() => {
-        isSeriesValidRef.current = isSeriesValid;
-    }, [isSeriesValid]);
+    // useEffect(() => {
+    //     isSeriesValidRef.current = isSeriesValid;
+    // }, [isSeriesValid]);
 
     //=========================================================
 
+    useEffect(() => {
+        console.log('🎯 Updating completed state:', seriesStatus);
 
+    if (seriesStatus === null) return;
+        setSeriesAnnotationsCompleted(seriesStatus === 'done');
+    }, [seriesStatus]);
+
+
+    
+    //=========================================================
+
+///////////// BEFORE HOOK ///////////
+
+useEffect(() => {
+    if (!validatedSeriesUID || validatedSeriesUID !== seriesInstanceUID) return;
+    if (!studyInfo?.studyUID) return;
+
+    const postProgress = async () => {
+
+        const progressData = await fetchStudyProgressFromDB({
+            baseUrl: API_BASE_URL,
+            username: userInfo.username,
+            studyUID: studyInfo.studyUID,
+        });
+
+        console.log('📦 Progress data from hook:', progressData);
+
+        if (progressData?.error) {
+            console.warn('⚠️ Could not fetch progress:', progressData.error);
+            return;
+        }
+
+        const currentSeriesProgress = progressData.seriesProgress?.find(
+            entry => entry.seriesUID === seriesInstanceUID
+        );
+
+        if (currentSeriesProgress?.status === 'done') {
+            console.log(`🛑 Series ${seriesInstanceUID} already marked as done — skipping wip post`);
+            return;
+        }
+
+        console.log(`✅ Series ${seriesInstanceUID} validated — posting wip`);
+
+        const progressResult = await postStudyProgress({
+            baseUrl: API_BASE_URL,
+            username: userInfo.username,
+            studyUID: studyInfo.studyUID,
+            seriesUID: seriesInstanceUID,
+            status: 'wip',
+        });
+
+        if (progressResult?.error) {
+            console.warn('⚠️ Failed to post progress:', progressResult.error);
+        } else {
+            console.log(`📌 Progress posted for ${seriesInstanceUID}`);
+        }
+    };
+
+    postProgress();
+    }, [validatedSeriesUID, studyInfo?.studyUID, seriesInstanceUID]);
+
+
+
+
+//////////// USING THE HOOK - SOMETHING IS WRONG ??  ////////////////
+    // useEffect(() => {
+    // if (!validatedSeriesUID || validatedSeriesUID !== seriesInstanceUID) return;
+    // if (!studyInfo?.studyUID || !seriesStatus) return;
+
+    // if (seriesStatus === 'done') {
+    //     console.log(`🛑 Series ${seriesInstanceUID} already marked as done — skipping wip post`);
+    //     return;
+    // }
+
+    // const postProgress = async () => {
+    //     console.log(`✅ Series ${seriesInstanceUID} validated — posting wip`);
+
+    //     const progressResult = await postStudyProgress({
+    //     baseUrl: API_BASE_URL,
+    //     username: userInfo.username,
+    //     studyUID: studyInfo.studyUID,
+    //     seriesUID: seriesInstanceUID,
+    //     status: 'wip',
+    //     });
+
+    //     if (progressResult?.error) {
+    //     console.warn('⚠️ Failed to post progress:', progressResult.error);
+    //     } else {
+    //     console.log(`📌 Progress posted for ${seriesInstanceUID}`);
+    //     }
+    // };
+
+    // postProgress();
+    // }, [validatedSeriesUID, studyInfo?.studyUID, seriesInstanceUID, seriesStatus]);
 
     //=========================================================
+    ////////// Re-enable button when moving to a different series if valid
+
     useEffect(() => {
-        const postProgress = async () => {
-            if (isSeriesValid && studyInfo?.studyUID && seriesInstanceUID) {
-                console.log(`✅ Series ${seriesInstanceUID} validated`);
+    const fetchProgress = async () => {
+        if (!studyInfo?.studyUID || !seriesInstanceUID) return;
 
-                const progressResult = await postStudyProgress({
-                    baseUrl: API_BASE_URL,
-                    username: userInfo.username,
-                    studyUID: studyInfo.studyUID,
-                    seriesUID: seriesInstanceUID,
-                    status: 'wip',
-                });
+        const progressData = await fetchStudyProgressFromDB({
+        baseUrl: API_BASE_URL,
+        username: userInfo.username,
+        studyUID: studyInfo.studyUID,
+        });
 
-                if (progressResult?.error) {
-                    console.warn('⚠️ Failed to post progress:', progressResult.error);
-                } else {
-                    console.log(`📌 Progress posted for ${seriesInstanceUID}`);
-                }
-            } else if (isSeriesValid === false) {
-                console.log(`❌ Series ${seriesInstanceUID} is not valid for this project`);
-            }
-        };
+        if (progressData?.error) {
+        console.warn('⚠️ Could not fetch progress:', progressData.error);
+        return;
+        }
 
-        postProgress();
-    }, [isSeriesValid, studyInfo?.studyUID, seriesInstanceUID]);    
+        const currentSeriesProgress = progressData.seriesProgress?.find(
+        entry => entry.seriesUID === seriesInstanceUID
+        );
+
+        const isDone = currentSeriesProgress?.status === 'done';
+        setSeriesAnnotationsCompleted(isDone);
+    };
+
+    fetchProgress();
+    }, [studyInfo?.studyUID, seriesInstanceUID]);
 
     //=========================================================
     // add listeners with handlers
@@ -383,7 +499,7 @@ function WebQuizSidePanelComponent() {
                 }}
                 showModal={showModal}
                 closeModal={closeModal}
-                isSeriesValidRef={isSeriesValidRef}
+                isSeriesValid={isSeriesValid}
             />
             <div className="text-white w-full text-center"
                  style={{ flexGrow: 1, minHeight: 0 }}

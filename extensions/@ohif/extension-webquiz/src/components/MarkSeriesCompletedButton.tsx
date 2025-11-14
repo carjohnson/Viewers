@@ -19,7 +19,7 @@ type Props = {
     onCancel?: () => void;
   }) => void;
   closeModal: () => void;
-  isSeriesValidRef: React.MutableRefObject<boolean>;
+  isSeriesValid: boolean;
 };
 
 const MarkSeriesCompletedButton: React.FC<Props> = ({
@@ -32,11 +32,11 @@ const MarkSeriesCompletedButton: React.FC<Props> = ({
   onMarkCompleted,
   showModal,
   closeModal,
-  isSeriesValidRef,
+  isSeriesValid,
 }) => {
   const handleClick = () => {
 
-    if (!isSeriesValidRef.current) {
+    if (!isSeriesValid) {
       console.warn('🚫 Series is not valid—aborting completion');
       showModal({
         title: 'Invalid Series',
@@ -89,16 +89,27 @@ const MarkSeriesCompletedButton: React.FC<Props> = ({
 
   return (
     <div className="p-2 text-center">
-      <Button
-        // type="primary"
-        onClick={handleClick}
-        disabled={completed}
-        className="bg-green-600 hover:bg-green-700 text-white font-semibold rounded px-4 py-2"
-      >
-        {completed ? '✅ Annotations Completed' : 'Mark Series Annotations Completed'}
-      </Button>
+      <div title={!isSeriesValid ? 'Series is not valid for annotation' : ''}>
+        <Button
+          onClick={handleClick}
+          disabled={completed || !isSeriesValid}
+          className="bg-green-600 hover:bg-green-700 text-white font-semibold rounded px-4 py-2"
+        >
+          {completed ? '✅ Annotations Completed' : 'Mark Series Annotations Completed'}
+        </Button>
+      </div>
     </div>
   );
 };
 
 export default MarkSeriesCompletedButton;
+
+
+      // <Button
+      //   // type="primary"
+      //   onClick={handleClick}
+      //   disabled={completed}
+      //   className="bg-green-600 hover:bg-green-700 text-white font-semibold rounded px-4 py-2"
+      // >
+      //   {completed ? '✅ Annotations Completed' : 'Mark Series Annotations Completed'}
+      // </Button>
