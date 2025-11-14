@@ -172,9 +172,16 @@ function WebQuizSidePanelComponent() {
     // console.log('🧠 useStudyInfo() returned:', studyInfoFromHook);
     // console.log('📦 Zustand store currently holds:', studyInfo);
 
+
     //=========================================================
 
-
+    // This effect validates the series against the project
+    //      The database holds the list of studyUIDs and the seriesUIDs within
+    //      the study that are part of the project.
+    //      The user is supposed to annotate only specific series
+    useEffect(() => {
+        isSeriesValidRef.current = isSeriesValid;
+    }, [isSeriesValid]);
     //=========================================================
 
 
@@ -202,7 +209,7 @@ function WebQuizSidePanelComponent() {
             }
 
             const currentSeriesProgress = progressData.series_progress?.find(
-                entry => entry.SeriesUID === seriesInstanceUID
+                entry => entry.seriesUID === seriesInstanceUID
             );
 
             if (currentSeriesProgress?.status === 'done') {
@@ -249,7 +256,7 @@ function WebQuizSidePanelComponent() {
         }
 
         const currentSeriesProgress = progressData.series_progress?.find(
-        entry => entry.SeriesUID === seriesInstanceUID
+        entry => entry.seriesUID === seriesInstanceUID
         );
 
         const isDone = currentSeriesProgress?.status === 'done';

@@ -34,7 +34,7 @@ export function handleMeasurementAdded({
     const uid = measurement?.uid;
     const seriesUID = measurement?.referenceSeriesUID;
 
-    console.log('🕒 Delayed MEASUREMENT_ADDED check:', { uid, seriesUID });
+    console.log('🕒 Delayed MEASUREMENT_ADDED check:', { uid, seriesUID },  pendingAnnotationUIDRef.current);
 
     if (
       uid &&
@@ -53,6 +53,7 @@ export function handleMeasurementAdded({
 
       pendingAnnotationUIDRef.current = null;
     } else {
+      console.log(' *** IN MEASUREMENT ADDED HANDLER :', pendingAnnotationUIDRef, uid);
       setActiveUID(uid);
       debouncedShowScoreModal();
       pendingAnnotationUIDRef.current = null;

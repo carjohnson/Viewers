@@ -13,6 +13,7 @@ export const validateSeriesFromDB = async ({
       { credentials: 'include' }
     );
     const result = await res.json();
+    // console.log(' *** Validation result:', result);
     return result;
   } catch (err) {
     console.error('🚨 Error validating series:', err);
