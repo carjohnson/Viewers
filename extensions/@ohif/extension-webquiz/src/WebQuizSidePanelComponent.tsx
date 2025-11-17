@@ -92,6 +92,7 @@ function WebQuizSidePanelComponent() {
     const measurementListRef = useRef([]);    
     const pendingAnnotationUIDRef = useRef<string | null>(null);
     const { cornerstoneViewportService, displaySetService } = servicesManager.services;
+    const listOfUsersAnnotationsRef = useRef<any>(null);
 
 
     const scoreOptions = [
@@ -285,6 +286,7 @@ function WebQuizSidePanelComponent() {
                 debouncedShowScoreModal,
                 pendingAnnotationUIDRef,
                 isSeriesValidRef,
+                listOfUsersAnnotationsRef,
         });
 
         const wrappedAnnotationChangeHandler = (event: any) => handleAnnotationChange({
@@ -357,6 +359,7 @@ function WebQuizSidePanelComponent() {
         setDropdownSelectionMap,
         annotation,
         setAnnotationsLoaded,
+        listOfUsersAnnotationsRef,
         });
     }, [userInfo, patientName]);
 

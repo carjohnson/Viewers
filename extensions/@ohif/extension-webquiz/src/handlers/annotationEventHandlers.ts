@@ -16,6 +16,7 @@ export function handleMeasurementAdded({
   debouncedShowScoreModal,
   pendingAnnotationUIDRef,
   isSeriesValidRef,
+  listOfUsersAnnotationsRef,
 }: {
   measurement: any;
   measurementService: any;
@@ -29,34 +30,61 @@ export function handleMeasurementAdded({
   debouncedShowScoreModal: () => void;
   pendingAnnotationUIDRef: React.MutableRefObject<string | null>;
   isSeriesValidRef: React.MutableRefObject<boolean>;
+  listOfUsersAnnotationsRef: React.MutableRefObject<Record<string, any> | null>;
 }) {
+  console.log('📌 MEASUREMENT_ADDED handler triggered:', measurement);
   setTimeout(() => {
-    const uid = measurement?.uid;
-    const seriesUID = measurement?.referenceSeriesUID;
+    try {
+      const uid = measurement?.uid;
+      const seriesUID = measurement?.referenceSeriesUID;
 
-    console.log('🕒 Delayed MEASUREMENT_ADDED check:', { uid, seriesUID },  pendingAnnotationUIDRef.current);
+      console.log('🕒 Delayed MEASUREMENT_ADDED check:', { uid, seriesUID },  pendingAnnotationUIDRef.current);
 
-    if (
-      uid &&
-      uid === pendingAnnotationUIDRef.current &&
-      isSeriesValidRef.current === false
-    ) {
-      console.warn('🧹 Removing measurement on invalid series:', uid);
-      measurementService.remove(uid);
+      // Flatten all annotationUIDs with scores
+      const annotationsObj = listOfUsersAnnotationsRef.current;
+      const annotationGroups = annotationsObj ? Object.values(annotationsObj) : [];
 
-      showModal({
-        title: 'Invalid Series',
-        message:
-          'This series is not to be annotated.',
-          showCancel: false,
-        });
+      const scoredUIDs = annotationGroups
+        .flatMap(group => group.data || [])
+        .filter(a => a?.annotationUID && a?.data?.suspicionScore != null)
+        .map(a => a.annotationUID);
 
-      pendingAnnotationUIDRef.current = null;
-    } else {
-      console.log(' *** IN MEASUREMENT ADDED HANDLER :', pendingAnnotationUIDRef, uid);
-      setActiveUID(uid);
-      debouncedShowScoreModal();
-      pendingAnnotationUIDRef.current = null;
+      console.log('📌 MEASUREMENT_ADDED handler triggered:', listOfUsersAnnotationsRef.current, scoredUIDs);
+      const isAlreadyScored = scoredUIDs.includes(uid);
+
+      if (
+        uid &&
+        uid === pendingAnnotationUIDRef.current &&
+        isSeriesValidRef.current === false
+      ) {
+        console.warn('🧹 Removing measurement on invalid series:', uid);
+        measurementService.remove(uid);
+
+        showModal({
+          title: 'Invalid Series',
+          message:
+            'This series is not to be annotated.',
+            showCancel: false,
+          });
+
+        pendingAnnotationUIDRef.current = null;
+      } else {
+        // console.log(' *** IN MEASUREMENT ADDED HANDLER :', pendingAnnotationUIDRef, uid);
+
+        setActiveUID(uid);
+
+        if (!isAlreadyScored) {
+          debouncedShowScoreModal();
+        } else {
+          console.log('🛑 Skipping score modal — annotation already scored:', uid);
+        }
+
+        pendingAnnotationUIDRef.current = null;
+
+      }
+    
+    } catch (error) {
+      console.error('🔥 Error in delayed MEASUREMENT_ADDED block:', error);
     }
   }, 50);
 }

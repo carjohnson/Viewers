@@ -9,6 +9,7 @@ export const fetchAnnotationsFromDB = async ({
   setDropdownSelectionMap,
   annotation,
   setAnnotationsLoaded,
+  listOfUsersAnnotationsRef,
 }: {
   userInfo: { username: string; role: string };
   patientName: string;
@@ -17,6 +18,7 @@ export const fetchAnnotationsFromDB = async ({
   setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   annotation: any;
   setAnnotationsLoaded: (loaded: boolean) => void;
+  listOfUsersAnnotationsRef: React.MutableRefObject<Record<string, any> | null>;
 }) => {
   const username = userInfo.role === 'reader' ? userInfo.username : 'all';
 
@@ -31,6 +33,7 @@ export const fetchAnnotationsFromDB = async ({
     const { payload: annotationsList, legend } = await response.json();
 
     setListOfUsersAnnotations(annotationsList);
+    listOfUsersAnnotationsRef.current = annotationsList;
 
     const newMap = buildDropdownSelectionMapFromFetched(annotationsList);
     setDropdownSelectionMap(newMap);
