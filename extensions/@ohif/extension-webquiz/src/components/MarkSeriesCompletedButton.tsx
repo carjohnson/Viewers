@@ -92,7 +92,7 @@ const MarkSeriesCompletedButton: React.FC<Props> = ({
       <div title={!isSeriesValid ? 'Series is not valid for annotation' : ''}>
         <Button
           onClick={handleClick}
-          disabled={completed || !isSeriesValid}
+          disabled={completed || !isSeriesValid || getUserInfo()?.role === 'admin'}
           className="bg-green-600 hover:bg-green-700 text-white font-semibold rounded px-4 py-2"
         >
           {completed ? '✅ Annotations Completed' : 'Mark Series Annotations Completed'}
@@ -103,13 +103,3 @@ const MarkSeriesCompletedButton: React.FC<Props> = ({
 };
 
 export default MarkSeriesCompletedButton;
-
-
-      // <Button
-      //   // type="primary"
-      //   onClick={handleClick}
-      //   disabled={completed}
-      //   className="bg-green-600 hover:bg-green-700 text-white font-semibold rounded px-4 py-2"
-      // >
-      //   {completed ? '✅ Annotations Completed' : 'Mark Series Annotations Completed'}
-      // </Button>

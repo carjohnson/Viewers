@@ -204,3 +204,52 @@ export const handleAnnotationRemove = ({
     }, 0);
 
 };
+
+//=========================================================
+export const handleAnnotationCompleted = ({
+  event,
+  pendingAnnotationUIDRef,
+  isSeriesValidRef,
+  showModal,
+  setActiveUID,
+  debouncedShowScoreModal,
+
+}: {
+  event: any;
+  pendingAnnotationUIDRef: React.MutableRefObject<string | null>;
+  isSeriesValidRef: React.MutableRefObject<boolean | null>;
+  showModal: (modalProps: {
+    title: string;
+    message: string;
+    showCancel?: boolean;
+    onCancel?: () => void;
+  }) => void;
+  setActiveUID: (activeUID: string | null) => void;
+  debouncedShowScoreModal: () => void;
+}) => {
+
+    console.log('🔍 *** IN ANNOTATION COMPLETED:', event.detail);
+
+    const uid = event.detail?.annotation?.annotationUID;
+    if (!uid) return;
+
+    pendingAnnotationUIDRef.current = uid;
+
+    if (isSeriesValidRef.current === false) {
+      console.warn('🚫 Invalid series — blocking annotation.');
+      showModal({
+        title: 'Invalid Series',
+        message: 'This series is not part of the project.',
+        showCancel: false,
+      });
+      pendingAnnotationUIDRef.current = null;
+      return;
+    }
+
+    console.log('✅ Annotation completed:', uid);
+    setActiveUID(uid);
+    debouncedShowScoreModal();
+    pendingAnnotationUIDRef.current = null;
+
+
+};
