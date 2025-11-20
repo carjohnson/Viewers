@@ -2,6 +2,9 @@ import React from 'react';
 import Modal from 'react-modal';
 import Select from 'react-select';
 import styles from './ScoreModal.module.css';
+import { customizeAnnotationLabel, rebuildMapAndPostAnnotations } from './../utils/annotationUtils';
+import { TriggerPostArgs } from '../models/TriggerPostArgs';
+
 
 type ScoreOption = {
   value: number;
@@ -15,6 +18,9 @@ type Props = {
   selectedScore: number | null;
   setSelectedScore: (score: number | null) => void;
   onClose: () => void;
+  pendingAnnotationUIDRef: React.MutableRefObject<string | null>;
+  setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>
+  triggerPost: (args: TriggerPostArgs) => void;
 };
 
 export const ScoreModal = ({
@@ -23,6 +29,9 @@ export const ScoreModal = ({
   selectedScore,
   setSelectedScore,
   onClose,
+  pendingAnnotationUIDRef,
+  setDropdownSelectionMap,
+  triggerPost,
 }: Props) => {
   return (
     <Modal
@@ -43,8 +52,14 @@ export const ScoreModal = ({
             style={{ padding: '8px 16px', backgroundColor: '#007bff', color: '#fff', border: 'none', borderRadius: '4px' }}
             disabled={selectedScore === null}
             onClick={() => { 
-                console.log('✅ OK button clicked');
-                onClose() }}
+                console.log('✅ OK button clicked', pendingAnnotationUIDRef.current);
+                const uid = pendingAnnotationUIDRef.current;
+                if (!uid) return;
+                customizeAnnotationLabel(uid);
+                onClose(); //closing modal will set suspicionScore
+                rebuildMapAndPostAnnotations(setDropdownSelectionMap, triggerPost);
+                pendingAnnotationUIDRef.current = null;
+                }}
         >
             OK
         </button>

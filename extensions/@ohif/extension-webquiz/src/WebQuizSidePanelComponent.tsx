@@ -18,7 +18,7 @@ import { AnnotationList } from './components/AnnotationList/AnnotationList';
 import { ScoreModal } from './components/ScoreModal';
 import { handleMeasurementAdded, handleAnnotationChange, handleAnnotationRemove,handleAnnotationCompleted } from './handlers/annotationEventHandlers';
 import { createDebouncedStatsUpdater } from './utils/annotationUtils';
-import { createDebouncedModalTrigger } from './utils/annotationUtils';
+import { createDebouncedShowScoreModalTrigger } from './utils/annotationUtils';
 import { buildDropdownSelectionMapFromState } from './utils/annotationUtils';
 
 import MarkSeriesCompletedButton from './components/MarkSeriesCompletedButton';
@@ -79,10 +79,6 @@ function WebQuizSidePanelComponent() {
         setModalInfo(null);
     };
 
-    //~~~~~~~~~~~~~~~~~
-    // ensure debounced definitions are stable across renders using useMemo
-    const debouncedUpdateStats = useMemo(() => createDebouncedStatsUpdater(setAnnotationData), [setAnnotationData]);
-    const debouncedShowScoreModal = useMemo(() => createDebouncedModalTrigger(setShowScoreModal), [setShowScoreModal]);
 
     //~~~~~~~~~~~~~~~~~
     const { servicesManager } = useSystem();
@@ -102,6 +98,15 @@ function WebQuizSidePanelComponent() {
         { value: 4, label: '4' },
         { value: 5, label: '5' },
     ];
+
+    //~~~~~~~~~~~~~~~~~
+    // ensure debounced definitions are stable across renders using useMemo
+    const debouncedUpdateStats = useMemo(() => createDebouncedStatsUpdater(setAnnotationData), [setAnnotationData]);
+    // const debouncedShowScoreModal = useMemo(() => createDebouncedModalTrigger(setShowScoreModal), [setShowScoreModal]);
+    const debouncedShowScoreModal = useMemo(
+        () => createDebouncedShowScoreModalTrigger(setShowScoreModal, pendingAnnotationUIDRef),
+        [setShowScoreModal, pendingAnnotationUIDRef]
+    );
 
 
     // ---------------------------------------------
@@ -289,18 +294,18 @@ function WebQuizSidePanelComponent() {
                 listOfUsersAnnotationsRef,
         });
 
-        const wrappedAnnotationChangeHandler = (event: any) => handleAnnotationChange({
-            event,
-            setIsSaved,
-            debouncedUpdateStats,
-            setDropdownSelectionMap,
-            setShowScoreModal,
-            triggerPost,
-            debouncedShowScoreModal,
-            setActiveUID,
-            pendingAnnotationUIDRef,
-            isSeriesValidRef,
-        });
+        // const wrappedAnnotationCompletedHandler = (event: any) => handleAnnotationCompleted({
+        //     event,
+        //     setIsSaved,
+        //     debouncedUpdateStats,
+        //     setDropdownSelectionMap,
+        //     setShowScoreModal,
+        //     triggerPost,
+        //     debouncedShowScoreModal,
+        //     setActiveUID,
+        //     pendingAnnotationUIDRef,
+        //     isSeriesValidRef,
+        // });
 
         const wrappedAnnotationRemovedHandler = (event: any) => handleAnnotationRemove({
             event,
@@ -312,23 +317,24 @@ function WebQuizSidePanelComponent() {
 
         const wrappedAnnotationCompletedHandler = (event: any) => handleAnnotationCompleted({
             event,
+        })
+
+        const wrappedAnnotationChangeHandler = (event: any) => handleAnnotationChange({
+            event,
+            debouncedUpdateStats,
             pendingAnnotationUIDRef,
-            isSeriesValidRef,
-            showModal,
-            setActiveUID,
-            debouncedShowScoreModal,
         });
 
         const subscription = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_ADDED,wrappedMeasurementAddedHandler);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangeHandler);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationRemovedHandler);
-        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, wrappedAnnotationCompletedHandler);
+        // cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, wrappedAnnotationCompletedHandler);
 
         return () => {
           subscription.unsubscribe();
           cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangeHandler);
           cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationRemovedHandler);
-          cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, wrappedAnnotationCompletedHandler);
+        //   cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, wrappedAnnotationCompletedHandler);
         }
 
     }, [patientName]);
@@ -483,6 +489,9 @@ function WebQuizSidePanelComponent() {
             selectedScore={selectedScore}
             setSelectedScore={setSelectedScore}
             onClose={onCloseScoreModal}
+            pendingAnnotationUIDRef={pendingAnnotationUIDRef}
+            setDropdownSelectionMap={setDropdownSelectionMap}
+            triggerPost={triggerPost}
             />
             {modalInfo && (
                 <ModalComponent

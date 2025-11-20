@@ -3,6 +3,10 @@ import { AnnotationStats } from '../models/AnnotationStats';
 import { annotation } from '@cornerstonejs/tools';
 import { debounce } from './debounce';
 
+import {  getUserInfo } from './../../../../../modes/@ohif/mode-webquiz/src/userInfoService';
+import { TriggerPostArgs } from '../models/TriggerPostArgs';
+
+
 
 //=========================================================
 export const buildDropdownSelectionMapFromFetched = (lFetchedAnnotations: any[]) => {
@@ -77,18 +81,26 @@ export const createDebouncedStatsUpdater = (
 ) =>
   debounce(() => {
     setAnnotationData(getAnnotationsStats());
-  }, 100);
+  }, 300);
 
 //=========================================================
 // debounced wrapper for modal trigger
 // delay showing modal to ensure annotations have settled
-export const createDebouncedModalTrigger = (
-  setShowScoreModal: (show: boolean) => void
+// export const createDebouncedModalTrigger = (
+//   setShowScoreModal: (show: boolean) => void
+// ) =>
+//   debounce(() => {
+//     setShowScoreModal(true);
+//   }, 300);
+export const createDebouncedShowScoreModalTrigger = (
+  setShowScoreModal: (show: boolean) => void,
+  pendingAnnotationUIDRef: React.MutableRefObject<string | null>
 ) =>
-  debounce(() => {
+  debounce((uid: string) => {
+    // set UID then open modal
+    pendingAnnotationUIDRef.current = uid;
     setShowScoreModal(true);
   }, 300);
-
 //=========================================================
 export const getLastIndexStored = (allAnnotations: any[]): number => {
   let iLastIndex = 0;
@@ -107,3 +119,34 @@ export const getLastIndexStored = (allAnnotations: any[]): number => {
   return iLastIndex;
 };
 
+//=========================================================
+export const customizeAnnotationLabel = (
+  uid: string,
+) => {
+  const allAnnotations = annotation.state.getAllAnnotations?.() || [];
+
+  // Label assignment
+  const userInfo = getUserInfo();
+  const measurementIndex = getLastIndexStored(allAnnotations) + 1;
+  const customLabel = `${userInfo.username}_${measurementIndex}`;
+
+  const target = allAnnotations.find(a => a.annotationUID === uid);
+  if (target && target.data.label === "") {
+    target.data.label = customLabel;
+  }
+};
+
+//=========================================================
+export const rebuildMapAndPostAnnotations = (
+  setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>,
+  triggerPost: (args: TriggerPostArgs) => void
+) => {
+  const allAnnotations = annotation.state.getAllAnnotations?.() || [];
+
+  // Dropdown map
+  const newMap = buildDropdownSelectionMapFromState(allAnnotations);
+  setDropdownSelectionMap(newMap);
+
+  // Trigger POST
+  triggerPost({ allAnnotations, dropdownSelectionMap: newMap });
+};
