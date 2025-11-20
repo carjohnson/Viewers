@@ -76,12 +76,32 @@ export const getAnnotationsStats = (
 //=========================================================
 // debounced wrapper for getAnnotationStats
 // delay acquiring stats to let ohif complete the add of the annotation
+
+// export const createDebouncedStatsUpdater = (
+//   setAnnotationData: (data: any) => void
+// ) =>
+//   debounce(() => {
+//     setAnnotationData(getAnnotationsStats());
+//   }, 300);
+
 export const createDebouncedStatsUpdater = (
-  setAnnotationData: (data: any) => void
+  setAnnotationData: (data: any) => void,
+  setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>,
+  triggerPost: (args: TriggerPostArgs) => void
 ) =>
   debounce(() => {
-    setAnnotationData(getAnnotationsStats());
-  }, 300);
+    // 1. Update stats
+    const stats = getAnnotationsStats();
+    setAnnotationData(stats);
+
+    // 2. Rebuild dropdown map
+    const allAnnotations = annotation.state.getAllAnnotations?.() || [];
+    const newMap = buildDropdownSelectionMapFromState(allAnnotations);
+    setDropdownSelectionMap(newMap);
+
+    // 3. Trigger POST
+    triggerPost({ allAnnotations, dropdownSelectionMap: newMap });
+  }, 300); 
 
 //=========================================================
 // debounced wrapper for modal trigger

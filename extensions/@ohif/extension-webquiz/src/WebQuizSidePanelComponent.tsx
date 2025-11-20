@@ -16,7 +16,7 @@ import { handleMeasurementClick, toggleVisibility, closeScoreModal } from './han
 import { useSystem } from '@ohif/core';
 import { AnnotationList } from './components/AnnotationList/AnnotationList';
 import { ScoreModal } from './components/ScoreModal';
-import { handleMeasurementAdded, handleAnnotationChange, handleAnnotationRemove,handleAnnotationCompleted } from './handlers/annotationEventHandlers';
+import { handleMeasurementAdd, handleAnnotationChange, handleAnnotationRemove } from './handlers/annotationEventHandlers';
 import { createDebouncedStatsUpdater } from './utils/annotationUtils';
 import { createDebouncedShowScoreModalTrigger } from './utils/annotationUtils';
 import { buildDropdownSelectionMapFromState } from './utils/annotationUtils';
@@ -33,9 +33,6 @@ import { ModalComponent } from './components/ModalComponent';
  *  Also performs a simple div that uses Math.js to output the square root.
  */
 function WebQuizSidePanelComponent() {
-    // set up useEffect hook to manage gathering all data from services
-    //  as the other components may be updating asynchronously and this
-    //  component needs to be subscribed to those updates
 
     const [annotationData, setAnnotationData] = useState<AnnotationStats[]>([]);
     const [isSaved, setIsSaved] = useState(true);
@@ -50,7 +47,8 @@ function WebQuizSidePanelComponent() {
     const isSeriesValidRef = useRef<boolean | null>(null);
     const [validatedSeriesUID, setValidatedSeriesUID] = useState(null);
 
-    //~~~~~~~~~~~~~~~~~
+    // ~~~~~~~~~~
+
     const [modalInfo, setModalInfo] = useState<null | { 
         title: string;
         message: string;
@@ -80,7 +78,7 @@ function WebQuizSidePanelComponent() {
     };
 
 
-    //~~~~~~~~~~~~~~~~~
+    // ~~~~~~~~~~
     const { servicesManager } = useSystem();
     const { measurementService, viewportGridService } = servicesManager.services;
     const activeViewportId = viewportGridService.getActiveViewportId();
@@ -91,6 +89,7 @@ function WebQuizSidePanelComponent() {
     const listOfUsersAnnotationsRef = useRef<any>(null);
 
 
+    // ~~~~~~~~~~
     const scoreOptions = [
         { value: 1, label: '1' },
         { value: 2, label: '2' },
@@ -99,14 +98,6 @@ function WebQuizSidePanelComponent() {
         { value: 5, label: '5' },
     ];
 
-    //~~~~~~~~~~~~~~~~~
-    // ensure debounced definitions are stable across renders using useMemo
-    const debouncedUpdateStats = useMemo(() => createDebouncedStatsUpdater(setAnnotationData), [setAnnotationData]);
-    // const debouncedShowScoreModal = useMemo(() => createDebouncedModalTrigger(setShowScoreModal), [setShowScoreModal]);
-    const debouncedShowScoreModal = useMemo(
-        () => createDebouncedShowScoreModalTrigger(setShowScoreModal, pendingAnnotationUIDRef),
-        [setShowScoreModal, pendingAnnotationUIDRef]
-    );
 
 
     // ---------------------------------------------
@@ -156,6 +147,9 @@ function WebQuizSidePanelComponent() {
     });
 
     //=========================================================
+    // set up useEffect hooks to manage gathering all data from services
+    //  as the other components may be updating asynchronously and this
+    //  component needs to be subscribed to those updates
     useEffect(() => {
         if (!studyInfoFromHook?.studyUID ||
             !patientInfo?.PatientName
@@ -190,11 +184,10 @@ function WebQuizSidePanelComponent() {
     }, [isSeriesValid]);
     //=========================================================
 
-
     
     //=========================================================
-    // Post status to wip when a new series is selected (if valid)
-
+    // Post status to database as wip when a new series is selected (if valid)
+    //  Leave any series already marked as "done"
     useEffect(() => {
         if (!validatedSeriesUID || validatedSeriesUID !== seriesInstanceUID) return;
         if (!studyInfo?.studyUID) return;
@@ -245,7 +238,6 @@ function WebQuizSidePanelComponent() {
 
     //=========================================================
     // Re-enable button when moving to a different series if valid
-
     useEffect(() => {
     const fetchProgress = async () => {
         if (!studyInfo?.studyUID || !seriesInstanceUID) return;
@@ -282,8 +274,8 @@ function WebQuizSidePanelComponent() {
 
         const { measurementService } = servicesManager.services;
 
-        const wrappedMeasurementAddedHandler = ({ measurement }: any) => 
-            handleMeasurementAdded({
+        const wrappedMeasurementAddHandler = ({ measurement }: any) => 
+            handleMeasurementAdd({
                 measurement,
                 measurementService,
                 showModal,
@@ -294,20 +286,7 @@ function WebQuizSidePanelComponent() {
                 listOfUsersAnnotationsRef,
         });
 
-        // const wrappedAnnotationCompletedHandler = (event: any) => handleAnnotationCompleted({
-        //     event,
-        //     setIsSaved,
-        //     debouncedUpdateStats,
-        //     setDropdownSelectionMap,
-        //     setShowScoreModal,
-        //     triggerPost,
-        //     debouncedShowScoreModal,
-        //     setActiveUID,
-        //     pendingAnnotationUIDRef,
-        //     isSeriesValidRef,
-        // });
-
-        const wrappedAnnotationRemovedHandler = (event: any) => handleAnnotationRemove({
+        const wrappedAnnotationRemoveHandler = (event: any) => handleAnnotationRemove({
             event,
             setIsSaved,
             debouncedUpdateStats,
@@ -315,31 +294,26 @@ function WebQuizSidePanelComponent() {
             triggerPost,
         });
 
-        const wrappedAnnotationCompletedHandler = (event: any) => handleAnnotationCompleted({
-            event,
-        })
-
         const wrappedAnnotationChangeHandler = (event: any) => handleAnnotationChange({
             event,
             debouncedUpdateStats,
             pendingAnnotationUIDRef,
         });
 
-        const subscription = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_ADDED,wrappedMeasurementAddedHandler);
+        const subscription = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_ADDED,wrappedMeasurementAddHandler);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangeHandler);
-        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationRemovedHandler);
-        // cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, wrappedAnnotationCompletedHandler);
+        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationRemoveHandler);
 
         return () => {
           subscription.unsubscribe();
           cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangeHandler);
-          cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationRemovedHandler);
-        //   cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED, wrappedAnnotationCompletedHandler);
+          cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationRemoveHandler);
         }
 
     }, [patientName]);
 
     //=========================================================
+
 
     //=========================================================
     useEffect(() => {
@@ -380,8 +354,8 @@ function WebQuizSidePanelComponent() {
 
 
     //=========================================================
-    // ~~~~~~ post annotations to DB
-    // Memorize the trigger for POST to make sure all handlers who use
+    // Memorize the trigger for POST of annotations to the database
+    //      to make sure all handlers who use
     //      triggerPost access it once the patientName is available 
     const triggerPost = useMemo(() => {
         if (!patientName) return null;
@@ -392,6 +366,18 @@ function WebQuizSidePanelComponent() {
             setIsSaved,
         });
     }, [patientName, measurementListRef, setIsSaved]);
+
+    //=========================================================
+    // ensure debounced definitions are stable across renders using useMemo
+    const debouncedUpdateStats = useMemo(
+        () => createDebouncedStatsUpdater(setAnnotationData, setDropdownSelectionMap, triggerPost),
+        [setAnnotationData, setDropdownSelectionMap, triggerPost]
+    );
+    // ~~~~~~~~~~
+    const debouncedShowScoreModal = useMemo(
+        () => createDebouncedShowScoreModalTrigger(setShowScoreModal, pendingAnnotationUIDRef),
+        [setShowScoreModal, pendingAnnotationUIDRef]
+    );
 
     //=========================================================
     const onMeasurementClick = (id: string) =>

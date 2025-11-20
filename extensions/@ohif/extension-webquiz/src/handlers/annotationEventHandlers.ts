@@ -8,8 +8,7 @@ import { TriggerPostArgs } from '../models/TriggerPostArgs';
 
 
 //=========================================================
-
-export function handleMeasurementAdded({
+export function handleMeasurementAdd({
   measurement,
   measurementService,
   showModal,
@@ -94,14 +93,6 @@ export function handleMeasurementAdded({
   }, 50);
 }
 //=========================================================
-export const handleAnnotationCompleted = ({
-  event,
-}: {
-  event: any;
-}) => {
-  console.log('🔍 *** IN CHANGED HANDLER Annotation event detail:', event.detail);
-};
-//=========================================================
 export const handleAnnotationChange = ({
   event,
   debouncedUpdateStats,
@@ -116,14 +107,44 @@ export const handleAnnotationChange = ({
    pendingAnnotationUIDRef.current = changedAnnotation.annotationUID;
   // console.log('🔍 IN CHANGED Annotation event detail:', event.detail);
   // console.log('🧷 Annotation UID set:', changedAnnotation.annotationUID);
-
   
   debouncedUpdateStats();
 
-  const allAnnotations = annotation.state.getAllAnnotations?.() || [];
-  console.log('🔁 Re-fired ANNOTATION_MODIFIED for UID:', changedAnnotation.annotationUID);
-
 }
+
+//=========================================================
+export const handleAnnotationRemove = ({
+  event,
+  setIsSaved,
+  debouncedUpdateStats,
+  setDropdownSelectionMap,
+  triggerPost,
+}: {
+  event: any;
+  setIsSaved: (value: boolean) => void;
+  debouncedUpdateStats: () => void;
+  setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  triggerPost: (args: TriggerPostArgs) => void;
+}) => {
+    const userInfo = getUserInfo();
+    if (userInfo?.role === 'admin') {
+      alert("Admins are not allowed to delete annotations.");
+      console.warn("🚫 Annotation deletion blocked for admin user:", userInfo.username);
+      return;
+    }
+    setIsSaved(false);
+    // debouncedUpdateStats();
+    setTimeout(() => {
+      const allAnnotations = annotation.state.getAllAnnotations?.() || [];
+      const newMap = buildDropdownSelectionMapFromState(allAnnotations);
+      setDropdownSelectionMap(newMap);
+
+      const postArgs = { allAnnotations, dropdownSelectionMap: newMap };
+      triggerPost(postArgs);
+    }, 0);
+
+};
+
 
 //=========================================================
 // export const handleAnnotationChange = ({
@@ -203,42 +224,15 @@ export const handleAnnotationChange = ({
 //   }
 // };
 
-
 //=========================================================
-// no time delay when deleting a measurement
-export const handleAnnotationRemove = ({
-  event,
-  setIsSaved,
-  debouncedUpdateStats,
-  setDropdownSelectionMap,
-  triggerPost,
-}: {
-  event: any;
-  setIsSaved: (value: boolean) => void;
-  debouncedUpdateStats: () => void;
-  setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
-  triggerPost: (args: TriggerPostArgs) => void;
-}) => {
-    const userInfo = getUserInfo();
-    if (userInfo?.role === 'admin') {
-      alert("Admins are not allowed to delete annotations.");
-      console.warn("🚫 Annotation deletion blocked for admin user:", userInfo.username);
-      return;
-    }
-    setIsSaved(false);
-    debouncedUpdateStats();
-    setTimeout(() => {
-      const allAnnotations = annotation.state.getAllAnnotations?.() || [];
-      const newMap = buildDropdownSelectionMapFromState(allAnnotations);
-      setDropdownSelectionMap(newMap);
+// export const handleAnnotationCompleted = ({
+//   event,
+// }: {
+//   event: any;
+// }) => {
+//   console.log('🔍 *** IN CHANGED HANDLER Annotation event detail:', event.detail);
+// };
 
-      triggerPost({
-          allAnnotations,
-          dropdownSelectionMap: newMap,
-      });
-    }, 0);
-
-};
 
 //=========================================================
 // export const handleAnnotationCompleted = ({
