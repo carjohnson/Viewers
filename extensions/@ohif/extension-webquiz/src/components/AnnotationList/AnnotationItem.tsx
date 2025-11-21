@@ -8,6 +8,7 @@ type Props = {
   scoreOptions: { value: number; label: string }[];
   selectedScore: number;
   isVisible: boolean;
+  onMenuOpen: () => void;
   onDropdownChange: (value: number) => void;
   onClick: () => void;
   onToggleVisibility: () => void;
@@ -19,6 +20,7 @@ export const AnnotationItem = ({
   scoreOptions,
   selectedScore,
   isVisible,
+  onMenuOpen,
   onDropdownChange,
   onClick,
   onToggleVisibility,
@@ -27,6 +29,7 @@ export const AnnotationItem = ({
     <Select
       options={scoreOptions}
       value={scoreOptions.find(opt => opt.value === selectedScore)}
+      onMenuOpen={onMenuOpen}
       onChange={(option) => onDropdownChange(option!.value)}
       getOptionLabel={(e) => e.label}
       styles={{

@@ -69,6 +69,7 @@ export const AnnotationList = ({
                 scoreOptions={scoreOptions}
                 selectedScore={selectedScore}
                 isVisible={isVisible}
+                onMenuOpen={() => onMeasurementClick(uid)}
                 onDropdownChange={(value) => onDropdownChange(uid, value)}
                 onClick={() => onMeasurementClick(uid)}
                 onToggleVisibility={() => onToggleVisibility(uid)}

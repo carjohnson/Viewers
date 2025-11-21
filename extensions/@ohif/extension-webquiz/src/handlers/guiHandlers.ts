@@ -3,6 +3,7 @@ import * as cornerstone from '@cornerstonejs/core';
 import * as cornerstoneTools from '@cornerstonejs/tools';
 import { annotation } from '@cornerstonejs/tools';
 
+//=========================================================
 // Set up GUI so the user can click on an annotation in the panel list
 //    and have the image jump to the corresponding slice
 //    also - set up a visibility icon for each annotation
@@ -25,6 +26,7 @@ export const handleMeasurementClick = ({
   }
 };
 
+//=========================================================
 export const toggleVisibility = ({
   uid,
   visibilityMap,
@@ -47,6 +49,7 @@ export const toggleVisibility = ({
   }));
 };
 
+//=========================================================
 export const closeScoreModal = ({
   activeUID,
   selectedScore,

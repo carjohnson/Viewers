@@ -8,7 +8,7 @@ import { TriggerPostArgs } from '../models/TriggerPostArgs';
 
 
 //=========================================================
-export function handleMeasurementAdd({
+export function handleMeasurementAdded({
   measurement,
   measurementService,
   showModal,
@@ -17,6 +17,7 @@ export function handleMeasurementAdd({
   pendingAnnotationUIDRef,
   isSeriesValidRef,
   listOfUsersAnnotationsRef,
+  isSeriesAnnotationsCompletedRef,
 }: {
   measurement: any;
   measurementService: any;
@@ -31,7 +32,19 @@ export function handleMeasurementAdd({
   pendingAnnotationUIDRef: React.MutableRefObject<string | null>;
   isSeriesValidRef: React.MutableRefObject<boolean>;
   listOfUsersAnnotationsRef: React.MutableRefObject<Record<string, any> | null>;
+  isSeriesAnnotationsCompletedRef: React.MutableRefObject<boolean>;
 }) {
+
+  if (isSeriesAnnotationsCompletedRef.current) {
+    measurementService.remove(measurement?.uid);
+    showModal({
+      title: 'Series Locked',
+      message: 'This series has been marked completed. No further annotations allowed.',
+      showCancel: false,
+    });
+    return;
+  }
+
   console.log('📌 MEASUREMENT_ADDED handler triggered:', isSeriesValidRef, pendingAnnotationUIDRef.current,  measurement);
   setTimeout(() => {
     try {
@@ -93,16 +106,19 @@ export function handleMeasurementAdd({
   }, 50);
 }
 //=========================================================
-export const handleAnnotationChange = ({
+export const handleAnnotationChanged = ({
   event,
   debouncedUpdateStats,
   pendingAnnotationUIDRef,
+  isSeriesAnnotationsCompletedRef,
 }: {
   event: any;
   debouncedUpdateStats: () => void;
   pendingAnnotationUIDRef: React.MutableRefObject<string | null>;
+  isSeriesAnnotationsCompletedRef: React.MutableRefObject<boolean>;
 }) => {
   const { annotation: changedAnnotation } = event.detail;
+
   if (!changedAnnotation) return;
    pendingAnnotationUIDRef.current = changedAnnotation.annotationUID;
   // console.log('🔍 IN CHANGED Annotation event detail:', event.detail);
@@ -113,25 +129,40 @@ export const handleAnnotationChange = ({
 }
 
 //=========================================================
-export const handleAnnotationRemove = ({
+// this handler takes effect AFTER the removal of the measurement - it is reactive
+export const handleAnnotationRemoved = ({
   event,
   setIsSaved,
   debouncedUpdateStats,
   setDropdownSelectionMap,
   triggerPost,
+  showModal,
 }: {
   event: any;
   setIsSaved: (value: boolean) => void;
   debouncedUpdateStats: () => void;
   setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   triggerPost: (args: TriggerPostArgs) => void;
+  showModal: (modalProps: {
+    title: string;
+    message: string;
+    showCancel?: boolean;
+    onCancel?: () => void;
+  }) => void;
 }) => {
     const userInfo = getUserInfo();
     if (userInfo?.role === 'admin') {
-      alert("Admins are not allowed to delete annotations.");
-      console.warn("🚫 Annotation deletion blocked for admin user:", userInfo.username);
+      // alert("Admins are not allowed to delete annotations.");
+      // console.warn("🚫 Annotation deletion blocked for admin user:", userInfo.username);
+      showModal({
+        title: 'Deletion Blocked',
+        message: 'Admins are not allowed to delete annotations.',
+        showCancel: false,
+      });
+      console.warn('🚫 Annotation deletion blocked for admin:', userInfo.username);
       return;
     }
+
     setIsSaved(false);
     // debouncedUpdateStats();
     setTimeout(() => {
@@ -145,7 +176,70 @@ export const handleAnnotationRemove = ({
 
 };
 
+//=========================================================
+// >>>>>>>>>>>>>>>>>>>> trying to stop removal of measurement - using ref
+//    but this handler takes effect AFTER the removal --- ie. it's too late
+// export const handleAnnotationRemove = ({
+//   event,
+//   setIsSaved,
+//   debouncedUpdateStats,
+//   setDropdownSelectionMap,
+//   triggerPost,
+//   isSeriesAnnotationsCompletedRef,
+//   showModal,
+// }: {
+//   event: any;
+//   setIsSaved: (value: boolean) => void;
+//   debouncedUpdateStats: () => void;
+//   setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+//   triggerPost: (args: TriggerPostArgs) => void;
+//   isSeriesAnnotationsCompletedRef: React.MutableRefObject<boolean>;
+//   showModal: (modalProps: {
+//     title: string;
+//     message: string;
+//     showCancel?: boolean;
+//     onCancel?: () => void;
+//   }) => void;
+// }) => {
+//   const userInfo = getUserInfo();
 
+//   if (userInfo?.role === 'admin') {
+//     showModal({
+//       title: 'Deletion Blocked',
+//       message: 'Admins are not allowed to delete annotations.',
+//       showCancel: false,
+//     });
+//     console.warn('🚫 Annotation deletion blocked for admin:', userInfo.username);
+//     // UI will already have removed it, but we skip persistence
+//     return;
+//   }
+
+//   if (isSeriesAnnotationsCompletedRef.current) {
+//     showModal({
+//       title: 'Series Locked',
+//       message: 'This series has been marked completed. No further modifications allowed.',
+//       showCancel: false,
+//     });
+//     console.warn('🚫 Annotation deletion blocked for completed series');
+//     // UI will already have removed it, but we skip persistence
+//     return;
+//   }
+
+//   // ✅ allowed → persist removal
+//   setIsSaved(false);
+//   debouncedUpdateStats();
+
+//   setTimeout(() => {
+//     const allAnnotations = annotation.state.getAllAnnotations?.() || [];
+//     const newMap = buildDropdownSelectionMapFromState(allAnnotations);
+//     setDropdownSelectionMap(newMap);
+
+//     const postArgs = { allAnnotations, dropdownSelectionMap: newMap };
+//     triggerPost(postArgs);
+//   }, 0);
+// };
+
+// >>>>>>>>>>>>>>>>>>>> OLD STUFF <<<<<<<<<<<<<<<<<<<<<<<<<<<<
 //=========================================================
 // export const handleAnnotationChange = ({
 //   event,

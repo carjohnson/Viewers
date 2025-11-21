@@ -16,7 +16,7 @@ import { handleMeasurementClick, toggleVisibility, closeScoreModal } from './han
 import { useSystem } from '@ohif/core';
 import { AnnotationList } from './components/AnnotationList/AnnotationList';
 import { ScoreModal } from './components/ScoreModal';
-import { handleMeasurementAdd, handleAnnotationChange, handleAnnotationRemove } from './handlers/annotationEventHandlers';
+import { handleMeasurementAdded, handleAnnotationChanged, handleAnnotationRemoved } from './handlers/annotationEventHandlers';
 import { createDebouncedStatsUpdater } from './utils/annotationUtils';
 import { createDebouncedShowScoreModalTrigger } from './utils/annotationUtils';
 import { buildDropdownSelectionMapFromState } from './utils/annotationUtils';
@@ -44,11 +44,11 @@ function WebQuizSidePanelComponent() {
     const [activeUID, setActiveUID] = useState<string | null>(null);
     const [listOfUsersAnnotations, setListOfUsersAnnotations] = useState(null);
     const [isSeriesAnnotationsCompleted, setSeriesAnnotationsCompleted] = useState(false);
+    const isSeriesAnnotationsCompletedRef = useRef(isSeriesAnnotationsCompleted);
     const isSeriesValidRef = useRef<boolean | null>(null);
     const [validatedSeriesUID, setValidatedSeriesUID] = useState(null);
 
-    // ~~~~~~~~~~
-
+    //~~~~~~~~~~~~~~~~~
     const [modalInfo, setModalInfo] = useState<null | { 
         title: string;
         message: string;
@@ -78,7 +78,7 @@ function WebQuizSidePanelComponent() {
     };
 
 
-    // ~~~~~~~~~~
+    //~~~~~~~~~~~~~~~~~
     const { servicesManager } = useSystem();
     const { measurementService, viewportGridService } = servicesManager.services;
     const activeViewportId = viewportGridService.getActiveViewportId();
@@ -89,7 +89,7 @@ function WebQuizSidePanelComponent() {
     const listOfUsersAnnotationsRef = useRef<any>(null);
 
 
-    // ~~~~~~~~~~
+    //~~~~~~~~~~~~~~~~~
     const scoreOptions = [
         { value: 1, label: '1' },
         { value: 2, label: '2' },
@@ -274,45 +274,50 @@ function WebQuizSidePanelComponent() {
 
         const { measurementService } = servicesManager.services;
 
-        const wrappedMeasurementAddHandler = ({ measurement }: any) => 
-            handleMeasurementAdd({
-                measurement,
-                measurementService,
-                showModal,
-                setActiveUID,
-                debouncedShowScoreModal,
-                pendingAnnotationUIDRef,
-                isSeriesValidRef,
-                listOfUsersAnnotationsRef,
+        const wrappedMeasurementAddedHandler = ({ measurement }: any) => handleMeasurementAdded({
+            measurement,
+            measurementService,
+            showModal,
+            setActiveUID,
+            debouncedShowScoreModal,
+            pendingAnnotationUIDRef,
+            isSeriesValidRef,
+            listOfUsersAnnotationsRef,
+            isSeriesAnnotationsCompletedRef,
         });
 
-        const wrappedAnnotationRemoveHandler = (event: any) => handleAnnotationRemove({
+        const wrappedAnnotationRemovedHandler = (event: any) => handleAnnotationRemoved({
             event,
             setIsSaved,
             debouncedUpdateStats,
             setDropdownSelectionMap,
             triggerPost,
+            showModal,
         });
 
-        const wrappedAnnotationChangeHandler = (event: any) => handleAnnotationChange({
+        const wrappedAnnotationChangedHandler = (event: any) => handleAnnotationChanged({
             event,
             debouncedUpdateStats,
             pendingAnnotationUIDRef,
+            isSeriesAnnotationsCompletedRef,
         });
 
-        const subscription = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_ADDED,wrappedMeasurementAddHandler);
-        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangeHandler);
-        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationRemoveHandler);
+        const subscription = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_ADDED,wrappedMeasurementAddedHandler);
+        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangedHandler);
+        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationRemovedHandler);
 
         return () => {
           subscription.unsubscribe();
-          cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangeHandler);
-          cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationRemoveHandler);
+          cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangedHandler);
+          cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationRemovedHandler);
         }
 
     }, [patientName]);
 
     //=========================================================
+    useEffect(() => {
+        isSeriesAnnotationsCompletedRef.current = isSeriesAnnotationsCompleted;
+    }, [isSeriesAnnotationsCompleted]);
 
 
     //=========================================================
@@ -373,7 +378,7 @@ function WebQuizSidePanelComponent() {
         () => createDebouncedStatsUpdater(setAnnotationData, setDropdownSelectionMap, triggerPost),
         [setAnnotationData, setDropdownSelectionMap, triggerPost]
     );
-    // ~~~~~~~~~~
+    //~~~~~~~~~~~~~~~~~
     const debouncedShowScoreModal = useMemo(
         () => createDebouncedShowScoreModalTrigger(setShowScoreModal, pendingAnnotationUIDRef),
         [setShowScoreModal, pendingAnnotationUIDRef]
@@ -416,6 +421,8 @@ function WebQuizSidePanelComponent() {
             setDropdownSelectionMap,
             triggerPost,
             annotation,
+            isSeriesAnnotationsCompletedRef,
+            showModal,
         });
     };    
     
