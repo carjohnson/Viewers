@@ -336,17 +336,23 @@ function WebQuizSidePanelComponent() {
     }, [annotationData]);
 
     //=========================================================
-    // watch for changes to the state properties
-    // wait for all annotations to be loaded, then set to locked if user role is 'admin'
+    // wait for all annotations to be loaded, then set to locked 
+    //     if the selected series has been marked as completed
+    //  If the user is 'admin', the handles are unavailable because the measurement tools 
+    //      were disabled before the extension was mounted (in code for mode)
     useEffect(() => {
-        if (!annotationsLoaded || userInfo?.role !== 'admin') return;
+    if (!annotationsLoaded) return;
+    console.log('*** Series Completed?? :', isSeriesAnnotationsCompleted);
+    if (!isSeriesAnnotationsCompleted) return;
 
-        annotation.state.getAllAnnotations().forEach(ann => {
-            ann.isLocked = true;
-        });
+    annotation.state.getAllAnnotations().forEach(ann => {
+        ann.isLocked = true;
+    });
 
-        console.log('🔒 All annotations locked for admin user:', userInfo.username);
-    }, [userInfo, annotationsLoaded]);
+    console.log('🔒 All annotations locked for series marked as complete:');
+    // add activeUID to dependency array s.t. whenever the series changes and the activeUID
+    //      is updated, this effect will re-run
+    }, [isSeriesAnnotationsCompleted, annotationsLoaded, activeUID]);
 
     //=========================================================
     // ~~~~~~ fetch annotations from DB based on user role

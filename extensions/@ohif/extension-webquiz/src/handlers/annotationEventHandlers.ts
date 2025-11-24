@@ -106,6 +106,28 @@ export function handleMeasurementAdded({
   }, 50);
 }
 //=========================================================
+// export const handleAnnotationChanged = ({
+//   event,
+//   debouncedUpdateStats,
+//   pendingAnnotationUIDRef,
+//   isSeriesAnnotationsCompletedRef,
+// }: {
+//   event: any;
+//   debouncedUpdateStats: () => void;
+//   pendingAnnotationUIDRef: React.MutableRefObject<string | null>;
+//   isSeriesAnnotationsCompletedRef: React.MutableRefObject<boolean>;
+// }) => {
+//   const { annotation: changedAnnotation } = event.detail;
+
+//   if (!changedAnnotation) return;
+//    pendingAnnotationUIDRef.current = changedAnnotation.annotationUID;
+//   // console.log('🔍 IN CHANGED Annotation event detail:', event.detail);
+//   // console.log('🧷 Annotation UID set:', changedAnnotation.annotationUID);
+  
+//   debouncedUpdateStats();
+
+// }
+
 export const handleAnnotationChanged = ({
   event,
   debouncedUpdateStats,
@@ -118,15 +140,26 @@ export const handleAnnotationChanged = ({
   isSeriesAnnotationsCompletedRef: React.MutableRefObject<boolean>;
 }) => {
   const { annotation: changedAnnotation } = event.detail;
-
   if (!changedAnnotation) return;
-   pendingAnnotationUIDRef.current = changedAnnotation.annotationUID;
-  // console.log('🔍 IN CHANGED Annotation event detail:', event.detail);
-  // console.log('🧷 Annotation UID set:', changedAnnotation.annotationUID);
-  
-  debouncedUpdateStats();
 
-}
+  // 🔒 Guard: if series is completed, force lock and bail
+  if (isSeriesAnnotationsCompletedRef.current) {
+    changedAnnotation.isLocked = true;
+
+    // Optionally: revert any attempted changes
+    // e.g. reset handles to their previous state if you keep a snapshot
+    console.warn(
+      `Blocked modification on locked annotation ${changedAnnotation.annotationUID}`
+    );
+    return;
+  }
+
+  // Normal flow
+  pendingAnnotationUIDRef.current = changedAnnotation.annotationUID;
+  debouncedUpdateStats();
+};
+
+
 
 //=========================================================
 // this handler takes effect AFTER the removal of the measurement - it is reactive
