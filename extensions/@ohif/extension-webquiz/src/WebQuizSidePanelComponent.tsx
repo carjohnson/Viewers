@@ -24,6 +24,7 @@ import { buildDropdownSelectionMapFromState } from './utils/annotationUtils';
 import MarkSeriesCompletedButton from './components/MarkSeriesCompletedButton';
 import { useSeriesValidation } from './hooks/useSeriesValidation';
 import { useCurrentSeriesUID } from './hooks/useCurrentSeriesUID';
+import  useCustomizeAnnotationMenu  from './hooks/useCustomizeAnnotationMenu'
 import { postStudyProgress, fetchStudyProgressFromDB } from './handlers/studyProgressHandlers';
 import { ModalComponent } from './components/ModalComponent';
 
@@ -99,7 +100,6 @@ function WebQuizSidePanelComponent() {
     ];
 
 
-
     // ---------------------------------------------
     // Hook Setup for Study Metadata
     // ---------------------------------------------
@@ -128,6 +128,14 @@ function WebQuizSidePanelComponent() {
         cornerstoneViewportService,
         studyUID: studyInfo?.studyUID,
     });    
+
+    //~~~~~~~~~~~~~~~~~
+    useCustomizeAnnotationMenu ({
+        userInfo,
+        isSeriesAnnotationsCompletedRef,
+        measurementService,
+        showModal,
+    });
 
     //=========================================================
     // This call to the hook validates the series against the project
