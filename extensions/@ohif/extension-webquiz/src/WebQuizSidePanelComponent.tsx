@@ -200,7 +200,12 @@ function WebQuizSidePanelComponent() {
         if (!validatedSeriesUID || validatedSeriesUID !== seriesInstanceUID) return;
         if (!studyInfo?.studyUID) return;
 
+
         const postProgress = async () => {
+            if (userInfo?.role === 'admin') {
+                console.log('🚫 Admins cannot post study progress — skipping');
+                return;
+            }
 
             const progressData = await fetchStudyProgressFromDB({
                 baseUrl: API_BASE_URL,
@@ -378,6 +383,11 @@ function WebQuizSidePanelComponent() {
     //      triggerPost access it once the patientName is available 
     const triggerPost = useMemo(() => {
         if (!patientName) return null;
+        const userInfo = getUserInfo();
+        if (userInfo?.role === 'admin') {
+            console.warn('🚫 Admins cannot post to database');
+            return;
+    }
 
         return useAnnotationPosting({
             patientName,
