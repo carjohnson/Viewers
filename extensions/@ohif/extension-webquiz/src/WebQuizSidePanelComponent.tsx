@@ -202,10 +202,10 @@ function WebQuizSidePanelComponent() {
 
 
         const postProgress = async () => {
-            if (userInfo?.role === 'admin') {
-                console.log('🚫 Admins cannot post study progress — skipping');
-                return;
-            }
+            // if (userInfo?.role === 'admin') {
+            //     console.log('🚫 Admins cannot post study progress — skipping');
+            //     return;
+            // }
 
             const progressData = await fetchStudyProgressFromDB({
                 baseUrl: API_BASE_URL,
@@ -343,18 +343,21 @@ function WebQuizSidePanelComponent() {
     //=========================================================
     // wait for all annotations to be loaded, then set to locked 
     //     if the selected series has been marked as completed
-    //  If the user is 'admin', the handles are unavailable because the measurement tools 
-    //      were disabled before the extension was mounted (in code for mode)
     useEffect(() => {
     if (!annotationsLoaded) return;
-    console.log('*** Series Completed?? :', isSeriesAnnotationsCompleted);
-    if (!isSeriesAnnotationsCompleted) return;
+    try {
+        if (userInfo?.role === 'admin' || isSeriesAnnotationsCompleted) {
 
-    annotation.state.getAllAnnotations().forEach(ann => {
-        ann.isLocked = true;
-    });
+        annotation.state.getAllAnnotations().forEach(ann => {
+            ann.isLocked = true;
+        });
 
-    console.log('🔒 All annotations locked for series marked as complete:');
+        console.log('🔒 All annotations locked for series marked as complete:');
+
+            }
+        } catch (err) {
+            console.error('Error while locking annotations:', err);
+        }
     // add activeUID to dependency array s.t. whenever the series changes and the activeUID
     //      is updated, this effect will re-run
     }, [isSeriesAnnotationsCompleted, annotationsLoaded, activeUID]);
@@ -382,18 +385,30 @@ function WebQuizSidePanelComponent() {
     //      to make sure all handlers who use
     //      triggerPost access it once the patientName is available 
     const triggerPost = useMemo(() => {
-        if (!patientName) return null;
-        const userInfo = getUserInfo();
-        if (userInfo?.role === 'admin') {
-            console.warn('🚫 Admins cannot post to database');
-            return;
-    }
+        try {
+            if (!patientName) return null;
 
-        return useAnnotationPosting({
+            const userInfo = getUserInfo();
+            if (userInfo?.role === 'admin') {
+            console.warn('🚫 Admins cannot post to database');
+            // Return a no‑op function instead of undefined
+            return () => {
+                console.warn('Post suppressed for admin role');
+            };
+            }
+
+            return useAnnotationPosting({
             patientName,
             measurementListRef,
             setIsSaved,
-        });
+            });
+        } catch (err) {
+            console.error('Error initializing annotation posting:', err);
+            // Return a safe fallback so OHIF doesn’t explode
+            return () => {
+            console.error('Annotation posting unavailable due to error');
+            };
+        }
     }, [patientName, measurementListRef, setIsSaved]);
 
     //=========================================================

@@ -14,6 +14,67 @@ interface CustomizeAnnotationMenuProps {
   }) => void;
 }
 
+// export default function useCustomizeAnnotationMenu({
+//   userInfo,
+//   isSeriesAnnotationsCompletedRef,
+//   measurementService,
+//   showModal,
+// }: CustomizeAnnotationMenuProps) {
+
+//   const { servicesManager } = useSystem();
+//   const { customizationService } = servicesManager.services;
+
+//   useEffect(() => {
+//     customizationService.setCustomizations({
+//       measurementsContextMenu: {
+//         $set: {
+//           inheritsFrom: 'ohif.contextMenu',
+
+
+//           menus: [
+//             {
+//               id: 'measurementMenu',
+//               selector: ({ nearbyToolData }) => !!nearbyToolData,
+//               items: [
+//                 ...(isSeriesAnnotationsCompletedRef?.current || userInfo?.role === 'admin'
+//                     ? [
+//                         {
+//                             id: 'locked',
+//                             label: 'Changes Disabled',
+//                             commands: () => {
+//                                 const msg =
+//                                 userInfo?.role === 'admin'
+//                                     ? 'Admin not allowed to delete measurements or modify the labels.'
+//                                     : 'Series is locked. No further changes allowed.';
+
+//                                 showModal({
+//                                 title: 'Changes Disabled',
+//                                 message: msg,
+//                                 showCancel: false,
+//                                 });
+//                             },
+//                         },
+
+//                     ]
+//                     : [
+//                         {
+//                             id: 'delete',
+//                             label: 'Delete Measurement',
+//                             commands: 'removeMeasurement',
+//                         }
+//                     ]),
+//               ],
+//             },
+//           ],
+
+
+//         },
+//       },
+//     });
+//   }, [userInfo, isSeriesAnnotationsCompletedRef, measurementService, showModal]);
+// }
+
+
 export default function useCustomizeAnnotationMenu({
   userInfo,
   isSeriesAnnotationsCompletedRef,
@@ -24,69 +85,56 @@ export default function useCustomizeAnnotationMenu({
   const { servicesManager } = useSystem();
   const { customizationService } = servicesManager.services;
 
-  useEffect(() => {
+useEffect(() => {
+  try {
     customizationService.setCustomizations({
       measurementsContextMenu: {
         $set: {
           inheritsFrom: 'ohif.contextMenu',
-
-
           menus: [
             {
               id: 'measurementMenu',
               selector: ({ nearbyToolData }) => !!nearbyToolData,
               items: [
-                // {
-                //   id: 'info',
-                //   label: 'Measurement Info',
-                //   commands: ({nearbyToolData}) => 
-                //     {console.log(
-                //         'ℹ️ Measurement details:', nearbyToolData,
-                //         'role:', userInfo.role, 'isSeriesComplete?:',
-                //         isSeriesAnnotationsCompletedRef?.current
-                //       );
-                //     },
-                // },
                 ...(isSeriesAnnotationsCompletedRef?.current || userInfo?.role === 'admin'
-                    ? [
-                        {
-                            id: 'locked',
-                            label: 'Changes Disabled',
-                            commands: () => {
-                                const msg =
-                                userInfo?.role === 'admin'
-                                    ? 'Admin not allowed to delete measurements or modify the labels.'
-                                    : 'Series is locked. No further changes allowed.';
+                  ? [
+                      {
+                        id: 'locked',
+                        label: 'Changes Disabled',
+                        commands: () => {
+                          const msg =
+                            userInfo?.role === 'admin'
+                              ? 'Admin not allowed to delete measurements or modify the labels.'
+                              : 'Series is locked. No further changes allowed.';
 
-                                showModal({
-                                title: 'Changes Disabled',
-                                message: msg,
-                                showCancel: false,
-                                });
-                            },
+                          showModal({
+                            title: 'Changes Disabled',
+                            message: msg,
+                            showCancel: false,
+                          });
                         },
-
+                      },
                     ]
-                    : [
-                        {
-                            label: 'Add Label',
-                            commands: 'setMeasurementLabel',
-                        },
-
-                        {
-                            id: 'delete',
-                            label: 'Delete Measurement',
-                            commands: 'removeMeasurement',
-                        }
+                  : [
+                      {
+                        id: 'delete',
+                        label: 'Delete Measurement',
+                        commands: 'removeMeasurement',
+                      },
                     ]),
               ],
             },
           ],
-
-
         },
       },
     });
-  }, [userInfo, isSeriesAnnotationsCompletedRef, measurementService, showModal]);
+  } catch (err) {
+    console.error('Error customizing annotation menu:', err);
+    showModal({
+      title: 'Customization Error',
+      message: `An error occurred while setting up the annotation context menu: ${err instanceof Error ? err.message : String(err)}`,
+      showCancel: false,
+    });
+  }
+}, [userInfo, isSeriesAnnotationsCompletedRef, measurementService, showModal]);
 }
-

@@ -76,14 +76,6 @@ export const getAnnotationsStats = (
 //=========================================================
 // debounced wrapper for getAnnotationStats
 // delay acquiring stats to let ohif complete the add of the annotation
-
-// export const createDebouncedStatsUpdater = (
-//   setAnnotationData: (data: any) => void
-// ) =>
-//   debounce(() => {
-//     setAnnotationData(getAnnotationsStats());
-//   }, 300);
-
 export const createDebouncedStatsUpdater = (
   setAnnotationData: (data: any) => void,
   setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>,
@@ -106,12 +98,6 @@ export const createDebouncedStatsUpdater = (
 //=========================================================
 // debounced wrapper for modal trigger
 // delay showing modal to ensure annotations have settled
-// export const createDebouncedModalTrigger = (
-//   setShowScoreModal: (show: boolean) => void
-// ) =>
-//   debounce(() => {
-//     setShowScoreModal(true);
-//   }, 300);
 export const createDebouncedShowScoreModalTrigger = (
   setShowScoreModal: (show: boolean) => void,
   pendingAnnotationUIDRef: React.MutableRefObject<string | null>

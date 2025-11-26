@@ -106,6 +106,35 @@ export function handleMeasurementAdded({
   }, 50);
 }
 //=========================================================
+// export const handleAnnotationChanged = ({
+//   event,
+//   debouncedUpdateStats,
+//   pendingAnnotationUIDRef,
+//   isSeriesAnnotationsCompletedRef,
+// }: {
+//   event: any;
+//   debouncedUpdateStats: () => void;
+//   pendingAnnotationUIDRef: React.MutableRefObject<string | null>;
+//   isSeriesAnnotationsCompletedRef: React.MutableRefObject<boolean>;
+// }) => {
+//   const { annotation: changedAnnotation } = event.detail;
+//   if (!changedAnnotation) return;
+
+//   // 🔒 Guard: if series is completed, force lock and bail
+//   if (isSeriesAnnotationsCompletedRef.current) {
+//     changedAnnotation.isLocked = true;
+
+//     console.warn(
+//       `Blocked modification on locked annotation ${changedAnnotation.annotationUID}`
+//     );
+//     return;
+//   }
+
+//   pendingAnnotationUIDRef.current = changedAnnotation.annotationUID;
+//   debouncedUpdateStats();
+// };
+
+
 export const handleAnnotationChanged = ({
   event,
   debouncedUpdateStats,
@@ -117,21 +146,29 @@ export const handleAnnotationChanged = ({
   pendingAnnotationUIDRef: React.MutableRefObject<string | null>;
   isSeriesAnnotationsCompletedRef: React.MutableRefObject<boolean>;
 }) => {
-  const { annotation: changedAnnotation } = event.detail;
-  if (!changedAnnotation) return;
+  try {
+    const { annotation: changedAnnotation } = event?.detail ?? {};
+    if (!changedAnnotation) return;
 
-  // 🔒 Guard: if series is completed, force lock and bail
-  if (isSeriesAnnotationsCompletedRef.current) {
-    changedAnnotation.isLocked = true;
+    // 🔒 Guard: if series is completed, force lock and bail
+    if (isSeriesAnnotationsCompletedRef.current) {
+      changedAnnotation.isLocked = true;
 
-    console.warn(
-      `Blocked modification on locked annotation ${changedAnnotation.annotationUID}`
-    );
-    return;
+      console.warn(
+        `Blocked modification on locked annotation ${changedAnnotation.annotationUID}`
+      );
+      return;
+    }
+
+    pendingAnnotationUIDRef.current = changedAnnotation.annotationUID;
+
+    // Defensive guard: only call if defined
+    if (typeof debouncedUpdateStats === 'function') {
+      debouncedUpdateStats();
+    }
+  } catch (err) {
+    console.error('Error in handleAnnotationChanged:', err);
   }
-
-  pendingAnnotationUIDRef.current = changedAnnotation.annotationUID;
-  debouncedUpdateStats();
 };
 
 
