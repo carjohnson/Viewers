@@ -1,4 +1,6 @@
 // src/handlers/postAnnotations.ts
+import { getSeriesUIDFromMeasurement } from './../utils/annotationUtils';
+
 // ======== post annotations to Server
 export const postAnnotations = ({
     allAnnotations,
@@ -21,9 +23,11 @@ export const postAnnotations = ({
   validAnnotations.forEach((ann) => {
     const uid = ann.annotationUID;
     const selectedScore = dropdownSelectionMap[uid]; // use current state
+    const selectedSeriesUID = getSeriesUIDFromMeasurement(ann);
 
     if (typeof selectedScore === 'number' && selectedScore >= 1 && selectedScore <= 5) {
       (ann as any).data.suspicionScore = selectedScore;
+      (ann as any).seriesUID = selectedSeriesUID;
       annotationsWithStats.push(ann);
     } else {
       invalidUIDsMissingScore.push(uid);

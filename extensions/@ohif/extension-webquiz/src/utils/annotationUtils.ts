@@ -156,3 +156,30 @@ export const rebuildMapAndPostAnnotations = (
   // Trigger POST
   triggerPost({ allAnnotations, dropdownSelectionMap: newMap });
 };
+
+//=========================================================
+/**
+ * Extracts the Series UID from a measurement object's cachedStats.imageId
+ * @param measurement - The measurement object containing cachedStats.imageId
+ * @returns The Series UID string, or null if not found
+ */
+export function getSeriesUIDFromMeasurement(measurement: any): string | null {
+  try {
+    const cachedStats = measurement?.data?.cachedStats;
+    if (!cachedStats) return null;
+
+    // Grab the first key that starts with "imageId:"
+    const keyWithImageId = Object.keys(cachedStats).find(k => k.startsWith('imageId:'));
+    if (!keyWithImageId) return null;
+
+    // Strip off the "imageId:" prefix
+    const imageId = keyWithImageId.replace(/^imageId:/, '');
+
+    // Extract the series UID
+    const match = imageId.match(/\/series\/([^/]+)\//);
+    return match ? match[1] : null;
+  } catch (err) {
+    console.error('Error extracting series UID:', err);
+    return null;
+  }
+}
