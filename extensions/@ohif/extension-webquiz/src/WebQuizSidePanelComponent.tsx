@@ -16,7 +16,7 @@ import { handleMeasurementClick, toggleVisibility, closeScoreModal } from './han
 import { useSystem } from '@ohif/core';
 import { AnnotationList } from './components/AnnotationList/AnnotationList';
 import { ScoreModal } from './components/ScoreModal';
-import { handleMeasurementAdded, handleAnnotationChanged, handleAnnotationRemoved } from './handlers/annotationEventHandlers';
+import { handleMeasurementAdded, handleAnnotationChanged, handleMeasurementRemoved } from './handlers/annotationEventHandlers';
 import { createDebouncedStatsUpdater } from './utils/annotationUtils';
 import { createDebouncedShowScoreModalTrigger } from './utils/annotationUtils';
 import { buildDropdownSelectionMapFromState } from './utils/annotationUtils';
@@ -129,13 +129,6 @@ function WebQuizSidePanelComponent() {
         studyUID: studyInfo?.studyUID,
     });    
 
-    //~~~~~~~~~~~~~~~~~
-    useCustomizeAnnotationMenu ({
-        userInfo,
-        isSeriesAnnotationsCompletedRef,
-        measurementService,
-        showModal,
-    });
 
     //=========================================================
     // This call to the hook validates the series against the project
@@ -185,8 +178,7 @@ function WebQuizSidePanelComponent() {
 
     // This effect validates the series against the project
     //      The database holds the list of studyUIDs and the seriesUIDs within
-    //      the study that are part of the project.
-    //      The user is supposed to annotate only specific series
+    //      the study that are to be annotated.
     useEffect(() => {
         isSeriesValidRef.current = isSeriesValid;
     }, [isSeriesValid]);
@@ -299,13 +291,11 @@ function WebQuizSidePanelComponent() {
             isSeriesAnnotationsCompletedRef,
         });
 
-        const wrappedAnnotationRemovedHandler = (event: any) => handleAnnotationRemoved({
-            event,
-            setIsSaved,
-            debouncedUpdateStats,
+        const wrappedMeasurementRemovedHandler = ({ measurement } : any) => handleMeasurementRemoved({
+            measurement,
+            measurementService,
             setDropdownSelectionMap,
             triggerPost,
-            showModal,
         });
 
         const wrappedAnnotationChangedHandler = (event: any) => handleAnnotationChanged({
@@ -315,14 +305,14 @@ function WebQuizSidePanelComponent() {
             isSeriesAnnotationsCompletedRef,
         });
 
-        const subscription = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_ADDED,wrappedMeasurementAddedHandler);
+        const subscriptionAdd = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_ADDED,wrappedMeasurementAddedHandler);
+        const subscriptionRemove = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_REMOVED,wrappedMeasurementRemovedHandler);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangedHandler);
-        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationRemovedHandler);
 
         return () => {
-          subscription.unsubscribe();
+          subscriptionAdd.unsubscribe();
+          subscriptionRemove.unsubscribe();
           cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangedHandler);
-          cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_REMOVED, wrappedAnnotationRemovedHandler);
         }
 
     }, [patientName]);
@@ -422,6 +412,17 @@ function WebQuizSidePanelComponent() {
         () => createDebouncedShowScoreModalTrigger(setShowScoreModal, pendingAnnotationUIDRef),
         [setShowScoreModal, pendingAnnotationUIDRef]
     );
+    //~~~~~~~~~~~~~~~~~
+    useCustomizeAnnotationMenu ({
+        userInfo,
+        isSeriesAnnotationsCompletedRef,
+        measurementService,
+        showModal,
+        setIsSaved,
+        debouncedUpdateStats,
+        setDropdownSelectionMap,
+        triggerPost,
+    });
 
     //=========================================================
     const onMeasurementClick = (id: string) =>

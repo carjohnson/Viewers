@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useSystem } from '@ohif/core';
+import { handleAnnotationRemoved } from './../handlers/annotationEventHandlers'
+import { TriggerPostArgs } from '../models/TriggerPostArgs';
 
 
 interface CustomizeAnnotationMenuProps {
@@ -12,67 +14,11 @@ interface CustomizeAnnotationMenuProps {
     showCancel?: boolean;
     onCancel?: () => void;
   }) => void;
+  setIsSaved: (val: boolean) => void;
+  debouncedUpdateStats: () => void;
+  setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  triggerPost: (args: TriggerPostArgs) => void;
 }
-
-// export default function useCustomizeAnnotationMenu({
-//   userInfo,
-//   isSeriesAnnotationsCompletedRef,
-//   measurementService,
-//   showModal,
-// }: CustomizeAnnotationMenuProps) {
-
-//   const { servicesManager } = useSystem();
-//   const { customizationService } = servicesManager.services;
-
-//   useEffect(() => {
-//     customizationService.setCustomizations({
-//       measurementsContextMenu: {
-//         $set: {
-//           inheritsFrom: 'ohif.contextMenu',
-
-
-//           menus: [
-//             {
-//               id: 'measurementMenu',
-//               selector: ({ nearbyToolData }) => !!nearbyToolData,
-//               items: [
-//                 ...(isSeriesAnnotationsCompletedRef?.current || userInfo?.role === 'admin'
-//                     ? [
-//                         {
-//                             id: 'locked',
-//                             label: 'Changes Disabled',
-//                             commands: () => {
-//                                 const msg =
-//                                 userInfo?.role === 'admin'
-//                                     ? 'Admin not allowed to delete measurements or modify the labels.'
-//                                     : 'Series is locked. No further changes allowed.';
-
-//                                 showModal({
-//                                 title: 'Changes Disabled',
-//                                 message: msg,
-//                                 showCancel: false,
-//                                 });
-//                             },
-//                         },
-
-//                     ]
-//                     : [
-//                         {
-//                             id: 'delete',
-//                             label: 'Delete Measurement',
-//                             commands: 'removeMeasurement',
-//                         }
-//                     ]),
-//               ],
-//             },
-//           ],
-
-
-//         },
-//       },
-//     });
-//   }, [userInfo, isSeriesAnnotationsCompletedRef, measurementService, showModal]);
-// }
 
 
 export default function useCustomizeAnnotationMenu({
@@ -80,6 +26,11 @@ export default function useCustomizeAnnotationMenu({
   isSeriesAnnotationsCompletedRef,
   measurementService,
   showModal,
+  setIsSaved,
+  debouncedUpdateStats,
+  setDropdownSelectionMap,
+  triggerPost,
+
 }: CustomizeAnnotationMenuProps) {
 
   const { servicesManager } = useSystem();
@@ -119,8 +70,15 @@ useEffect(() => {
                       {
                         id: 'delete',
                         label: 'Delete Measurement',
-                        commands: 'removeMeasurement',
-                      },
+                        commands: ({ nearbyToolData }) => {
+                          // nearbyToolData is the full measurement/annotation object
+                          // console.log('Deleting annotation object:', nearbyToolData); // for debug
+                          const annotationUID = nearbyToolData.annotationUID;
+
+                          // Remove from MeasurementService (also fires MEASUREMENT_REMOVED internally)
+                          measurementService.remove(annotationUID);                          
+                        },
+                      }
                     ]),
               ],
             },

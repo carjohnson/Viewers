@@ -145,16 +145,26 @@ export const customizeAnnotationLabel = (
 //=========================================================
 export const rebuildMapAndPostAnnotations = (
   setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>,
-  triggerPost: (args: TriggerPostArgs) => void
+  triggerPost: (args: TriggerPostArgs) => void,
+  removedAnnotationUID?: string,
 ) => {
   const allAnnotations = annotation.state.getAllAnnotations?.() || [];
 
+  // create adjusted list of annotations if the triggerPost args have 
+  // a valid sRemovedAnnotationUID string
+  // Filter out the removed annotation if UID is provided
+  const adjustedAnnotationsList =
+    removedAnnotationUID && removedAnnotationUID.trim().length > 0
+      ? allAnnotations.filter(a => a.annotationUID !== removedAnnotationUID)
+      : allAnnotations;
+  
   // Dropdown map
-  const newMap = buildDropdownSelectionMapFromState(allAnnotations);
+  const newMap = buildDropdownSelectionMapFromState(adjustedAnnotationsList);
   setDropdownSelectionMap(newMap);
+  // console.log(' *** IN REBUILD:', removedAnnotationUID, allAnnotations, adjustedAnnotationsList, newMap);
 
   // Trigger POST
-  triggerPost({ allAnnotations, dropdownSelectionMap: newMap });
+  triggerPost({ allAnnotations: adjustedAnnotationsList, dropdownSelectionMap: newMap });
 };
 
 //=========================================================
