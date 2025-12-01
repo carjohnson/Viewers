@@ -26,6 +26,7 @@ import { createDebouncedStatsUpdater,
 import MarkSeriesCompletedButton from './components/MarkSeriesCompletedButton';
 import { useSeriesValidation } from './hooks/useSeriesValidation';
 import { useCurrentSeriesUID } from './hooks/useCurrentSeriesUID';
+// import { useActiveViewportId } from './hooks/useActiveViewportId';
 import  useCustomizeAnnotationMenu  from './hooks/useCustomizeAnnotationMenu'
 import { postStudyProgress, fetchStudyProgressFromDB } from './handlers/studyProgressHandlers';
 import { ModalComponent } from './components/ModalComponent';
@@ -50,6 +51,7 @@ function WebQuizSidePanelComponent() {
     const isSeriesAnnotationsCompletedRef = useRef(isSeriesAnnotationsCompleted);
     const isSeriesValidRef = useRef<boolean | null>(null);
     const [validatedSeriesUID, setValidatedSeriesUID] = useState(null);
+    const [activeViewportId, setActiveViewportId] = useState<string | null>(null);
 
     //~~~~~~~~~~~~~~~~~
     const [modalInfo, setModalInfo] = useState<null | { 
@@ -84,12 +86,22 @@ function WebQuizSidePanelComponent() {
     //~~~~~~~~~~~~~~~~~
     const { servicesManager } = useSystem();
     const { measurementService, viewportGridService } = servicesManager.services;
-    const activeViewportId = viewportGridService.getActiveViewportId();
+    // const activeViewportId = viewportGridService.getActiveViewportId();
+
+
+    
     const measurementList = measurementService.getMeasurements(); 
     const measurementListRef = useRef([]);    
     const pendingAnnotationUIDRef = useRef<string | null>(null);
     const { cornerstoneViewportService, displaySetService } = servicesManager.services;
     const listOfUsersAnnotationsRef = useRef<any>(null);
+
+
+    // const [activeViewportId] = useActiveViewportId(
+    //   cornerstoneViewportService ?? viewportGridService
+    // );
+    // const activeViewportId = useActiveViewportId(viewportGridService);
+    // const activeViewportId = useActiveViewportId(cornerstoneViewportService);
 
 
     //~~~~~~~~~~~~~~~~~
@@ -121,6 +133,7 @@ function WebQuizSidePanelComponent() {
     const patientName = patientInfo?.PatientName;
 
     const userInfo = getUserInfo();
+
 
     //=========================================================
     // Call to hook to get the current series 
@@ -176,6 +189,46 @@ function WebQuizSidePanelComponent() {
     //>>>>> for debug <<<<<
     // console.log('🧠 useStudyInfo() returned:', studyInfoFromHook);
     // console.log('📦 Zustand store currently holds:', studyInfo);
+
+    //=========================================================
+    // // Watch for changes to the viewports (eg. when changing studies or series)
+    // useEffect(() => {
+    // // initialize once on mount
+    // setActiveViewportId(viewportGridService.getActiveViewportId());
+
+    // // subscribe to changes
+    // const subscription = viewportGridService.subscribe(
+    //     viewportGridService.EVENTS.ACTIVE_VIEWPORT_ID_CHANGED,
+    //     (evt: { viewportId: string }) => {
+    //         setActiveViewportId(evt.viewportId);
+    //     }
+    // );
+
+    // return () => {
+    //     subscription.unsubscribe();
+    // };
+    // }, [viewportGridService]);
+    type ActiveViewportEvent = { viewportId?: string } | any;
+    useEffect(() => {
+
+        // Initialize once on mount
+        setActiveViewportId(viewportGridService.getActiveViewportId());
+
+        // Subscribe to changes
+        const subscription = viewportGridService.subscribe(
+            viewportGridService.EVENTS.ACTIVE_VIEWPORT_ID_CHANGED,
+            (evt:ActiveViewportEvent) => {
+                setActiveViewportId(evt.viewportId);
+            }
+        );
+
+        // Cleanup on unmount
+        return () => {
+        subscription.unsubscribe();
+        };
+    }, [viewportGridService, annotationsLoaded]);
+
+
 
 
     //=========================================================
@@ -315,6 +368,7 @@ function WebQuizSidePanelComponent() {
         const subscriptionRemove = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_REMOVED,wrappedMeasurementRemovedHandler);
         cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangedHandler);
 
+
         return () => {
           subscriptionAdd.unsubscribe();
           subscriptionRemove.unsubscribe();
@@ -441,14 +495,14 @@ function WebQuizSidePanelComponent() {
     });
 
     //=========================================================
-    const onMeasurementClick = (id: string) =>
+    const onMeasurementClick = (id: string) => 
         handleMeasurementClick({ 
             measurementId: id,
             annotation,
             measurementService,
             activeViewportId,
          });
-
+        
     //=========================================================
     const onToggleVisibility = (uid: string) =>
         toggleVisibility({ uid, visibilityMap, setVisibilityMap, measurementService });

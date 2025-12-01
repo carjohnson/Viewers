@@ -7,24 +7,6 @@ import { annotation } from '@cornerstonejs/tools';
 // Set up GUI so the user can click on an annotation in the panel list
 //    and have the image jump to the corresponding slice
 //    also - set up a visibility icon for each annotation
-// export const handleMeasurementClick = ({
-//   measurementId,
-//   annotation,
-//   measurementService,
-//   activeViewportId,
-// }: {
-//   measurementId: string;
-//   annotation: any;
-//   measurementService: any;
-//   activeViewportId: string;
-// }) => {
-//   const ohifAnnotation = annotation.state.getAnnotation(measurementId);
-//   if (ohifAnnotation) {
-//     measurementService.jumpToMeasurement(activeViewportId, measurementId);
-//   } else {
-//     console.warn('No annotation found for UID:', measurementId);
-//   }
-// };
 
 
 export const handleMeasurementClick = ({
@@ -39,18 +21,31 @@ export const handleMeasurementClick = ({
   activeViewportId: string;
 }) => {
   try {
-    const ohifAnnotation = annotation?.state?.getAnnotation?.(measurementId);
+    console.log('[handleMeasurementClick] activeViewportId:', activeViewportId, 'measurementId:', measurementId);
 
-    if (ohifAnnotation) {
-      measurementService?.jumpToMeasurement?.(activeViewportId, measurementId);
-    } else {
-      console.warn('No annotation found for UID:', measurementId);
+    const ohifAnnotation = annotation?.state?.getAnnotation?.(measurementId);
+    if (!ohifAnnotation) {
+      console.warn('[handleMeasurementClick] No annotation found for UID:', measurementId);
+      return;
     }
+
+    if (activeViewportId) {
+      measurementService?.jumpToMeasurement?.(activeViewportId, measurementId);
+      // console.log('[handleMeasurementClick] jumpToMeasurement with viewportId');
+    } else {
+      // If supported, let OHIF resolve a viewport automatically
+      if (typeof measurementService?.jumpToMeasurement === 'function' && measurementService.jumpToMeasurement.length < 2) {
+        measurementService.jumpToMeasurement(measurementId);
+        console.log('[handleMeasurementClick] jumpToMeasurement without viewportId');
+      } else {
+        console.warn('[handleMeasurementClick] No active viewport; cannot jump.');
+      }
+    }
+
   } catch (err) {
     console.error('Error in handleMeasurementClick:', err);
   }
 };
-
 //=========================================================
 export const toggleVisibility = ({
   uid,

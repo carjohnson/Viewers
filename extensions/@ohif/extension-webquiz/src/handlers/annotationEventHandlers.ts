@@ -61,7 +61,7 @@ export function handleMeasurementAdded({
         .map(a => a.annotationUID);
 
       const isAlreadyScored = scoredUIDs.includes(uid);
-      console.log('📌 MEASUREMENT_ADDED handler triggered:', isSeriesValidRef, pendingAnnotationUIDRef.current, isAlreadyScored, listOfUsersAnnotationsRef.current, scoredUIDs);
+      // console.log('📌 MEASUREMENT_ADDED handler triggered:', isSeriesValidRef, pendingAnnotationUIDRef.current, isAlreadyScored, listOfUsersAnnotationsRef.current, scoredUIDs);
 
       if (
         uid &&
