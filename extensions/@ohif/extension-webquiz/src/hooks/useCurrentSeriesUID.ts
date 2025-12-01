@@ -6,11 +6,15 @@ export const useCurrentSeriesUID = ({
   displaySetService,
   cornerstoneViewportService,
   studyUID,
+  isSeriesAnnotationsCompletedRef,
+  setSeriesAnnotationsCompleted,
 }: {
   viewportGridService: any;
   displaySetService: any;
   cornerstoneViewportService: any;
   studyUID: string | null;
+  isSeriesAnnotationsCompletedRef: React.MutableRefObject<boolean>;
+  setSeriesAnnotationsCompleted: (value:boolean) => void;
 }): string | null => {
   const [seriesUID, setSeriesUID] = useState<string | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -38,6 +42,10 @@ export const useCurrentSeriesUID = ({
       return;
     }
     setSeriesUID(uid);
+
+    isSeriesAnnotationsCompletedRef.current = false;
+    setSeriesAnnotationsCompleted(false);
+
   };
 
 

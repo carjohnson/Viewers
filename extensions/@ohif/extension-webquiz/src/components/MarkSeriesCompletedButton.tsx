@@ -8,8 +8,9 @@ type Props = {
   getUserInfo: () => UserInfo | null;
   studyInstanceUID: string;
   seriesInstanceUID: string;
-  completed: boolean;
-  setCompleted: (value:boolean) => void;
+  isSeriesAnnotationsCompleted: boolean;
+  setSeriesAnnotationsCompleted: (value:boolean) => void;
+  isSeriesAnnotationsCompletedRef: React.MutableRefObject<boolean>;
   onMarkCompleted?: (studyUID: string, seriesUID: string) => void;
   showModal: (args: {
     title: string;
@@ -27,8 +28,9 @@ const MarkSeriesCompletedButton: React.FC<Props> = ({
   getUserInfo,
   studyInstanceUID,
   seriesInstanceUID,
-  completed,
-  setCompleted,
+  isSeriesAnnotationsCompleted,
+  setSeriesAnnotationsCompleted,
+  isSeriesAnnotationsCompletedRef,
   onMarkCompleted,
   showModal,
   closeModal,
@@ -66,7 +68,10 @@ const MarkSeriesCompletedButton: React.FC<Props> = ({
     if (onMarkCompleted) {
       onMarkCompleted(studyInstanceUID, seriesInstanceUID);
     }
-    setCompleted(true);
+    setSeriesAnnotationsCompleted(true);
+    if (isSeriesAnnotationsCompletedRef) {
+      isSeriesAnnotationsCompletedRef.current = true;
+    }
 
     const userInfo = getUserInfo();
     const progressResult = await postStudyProgress({
@@ -93,10 +98,10 @@ const MarkSeriesCompletedButton: React.FC<Props> = ({
         {getUserInfo()?.role !== 'admin' && (
           <Button
             onClick={handleClick}
-            disabled={completed || !isSeriesValid || getUserInfo()?.role === 'admin'}
+            disabled={isSeriesAnnotationsCompleted || !isSeriesValid || getUserInfo()?.role === 'admin'}
             className="bg-green-600 hover:bg-green-700 text-white font-semibold rounded px-4 py-2"
           >
-            {completed ? '✅ Annotations Completed' : 'Mark Series Annotations Completed'}
+            {isSeriesAnnotationsCompleted ? '✅ Annotations Completed' : 'Mark Series Annotations Completed'}
           </Button>
         )}
       </div>

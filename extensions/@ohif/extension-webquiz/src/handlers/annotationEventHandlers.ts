@@ -106,20 +106,24 @@ export const handleAnnotationChanged = ({
   debouncedUpdateStats,
   pendingAnnotationUIDRef,
   isSeriesAnnotationsCompletedRef,
+  seriesInstanceUID,
 }: {
   event: any;
   debouncedUpdateStats: () => void;
   pendingAnnotationUIDRef: React.MutableRefObject<string | null>;
   isSeriesAnnotationsCompletedRef: React.MutableRefObject<boolean>;
+  seriesInstanceUID: string;
 }) => {
   try {
     const { annotation: changedAnnotation } = event?.detail ?? {};
     if (!changedAnnotation) return;
 
-    // 🔒 Guard: if series is completed, force lock and bail
-    if (isSeriesAnnotationsCompletedRef.current) {
-      changedAnnotation.isLocked = true;
-
+   if (isSeriesAnnotationsCompletedRef.current) {
+      if (changedAnnotation.seriesUID === seriesInstanceUID) {
+        changedAnnotation.isLocked = true;
+        return;
+      }
+    
       console.warn(
         `Blocked modification on locked annotation ${changedAnnotation.annotationUID}`
       );

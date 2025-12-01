@@ -17,9 +17,11 @@ import { useSystem } from '@ohif/core';
 import { AnnotationList } from './components/AnnotationList/AnnotationList';
 import { ScoreModal } from './components/ScoreModal';
 import { handleMeasurementAdded, handleAnnotationChanged, handleMeasurementRemoved } from './handlers/annotationEventHandlers';
-import { createDebouncedStatsUpdater } from './utils/annotationUtils';
-import { createDebouncedShowScoreModalTrigger } from './utils/annotationUtils';
-import { buildDropdownSelectionMapFromState } from './utils/annotationUtils';
+import { createDebouncedStatsUpdater,
+        createDebouncedShowScoreModalTrigger,
+        buildDropdownSelectionMapFromState,
+        getSeriesUIDFromMeasurement
+        } from './utils/annotationUtils';
 
 import MarkSeriesCompletedButton from './components/MarkSeriesCompletedButton';
 import { useSeriesValidation } from './hooks/useSeriesValidation';
@@ -127,6 +129,8 @@ function WebQuizSidePanelComponent() {
         displaySetService,
         cornerstoneViewportService,
         studyUID: studyInfo?.studyUID,
+        isSeriesAnnotationsCompletedRef,
+        setSeriesAnnotationsCompleted,
     });    
 
 
@@ -264,6 +268,7 @@ function WebQuizSidePanelComponent() {
 
         const isDone = currentSeriesProgress?.status === 'done';
         setSeriesAnnotationsCompleted(isDone);
+        isSeriesAnnotationsCompletedRef.current = isDone;
     };
 
     fetchProgress();
@@ -303,6 +308,7 @@ function WebQuizSidePanelComponent() {
             debouncedUpdateStats,
             pendingAnnotationUIDRef,
             isSeriesAnnotationsCompletedRef,
+            seriesInstanceUID,
         });
 
         const subscriptionAdd = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_ADDED,wrappedMeasurementAddedHandler);
@@ -315,7 +321,7 @@ function WebQuizSidePanelComponent() {
           cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangedHandler);
         }
 
-    }, [patientName]);
+    }, [patientName, studyInfo?.studyUID, seriesInstanceUID]);
 
     //=========================================================
     useEffect(() => {
@@ -335,24 +341,34 @@ function WebQuizSidePanelComponent() {
     //     if the selected series has been marked as completed
     useEffect(() => {
     if (!annotationsLoaded) return;
-    try {
-        if (userInfo?.role === 'admin' || isSeriesAnnotationsCompleted) {
 
-        annotation.state.getAllAnnotations().forEach(ann => {
+    try {
+        const allAnnotations = annotation.state.getAllAnnotations();
+
+        allAnnotations.forEach(ann => {
+        const annSeriesUID = getSeriesUIDFromMeasurement(ann);
+
+        if (!annSeriesUID) return;
+
+        if (annSeriesUID === activeUID) {
+            // ✅ Only affect annotations for the current series
+            if (userInfo?.role === 'admin' || isSeriesAnnotationsCompleted) {
             ann.isLocked = true;
+            } else {
+            ann.isLocked = false;
+            }
+        }
         });
 
-        console.log('🔒 All annotations locked for series marked as complete:');
-
-            }
-        } catch (err) {
-            console.error('Error while locking annotations:', err);
-        }
-    // add activeUID to dependency array s.t. whenever the series changes and the activeUID
-    //      is updated, this effect will re-run
+        console.log(
+        `${isSeriesAnnotationsCompleted ? '🔒' : '🔓'} Updated annotations for series ${activeUID}`
+        );
+    } catch (err) {
+        console.error('Error while locking annotations:', err);
+    }
     }, [isSeriesAnnotationsCompleted, annotationsLoaded, activeUID]);
 
-    //=========================================================
+//=========================================================
     // ~~~~~~ fetch annotations from DB based on user role
     useEffect(() => {
         if (!userInfo?.username || !patientName) return;
@@ -492,8 +508,9 @@ function WebQuizSidePanelComponent() {
                 getUserInfo={getUserInfo}
                 studyInstanceUID={studyInfoFromHook?.studyUID}
                 seriesInstanceUID={seriesInstanceUID}
-                completed={isSeriesAnnotationsCompleted}
-                setCompleted={setSeriesAnnotationsCompleted}
+                isSeriesAnnotationsCompleted={isSeriesAnnotationsCompleted}
+                setSeriesAnnotationsCompleted={setSeriesAnnotationsCompleted}
+                isSeriesAnnotationsCompletedRef={isSeriesAnnotationsCompletedRef}
                 onMarkCompleted={(studyUID, seriesInstanceUID) => {
                 console.log(`🧠 Study ${studyUID}, Series ${seriesInstanceUID} marked as completed`);
                 }}
