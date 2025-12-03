@@ -37,7 +37,6 @@ function WebQuizSidePanelComponent() {
     // ****************** Initializing ******************
     // ************************************************************
     const [annotationData, setAnnotationData] = useState<AnnotationStats[]>([]);
-    const [isSaved, setIsSaved] = useState(false);
     const [annotationsLoaded, setAnnotationsLoaded] = useState(false);
     const [visibilityMap, setVisibilityMap] = useState<Record<string, boolean>>({});
     const [dropdownSelectionMap, setDropdownSelectionMap] = useState<Record<string, number>>({});
@@ -86,8 +85,8 @@ function WebQuizSidePanelComponent() {
     const closeModal = () => {
         setModalInfo(null);
     };
-    //~~~~~~~~~~~~~~~~~
 
+    //~~~~~~~~~~~~~~~~~
     const scoreOptions = [
         { value: 1, label: '1' },
         { value: 2, label: '2' },
@@ -98,51 +97,9 @@ function WebQuizSidePanelComponent() {
 
 
 
-    // //~~~~~~~~~~~~~~~~~
-    // const onMeasurementClick = (id: string) => 
-    //     handleMeasurementClick({ 
-    //         measurementId: id,
-    //         annotation,
-    //         measurementService,
-    //         activeViewportId,
-    //      });
-        
-    // //~~~~~~~~~~~~~~~~~
-    // const onToggleVisibility = (uid: string) =>
-    //     toggleVisibility({ uid, visibilityMap, setVisibilityMap, measurementService });
-
-    // //~~~~~~~~~~~~~~~~~
-    // const onCloseScoreModal = () =>
-    // closeScoreModal({
-    //     activeUID,
-    //     selectedScore,
-    //     setSelectedScore,
-    //     setDropdownSelectionMap,
-    //     setShowScoreModal,
-    // });
-
-    // //~~~~~~~~~~~~~~~~~
-    // const onDropdownChange = (uid: string, value: number) => {
-    //     if (!triggerPost) {
-    //         console.warn('⏳ triggerPost not ready yet — skipping dropdown change post');
-    //         return;
-    //     }
-
-    //     handleDropdownChange({
-    //         uid,
-    //         value,
-    //         dropdownSelectionMap,
-    //         setDropdownSelectionMap,
-    //         triggerPost,
-    //         annotation,
-    //         isSeriesAnnotationsCompletedRef,
-    //         showModal,
-    //     });
-    // };    
-
 
     // ************************************************************
-    // ********************* Hooks and Memos **********************
+    // ********************* Study metadata ***********************
     // ************************************************************
 
     //=========================================================
@@ -167,97 +124,8 @@ function WebQuizSidePanelComponent() {
     const userInfo = getUserInfo();
 
     //=========================================================
-    // Call to hook to get the current series 
-    // const seriesInstanceUID = useCurrentSeriesUID({
-    //     viewportGridService,
-    //     displaySetService,
-    //     cornerstoneViewportService,
-    //     studyUID: studyInfo?.studyUID,
-    //     isSeriesAnnotationsCompletedRef,
-    //     setSeriesAnnotationsCompleted,
-    // });    
-
-    // //=========================================================
-    // // This call to the hook validates the series against those in the database.
-    // //      The database holds the list of studyUIDs and the seriesUIDs within
-    // //      the study that are to be annotated.
-    // const isSeriesValid = useSeriesValidation({
-    //     studyUID: studyInfo?.studyUID,
-    //     seriesUID: seriesInstanceUID,
-    //     onValidated: (uid, valid) => {
-    //         if (valid) {
-    //         setValidatedSeriesUID(uid);
-    //         } else {
-    //         setValidatedSeriesUID(null);
-    //         }
-    //     },
-    // });
-
-    // //=========================================================
-    // // Memorize the trigger for POST of annotations to the database
-    // //      to make sure all handlers who use
-    // //      triggerPost access it once the patientName is available 
-    // const triggerPost = useMemo(() => {
-    //     try {
-    //         if (!patientName) return null;
-
-    //         const userInfo = getUserInfo();
-    //         if (userInfo?.role === 'admin') {
-    //         console.warn('🚫 Admins cannot post to database');
-    //         // Return a no‑op function instead of undefined
-    //         return () => {
-    //             console.warn('Post suppressed for admin role');
-    //         };
-    //         }
-
-    //         return useAnnotationPosting({
-    //         patientName,
-    //         measurementListRef,
-    //         setIsSaved,
-    //         });
-    //     } catch (err) {
-    //         console.error('Error initializing annotation posting:', err);
-    //         // Return a safe fallback so OHIF doesn’t explode
-    //         return () => {
-    //         console.error('Annotation posting unavailable due to error');
-    //         };
-    //     }
-    // }, [patientName, measurementListRef, setIsSaved]);
-
-    // //=========================================================
-    // // ensure debounced definitions are stable across renders using useMemo
-    // const debouncedUpdateStats = useMemo(
-    //     () => createDebouncedStatsUpdater(setAnnotationData, setDropdownSelectionMap, triggerPost),
-    //     [setAnnotationData, setDropdownSelectionMap, triggerPost]
-    // );
-    // //~~~~~~~~~~~~~~~~~
-    // const debouncedShowScoreModal = useMemo(
-    //     () => createDebouncedShowScoreModalTrigger(setShowScoreModal, pendingAnnotationUIDRef),
-    //     [setShowScoreModal, pendingAnnotationUIDRef]
-    // );
-    // //~~~~~~~~~~~~~~~~~
-    // useCustomizeAnnotationMenu ({
-    //     userInfo,
-    //     isSeriesAnnotationsCompletedRef,
-    //     measurementService,
-    //     showModal,
-    //     setIsSaved,
-    //     debouncedUpdateStats,
-    //     setDropdownSelectionMap,
-    //     triggerPost,
-    // });
-
-
-
-
-    // ************************************************************
-    // ****************** useEffects ******************
-    // ************************************************************
-
-    //=========================================================
-    // set up useEffect hooks to manage gathering all data from services
-    //  as the other components may be updating asynchronously and this
-    //  component needs to be subscribed to those updates
+    // This useEffect will keep the patient and study metadata
+    //      up-to-date
     useEffect(() => {
         if (!studyInfoFromHook?.studyUID ||
             !patientInfo?.PatientName
@@ -283,44 +151,188 @@ function WebQuizSidePanelComponent() {
 
 
 
+    // ************************************************************
+    // ****************** series validation ***********************
+    // ************************************************************
+    //=========================================================
+    // Call to hook to get the current series 
+    const seriesInstanceUID = useCurrentSeriesUID({
+        viewportGridService,
+        displaySetService,
+        cornerstoneViewportService,
+        studyUID: studyInfo?.studyUID,
+        isSeriesAnnotationsCompletedRef,
+        setSeriesAnnotationsCompleted,
+    });    
 
+    //=========================================================
+    // This call to the hook validates the series against those in the database.
+    //      The database holds the list of studyUIDs and the seriesUIDs within
+    //      the study that are to be annotated.
+    const isSeriesValid = useSeriesValidation({
+        studyUID: studyInfo?.studyUID,
+        seriesUID: seriesInstanceUID,
+        onValidated: (uid, valid) => {
+            if (valid) {
+            setValidatedSeriesUID(uid);
+            } else {
+            setValidatedSeriesUID(null);
+            }
+        },
+    });
 
-    // //=========================================================
-    // // ~~~~~~ fetch annotations from DB based on user role
-    // useEffect(() => {
-    //     if (!userInfo?.username || !patientName) return;
-
-    //     fetchAnnotationsFromDB({
-    //     userInfo,
-    //     patientName,
-    //     baseUrl: API_BASE_URL,
-    //     setListOfUsersAnnotations,
-    //     setDropdownSelectionMap,
-    //     annotation,
-    //     setAnnotationsLoaded,
-    //     listOfUsersAnnotationsRef,
-    //     });
-    // }, [userInfo, patientName]);
-
-
+    //=========================================================
+    // This effect keeps the ref mirrored with the series validation state
+    useEffect(() => {
+        isSeriesValidRef.current = isSeriesValid;
+    }, [isSeriesValid]);
     
-    // //=========================================================
-    // // When the extension is collapsed and reloaded,
-    // //  then the scores can be 're-fetched' from the database
-    // useEffect(() => {
-    //     const allAnnotations = annotation.state.getAllAnnotations?.() || [];
-    //     const newMap = buildDropdownSelectionMapFromState(allAnnotations);
-    //     setDropdownSelectionMap(newMap);
-    // }, []);
+
+    // ************************************************************
+    // ********************** Annotations *************************
+    // ************************************************************
+
+    //=========================================================
+    // fetch annotations from DB based on user role
+    useEffect(() => {
+        if (!userInfo?.username || !patientName) return;
+
+        fetchAnnotationsFromDB({
+        userInfo,
+        patientName,
+        baseUrl: API_BASE_URL,
+        setListOfUsersAnnotations,
+        setDropdownSelectionMap,
+        annotation,
+        setAnnotationsLoaded,
+        listOfUsersAnnotationsRef,
+        });
+    }, [userInfo, patientName]);
+
+    //=========================================================
+    // Memorize the trigger for POST of annotations to the database
+    //      to make sure all handlers who use
+    //      triggerPost access it once the patientName is available 
+    const triggerPost = useMemo(() => {
+        try {
+            if (!patientName) return null;
+
+            const userInfo = getUserInfo();
+            if (userInfo?.role === 'admin') {
+            console.warn('🚫 Admins cannot post to database');
+            // Return a no‑op function instead of undefined
+            return () => {
+                console.warn('Post suppressed for admin role');
+            };
+            }
+
+            return useAnnotationPosting({
+            patientName,
+            measurementListRef,
+            });
+        } catch (err) {
+            console.error('Error initializing annotation posting:', err);
+            // Return a safe fallback so OHIF doesn’t explode
+            return () => {
+            console.error('Annotation posting unavailable due to error');
+            };
+        }
+    }, [patientName, measurementListRef]);
+
+    //=========================================================
+    // ensure debounced definitions are stable across renders using useMemo
+
+    //~~~~~~~~~~~~~~~~~
+    const debouncedUpdateStats = useMemo(
+        () => createDebouncedStatsUpdater(setAnnotationData, setDropdownSelectionMap, triggerPost),
+        [setAnnotationData, setDropdownSelectionMap, triggerPost]
+    );
+
+    //~~~~~~~~~~~~~~~~~
+    const debouncedShowScoreModal = useMemo(
+        () => createDebouncedShowScoreModalTrigger(setShowScoreModal, pendingAnnotationUIDRef),
+        [setShowScoreModal, pendingAnnotationUIDRef]
+    );
+
+    //~~~~~~~~~~~~~~~~~
+    const onMeasurementClick = (id: string) => 
+        handleMeasurementClick({ 
+            measurementId: id,
+            annotation,
+            measurementService,
+            activeViewportId,
+         });
+        
+    //~~~~~~~~~~~~~~~~~
+    const onToggleVisibility = (uid: string) =>
+        toggleVisibility({ uid, visibilityMap, setVisibilityMap, measurementService });
+
+    //~~~~~~~~~~~~~~~~~
+    const onDropdownChange = (uid: string, value: number) => {
+        if (!triggerPost) {
+            console.warn('⏳ triggerPost not ready yet — skipping dropdown change post');
+            return;
+        }
+
+        handleDropdownChange({
+            uid,
+            value,
+            dropdownSelectionMap,
+            setDropdownSelectionMap,
+            triggerPost,
+            annotation,
+            isSeriesAnnotationsCompletedRef,
+            showModal,
+        });
+    };    
+
+    //~~~~~~~~~~~~~~~~~
+    const onCloseScoreModal = () =>
+    closeScoreModal({
+        activeUID,
+        selectedScore,
+        setSelectedScore,
+        setDropdownSelectionMap,
+        setShowScoreModal,
+    });
+
+
+
+
+    //~~~~~~~~~~~~~~~~~
+    useCustomizeAnnotationMenu ({
+        userInfo,
+        isSeriesAnnotationsCompletedRef,
+        measurementService,
+        showModal,
+        debouncedUpdateStats,
+        setDropdownSelectionMap,
+        triggerPost,
+    });
+
+
+
+
+    //=========================================================
+    // set up useEffect hooks to manage gathering all data from services
+    //  as the other components may be updating asynchronously and this
+    //  component needs to be subscribed to those updates
+
+
+
 
     
     //=========================================================
-    // This effect validates the series is listed in the database
-    //      The database holds the list of studyUIDs and the seriesUIDs within
-    //      the study that are to be annotated.
-    // useEffect(() => {
-    //     isSeriesValidRef.current = isSeriesValid;
-    // }, [isSeriesValid]);
+    // When the extension is collapsed and reloaded,
+    //  then the scores can be 're-fetched' from the database
+    useEffect(() => {
+        const allAnnotations = annotation.state.getAllAnnotations?.() || [];
+        const newMap = buildDropdownSelectionMapFromState(allAnnotations);
+        setDropdownSelectionMap(newMap);
+    }, []);
+
+    
+
 
 
 
@@ -333,204 +345,198 @@ function WebQuizSidePanelComponent() {
     // //=========================================================
     // // Re-enable button when moving to a different series if valid
 
-    // //=========================================================
-    // // Post status to database as wip when a new series is selected (if valid)
-    // //  Leave any series already marked as "done"
-    // useEffect(() => {
-    //     if (!validatedSeriesUID || validatedSeriesUID !== seriesInstanceUID) return;
-    //     if (!studyInfo?.studyUID) return;
+    //=========================================================
+    // Post status to database as wip when a new series is selected (if valid)
+    //  Leave any series already marked as "done"
+    useEffect(() => {
+        if (!validatedSeriesUID || validatedSeriesUID !== seriesInstanceUID) return;
+        if (!studyInfo?.studyUID) return;
 
 
-    //     const postProgress = async () => {
-    //         // if (userInfo?.role === 'admin') {
-    //         //     console.log('🚫 Admins cannot post study progress — skipping');
-    //         //     return;
-    //         // }
+        const postProgress = async () => {
+            // if (userInfo?.role === 'admin') {
+            //     console.log('🚫 Admins cannot post study progress — skipping');
+            //     return;
+            // }
 
-    //         const progressData = await fetchStudyProgressFromDB({
-    //             baseUrl: API_BASE_URL,
-    //             username: userInfo.username,
-    //             studyUID: studyInfo.studyUID,
-    //         });
+            const progressData = await fetchStudyProgressFromDB({
+                baseUrl: API_BASE_URL,
+                username: userInfo.username,
+                studyUID: studyInfo.studyUID,
+            });
 
-    //         console.log('📦 Progress data from hook:', progressData);
+            console.log('📦 Progress data from hook:', progressData);
 
-    //         if (progressData?.error) {
-    //             console.warn('⚠️ Could not fetch progress:', progressData.error);
-    //             return;
-    //         }
+            if (progressData?.error) {
+                console.warn('⚠️ Could not fetch progress:', progressData.error);
+                return;
+            }
 
-    //         const currentSeriesProgress = progressData.series_progress?.find(
-    //             entry => entry.seriesUID === seriesInstanceUID
-    //         );
+            const currentSeriesProgress = progressData.series_progress?.find(
+                entry => entry.seriesUID === seriesInstanceUID
+            );
 
-    //         if (currentSeriesProgress?.status === 'done') {
-    //             console.log(`🛑 Series ${seriesInstanceUID} already marked as done — skipping wip post`);
-    //             return;
-    //         }
+            if (currentSeriesProgress?.status === 'done') {
+                console.log(`🛑 Series ${seriesInstanceUID} already marked as done — skipping wip post`);
+                return;
+            }
 
-    //         console.log(`✅ Series ${seriesInstanceUID} validated — posting wip`);
+            console.log(`✅ Series ${seriesInstanceUID} validated — posting wip`);
 
-    //         const progressResult = await postStudyProgress({
-    //             baseUrl: API_BASE_URL,
-    //             username: userInfo.username,
-    //             studyUID: studyInfo.studyUID,
-    //             seriesUID: seriesInstanceUID,
-    //             status: 'wip',
-    //         });
+            const progressResult = await postStudyProgress({
+                baseUrl: API_BASE_URL,
+                username: userInfo.username,
+                studyUID: studyInfo.studyUID,
+                seriesUID: seriesInstanceUID,
+                status: 'wip',
+            });
 
-    //         if (progressResult?.error) {
-    //             console.warn('⚠️ Failed to post progress:', progressResult.error);
-    //         } else {
-    //             console.log(`📌 Progress posted for ${seriesInstanceUID}`);
-    //         }
-    //     };
+            if (progressResult?.error) {
+                console.warn('⚠️ Failed to post progress:', progressResult.error);
+            } else {
+                console.log(`📌 Progress posted for ${seriesInstanceUID}`);
+            }
+        };
 
-    //     postProgress();
-    // }, [validatedSeriesUID, studyInfo?.studyUID, seriesInstanceUID]);
+        postProgress();
+    }, [validatedSeriesUID, studyInfo?.studyUID, seriesInstanceUID]);
 
-    // //=========================================================
-    // useEffect(() => {
-    //     isSeriesAnnotationsCompletedRef.current = isSeriesAnnotationsCompleted;
-    // }, [isSeriesAnnotationsCompleted]);
-
-
-    // //=========================================================
-    // useEffect(() => {
-    //     if (annotationData.length > 0) {
-    //         setIsSaved(false);
-    //     }
-    // }, [annotationData]);
-
-    // //=========================================================
-    // // wait for all annotations to be loaded, then set to locked 
-    // //     if the selected series has been marked as completed
-
-    // //=========================================================
-    // useEffect(() => {
-    // let subscription: any;
-
-    // const annotationViewportSetup = async () => {
-    //     // 1️⃣ Wait until annotations are loaded
-    //     if (!annotationsLoaded) {
-    //     console.log('[annotationViewportSetup] annotations not yet loaded, skipping');
-    //     return;
-    //     }
-
-    //     // 2️⃣ Get the active viewport
-    //     const initialViewportId = viewportGridService.getActiveViewportId?.();
-    //     setActiveViewportId(initialViewportId);
-    //     console.log('[annotationViewportSetup] activeViewportId:', initialViewportId);
-
-    //     // Subscribe to viewport changes
-    //     subscription = viewportGridService.subscribe(
-    //     viewportGridService.EVENTS.ACTIVE_VIEWPORT_ID_CHANGED,
-    //     (evt: { viewportId: string }) => {
-    //         setActiveViewportId(evt.viewportId);
-    //     }
-    //     );
-
-    //     // 3️⃣ Fetch progress data
-    //     if (!studyInfo?.studyUID || !seriesInstanceUID) return;
-
-    //     try {
-    //     const progressData = await fetchStudyProgressFromDB({
-    //         baseUrl: API_BASE_URL,
-    //         username: userInfo.username,
-    //         studyUID: studyInfo.studyUID,
-    //     });
-
-    //     if (progressData?.error) {
-    //         console.warn('⚠️ Could not fetch progress:', progressData.error);
-    //         return;
-    //     }
-
-    //     const currentSeriesProgress = progressData.series_progress?.find(
-    //         entry => entry.seriesUID === seriesInstanceUID
-    //     );
-
-    //     const isDone = currentSeriesProgress?.status === 'done';
-    //     setSeriesAnnotationsCompleted(isDone);
-    //     isSeriesAnnotationsCompletedRef.current = isDone;
-
-    //     // 4️⃣ Lock annotations
-    //     const allAnnotations = annotation.state.getAllAnnotations();
-    //     allAnnotations.forEach(ann => {
-    //         const annSeriesUID = getSeriesUIDFromMeasurement(ann);
-    //         if (annSeriesUID !== seriesInstanceUID) return;
-    //         ann.isLocked = userInfo?.role === 'admin' || isDone;
-    //     });
-
-    //     //   // Notify tools to refresh
-    //     //     triggerAnnotationModified(allAnnotations);
+    //=========================================================
+    useEffect(() => {
+        isSeriesAnnotationsCompletedRef.current = isSeriesAnnotationsCompleted;
+    }, [isSeriesAnnotationsCompleted]);
 
 
-    //     console.log(
-    //         `${isDone ? '🔒' : '🔓'} Locked annotations for series ${seriesInstanceUID}`
-    //     );
-    //     } catch (err) {
-    //     console.error('[annotationViewportSetup] Error fetching progress or locking:', err);
-    //     }
-    // };
+    //=========================================================
 
-    // annotationViewportSetup();
+    //=========================================================
+    // wait for all annotations to be loaded, then set to locked 
+    //     if the selected series has been marked as completed
+    useEffect(() => {
+    let subscription: any;
 
-    // return () => {
-    //     subscription?.unsubscribe?.();
-    // };
-    // }, [annotationsLoaded, studyInfo?.studyUID, seriesInstanceUID, viewportGridService, userInfo?.role]);
+    const hydrateAndLockAnnotations = async () => {
+        // 1️⃣ Wait until annotations are loaded
+        if (!annotationsLoaded) {
+        console.log('[annotationViewportSetup] annotations not yet loaded, skipping');
+        return;
+        }
+
+        // 2️⃣ Get the active viewport
+        const initialViewportId = viewportGridService.getActiveViewportId?.();
+        setActiveViewportId(initialViewportId);
+        console.log('[annotationViewportSetup] activeViewportId:', initialViewportId);
+
+        // Subscribe to viewport changes
+        subscription = viewportGridService.subscribe(
+        viewportGridService.EVENTS.ACTIVE_VIEWPORT_ID_CHANGED,
+        (evt: { viewportId: string }) => {
+            setActiveViewportId(evt.viewportId);
+        }
+        );
+
+        // 3️⃣ Fetch progress data
+        if (!studyInfo?.studyUID || !seriesInstanceUID) return;
+
+        try {
+        const progressData = await fetchStudyProgressFromDB({
+            baseUrl: API_BASE_URL,
+            username: userInfo.username,
+            studyUID: studyInfo.studyUID,
+        });
+
+        if (progressData?.error) {
+            console.warn('⚠️ Could not fetch progress:', progressData.error);
+            return;
+        }
+
+        const currentSeriesProgress = progressData.series_progress?.find(
+            entry => entry.seriesUID === seriesInstanceUID
+        );
+
+        const isDone = currentSeriesProgress?.status === 'done';
+        setSeriesAnnotationsCompleted(isDone);
+        isSeriesAnnotationsCompletedRef.current = isDone;
+
+        // 4️⃣ Lock annotations
+        const allAnnotations = annotation.state.getAllAnnotations();
+        allAnnotations.forEach(ann => {
+            const annSeriesUID = getSeriesUIDFromMeasurement(ann);
+            if (annSeriesUID !== seriesInstanceUID) return;
+            ann.isLocked = userInfo?.role === 'admin' || isDone;
+        });
+
+        //   // Notify tools to refresh
+        //     triggerAnnotationModified(allAnnotations);
 
 
-    // //=========================================================
-    // //=========================================================
-    // // add listeners with handlers
-    // useEffect(() => {
-    //     if (!patientName) {
-    //         console.log('⏳ Waiting for patientName before setting up listeners...');
-    //         return;
-    //     }
+        console.log(
+            `${isDone ? '🔒' : '🔓'} Locked annotations for series ${seriesInstanceUID}`
+        );
+        } catch (err) {
+        console.error('[annotationViewportSetup] Error fetching progress or locking:', err);
+        }
+    };
 
-    //     const { measurementService } = servicesManager.services;
+    hydrateAndLockAnnotations();
 
-    //     const wrappedMeasurementAddedHandler = ({ measurement }: any) => handleMeasurementAdded({
-    //         measurement,
-    //         measurementService,
-    //         showModal,
-    //         setActiveUID,
-    //         debouncedShowScoreModal,
-    //         pendingAnnotationUIDRef,
-    //         isSeriesValidRef,
-    //         listOfUsersAnnotationsRef,
-    //         isSeriesAnnotationsCompletedRef,
-    //     });
-
-    //     const wrappedMeasurementRemovedHandler = ({ measurement } : any) => handleMeasurementRemoved({
-    //         measurement,
-    //         measurementService,
-    //         setDropdownSelectionMap,
-    //         triggerPost,
-    //     });
-
-    //     const wrappedAnnotationChangedHandler = (event: any) => handleAnnotationChanged({
-    //         event,
-    //         debouncedUpdateStats,
-    //         pendingAnnotationUIDRef,
-    //         isSeriesAnnotationsCompletedRef,
-    //         seriesInstanceUID,
-    //     });
-
-    //     const subscriptionAdd = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_ADDED,wrappedMeasurementAddedHandler);
-    //     const subscriptionRemove = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_REMOVED,wrappedMeasurementRemovedHandler);
-    //     cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangedHandler);
+    return () => {
+        subscription?.unsubscribe?.();
+    };
+    }, [annotationsLoaded, studyInfo?.studyUID, seriesInstanceUID, viewportGridService, userInfo?.role]);
 
 
-    //     return () => {
-    //       subscriptionAdd.unsubscribe();
-    //       subscriptionRemove.unsubscribe();
-    //       cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangedHandler);
-    //     }
+    //=========================================================
 
-    // }, [patientName, studyInfo?.studyUID, seriesInstanceUID]);
+
+
+    //=========================================================
+    // add listeners with handlers
+    useEffect(() => {
+        if (!patientName) {
+            console.log('⏳ Waiting for patientName before setting up listeners...');
+            return;
+        }
+
+        const { measurementService } = servicesManager.services;
+
+        const wrappedMeasurementAddedHandler = ({ measurement }: any) => handleMeasurementAdded({
+            measurement,
+            measurementService,
+            showModal,
+            setActiveUID,
+            debouncedShowScoreModal,
+            pendingAnnotationUIDRef,
+            isSeriesValidRef,
+            listOfUsersAnnotationsRef,
+            isSeriesAnnotationsCompletedRef,
+        });
+
+        const wrappedMeasurementRemovedHandler = ({ measurement } : any) => handleMeasurementRemoved({
+            measurement,
+            measurementService,
+            setDropdownSelectionMap,
+            triggerPost,
+        });
+
+        const wrappedAnnotationChangedHandler = (event: any) => handleAnnotationChanged({
+            event,
+            debouncedUpdateStats,
+            pendingAnnotationUIDRef,
+            isSeriesAnnotationsCompletedRef,
+            seriesInstanceUID,
+        });
+
+        const subscriptionAdd = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_ADDED,wrappedMeasurementAddedHandler);
+        const subscriptionRemove = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_REMOVED,wrappedMeasurementRemovedHandler);
+        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangedHandler);
+
+
+        return () => {
+          subscriptionAdd.unsubscribe();
+        }
+
+    }, [patientName, studyInfo?.studyUID, seriesInstanceUID]);
 
 
 
@@ -546,7 +552,7 @@ function WebQuizSidePanelComponent() {
                     padding: '0 0.5rem',
                 }}
              >
-            {/* <MarkSeriesCompletedButton
+            <MarkSeriesCompletedButton
                 baseUrl={API_BASE_URL}
                 getUserInfo={getUserInfo}
                 studyInstanceUID={studyInfoFromHook?.studyUID}
@@ -594,7 +600,7 @@ function WebQuizSidePanelComponent() {
                     showCancel={modalInfo.showCancel}
                     onCancel={modalInfo.onCancel}
                 />
-            )} */}
+            )}
             </div>
     );
 

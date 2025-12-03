@@ -7,13 +7,11 @@ export const postAnnotations = ({
   dropdownSelectionMap,
   patientName,
   measurementListRef,
-  setIsSaved,
 }: {
   allAnnotations: any[];
   dropdownSelectionMap: Record<string, number>;
   patientName: string;
   measurementListRef: React.MutableRefObject<any[]>;
-  setIsSaved: (val: boolean) => void;
 }) => {
   try {
     // Filter valid annotations
@@ -52,7 +50,6 @@ export const postAnnotations = ({
       },
       '*'
     );
-    setIsSaved(true);
   } catch (err) {
       console.error('postAnnotation :: Error posting annotations:', err);
   }

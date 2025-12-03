@@ -14,7 +14,6 @@ interface CustomizeAnnotationMenuProps {
     showCancel?: boolean;
     onCancel?: () => void;
   }) => void;
-  setIsSaved: (val: boolean) => void;
   debouncedUpdateStats: () => void;
   setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   triggerPost: (args: TriggerPostArgs) => void;
@@ -26,7 +25,6 @@ export default function useCustomizeAnnotationMenu({
   isSeriesAnnotationsCompletedRef,
   measurementService,
   showModal,
-  setIsSaved,
   debouncedUpdateStats,
   setDropdownSelectionMap,
   triggerPost,
