@@ -9,43 +9,86 @@ import { annotation } from '@cornerstonejs/tools';
 //    also - set up a visibility icon for each annotation
 
 
+// export const handleMeasurementClick = ({
+//   measurementId,
+//   annotation,
+//   measurementService,
+//   activeViewportId,
+// }: {
+//   measurementId: string;
+//   annotation: any;
+//   measurementService: any;
+//   activeViewportId: string;
+// }) => {
+//   try {
+//     console.log('[handleMeasurementClick] activeViewportId:', activeViewportId, 'measurementId:', measurementId);
+
+//     const ohifAnnotation = annotation?.state?.getAnnotation?.(measurementId);
+//     if (!ohifAnnotation) {
+//       console.warn('[handleMeasurementClick] No annotation found for UID:', measurementId);
+//       return;
+//     }
+
+//     if (activeViewportId) {
+//       measurementService?.jumpToMeasurement?.(activeViewportId, measurementId);
+//       // console.log('[handleMeasurementClick] jumpToMeasurement with viewportId');
+//     } else {
+//       // If supported, let OHIF resolve a viewport automatically
+//       if (typeof measurementService?.jumpToMeasurement === 'function' && measurementService.jumpToMeasurement.length < 2) {
+//         measurementService.jumpToMeasurement(measurementId);
+//         console.log('[handleMeasurementClick] jumpToMeasurement without viewportId');
+//       } else {
+//         console.warn('[handleMeasurementClick] No active viewport; cannot jump.');
+//       }
+//     }
+
+//   } catch (err) {
+//     console.error('Error in handleMeasurementClick:', err);
+//   }
+// };
+
+
 export const handleMeasurementClick = ({
   measurementId,
   annotation,
   measurementService,
-  activeViewportId,
+  activeViewportIdRef,
+  viewportGridService,
 }: {
   measurementId: string;
   annotation: any;
   measurementService: any;
-  activeViewportId: string;
+  activeViewportIdRef: React.RefObject<string | null>;
+  viewportGridService: any;
 }) => {
   try {
-    console.log('[handleMeasurementClick] activeViewportId:', activeViewportId, 'measurementId:', measurementId);
-
     const ohifAnnotation = annotation?.state?.getAnnotation?.(measurementId);
     if (!ohifAnnotation) {
       console.warn('[handleMeasurementClick] No annotation found for UID:', measurementId);
       return;
     }
 
-    if (activeViewportId) {
-      measurementService?.jumpToMeasurement?.(activeViewportId, measurementId);
-      // console.log('[handleMeasurementClick] jumpToMeasurement with viewportId');
-    } else {
-      // If supported, let OHIF resolve a viewport automatically
-      if (typeof measurementService?.jumpToMeasurement === 'function' && measurementService.jumpToMeasurement.length < 2) {
-        measurementService.jumpToMeasurement(measurementId);
-        console.log('[handleMeasurementClick] jumpToMeasurement without viewportId');
-      } else {
-        console.warn('[handleMeasurementClick] No active viewport; cannot jump.');
-      }
-    }
+    // Prefer the ref, fall back to service
+    const viewportId =
+      activeViewportIdRef.current ?? viewportGridService.getActiveViewportId?.();
 
+    if (viewportId) {
+      measurementService?.jumpToMeasurement?.(viewportId, measurementId);
+      console.log('[handleMeasurementClick] jumpToMeasurement with viewportId');
+    } else if (
+      typeof measurementService?.jumpToMeasurement === 'function' &&
+      measurementService.jumpToMeasurement.length < 2
+    ) {
+      measurementService.jumpToMeasurement(measurementId);
+      console.log('[handleMeasurementClick] jumpToMeasurement without viewportId');
+    } else {
+      console.warn('[handleMeasurementClick] No active viewport; cannot jump.');
+    }
   } catch (err) {
     console.error('Error in handleMeasurementClick:', err);
   }
 };
+
 //=========================================================
 export const toggleVisibility = ({
   uid,

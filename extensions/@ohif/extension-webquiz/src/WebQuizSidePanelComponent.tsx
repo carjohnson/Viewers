@@ -49,6 +49,7 @@ function WebQuizSidePanelComponent() {
     const isSeriesValidRef = useRef<boolean | null>(null);
     const [validatedSeriesUID, setValidatedSeriesUID] = useState(null);
     const [activeViewportId, setActiveViewportId] = useState<string | null>(null);
+    const activeViewportIdRef = useRef<string | null>(null);
 
     const { servicesManager } = useSystem();
     const { measurementService, viewportGridService } = servicesManager.services;
@@ -260,7 +261,8 @@ function WebQuizSidePanelComponent() {
             measurementId: id,
             annotation,
             measurementService,
-            activeViewportId,
+            activeViewportIdRef,
+            viewportGridService,
          });
         
     //~~~~~~~~~~~~~~~~~
@@ -322,14 +324,6 @@ function WebQuizSidePanelComponent() {
 
 
     
-    //=========================================================
-    // When the extension is collapsed and reloaded,
-    //  then the scores can be 're-fetched' from the database
-    useEffect(() => {
-        const allAnnotations = annotation.state.getAllAnnotations?.() || [];
-        const newMap = buildDropdownSelectionMapFromState(allAnnotations);
-        setDropdownSelectionMap(newMap);
-    }, []);
 
     
 
@@ -408,82 +402,149 @@ function WebQuizSidePanelComponent() {
 
 
     //=========================================================
+    useEffect(() => {
+    if (!annotationsLoaded) return;
+
+    const subscription = viewportGridService.subscribe(
+        viewportGridService.EVENTS.ACTIVE_VIEWPORT_ID_CHANGED,
+        (evt: { viewportId: string }) => {
+        setActiveViewportId(evt.viewportId);
+        activeViewportIdRef.current = evt.viewportId;
+
+        const allAnnotations = annotation.state.getAllAnnotations?.() || [];
+        const newMap = buildDropdownSelectionMapFromState(allAnnotations);
+        setDropdownSelectionMap(newMap);
+        }
+    );
+
+    return () => subscription.unsubscribe();
+    }, [annotationsLoaded, viewportGridService]);
 
     //=========================================================
-    // wait for all annotations to be loaded, then set to locked 
-    //     if the selected series has been marked as completed
+    // hydrate + lock annotations when series/annotations change
     useEffect(() => {
-    let subscription: any;
-
     const hydrateAndLockAnnotations = async () => {
-        // 1️⃣ Wait until annotations are loaded
-        if (!annotationsLoaded) {
-        console.log('[annotationViewportSetup] annotations not yet loaded, skipping');
+        if (!annotationsLoaded || !studyInfo?.studyUID || !seriesInstanceUID) {
+        console.log('[annotationViewportSetup] prerequisites not ready, skipping');
         return;
         }
 
-        // 2️⃣ Get the active viewport
-        const initialViewportId = viewportGridService.getActiveViewportId?.();
-        setActiveViewportId(initialViewportId);
-        console.log('[annotationViewportSetup] activeViewportId:', initialViewportId);
-
-        // Subscribe to viewport changes
-        subscription = viewportGridService.subscribe(
-        viewportGridService.EVENTS.ACTIVE_VIEWPORT_ID_CHANGED,
-        (evt: { viewportId: string }) => {
-            setActiveViewportId(evt.viewportId);
-        }
-        );
-
-        // 3️⃣ Fetch progress data
-        if (!studyInfo?.studyUID || !seriesInstanceUID) return;
-
-        try {
+        // One-time fetch + lock
         const progressData = await fetchStudyProgressFromDB({
-            baseUrl: API_BASE_URL,
-            username: userInfo.username,
-            studyUID: studyInfo.studyUID,
+        baseUrl: API_BASE_URL,
+        username: userInfo.username,
+        studyUID: studyInfo.studyUID,
         });
 
         if (progressData?.error) {
-            console.warn('⚠️ Could not fetch progress:', progressData.error);
-            return;
+        console.warn('⚠️ Could not fetch progress:', progressData.error);
+        return;
         }
 
         const currentSeriesProgress = progressData.series_progress?.find(
-            entry => entry.seriesUID === seriesInstanceUID
+        entry => entry.seriesUID === seriesInstanceUID
         );
 
         const isDone = currentSeriesProgress?.status === 'done';
         setSeriesAnnotationsCompleted(isDone);
         isSeriesAnnotationsCompletedRef.current = isDone;
 
-        // 4️⃣ Lock annotations
         const allAnnotations = annotation.state.getAllAnnotations();
         allAnnotations.forEach(ann => {
-            const annSeriesUID = getSeriesUIDFromMeasurement(ann);
-            if (annSeriesUID !== seriesInstanceUID) return;
-            ann.isLocked = userInfo?.role === 'admin' || isDone;
+        const annSeriesUID = getSeriesUIDFromMeasurement(ann);
+        if (annSeriesUID !== seriesInstanceUID) return;
+        ann.isLocked = userInfo?.role === 'admin' || isDone;
         });
 
-        //   // Notify tools to refresh
-        //     triggerAnnotationModified(allAnnotations);
-
-
         console.log(
-            `${isDone ? '🔒' : '🔓'} Locked annotations for series ${seriesInstanceUID}`
+        `${isDone ? '🔒' : '🔓'} Locked annotations for series ${seriesInstanceUID}`
         );
-        } catch (err) {
-        console.error('[annotationViewportSetup] Error fetching progress or locking:', err);
-        }
     };
 
     hydrateAndLockAnnotations();
+    }, [annotationsLoaded, studyInfo?.studyUID, seriesInstanceUID, userInfo?.role]);
 
-    return () => {
-        subscription?.unsubscribe?.();
-    };
-    }, [annotationsLoaded, studyInfo?.studyUID, seriesInstanceUID, viewportGridService, userInfo?.role]);
+    //=========================================================
+    // When the extension is collapsed and reloaded,
+    //  then the scores can be 're-fetched' from the database
+    useEffect(() => {
+        const allAnnotations = annotation.state.getAllAnnotations?.() || [];
+        const newMap = buildDropdownSelectionMapFromState(allAnnotations);
+        setDropdownSelectionMap(newMap);
+    }, []);
+
+    // //=========================================================
+    // // wait for all annotations to be loaded, then set to locked 
+    // //     if the selected series has been marked as completed
+    // useEffect(() => {
+    // let subscription: any;
+
+    // const hydrateAndLockAnnotations = async () => {
+    //     // 1️⃣ Wait until annotations are loaded
+    //     if (!annotationsLoaded) {
+    //     console.log('[annotationViewportSetup] annotations not yet loaded, skipping');
+    //     return;
+    //     }
+
+    //     // 2️⃣ Get the active viewport
+    //     const initialViewportId = viewportGridService.getActiveViewportId?.();
+    //     setActiveViewportId(initialViewportId);
+    //     activeViewportIdRef.current = initialViewportId;
+    //     console.log('[hydrateAndLockAnnotations] activeViewportId:', initialViewportId);
+
+    //     // Subscribe to viewport changes
+    //     subscription = viewportGridService.subscribe(
+    //     viewportGridService.EVENTS.ACTIVE_VIEWPORT_ID_CHANGED,
+    //     (evt: { viewportId: string }) => {
+    //         setActiveViewportId(evt.viewportId);
+    //     }
+    //     );
+
+    //     // 3️⃣ Fetch progress data
+    //     if (!studyInfo?.studyUID || !seriesInstanceUID) return;
+
+    //     try {
+    //     const progressData = await fetchStudyProgressFromDB({
+    //         baseUrl: API_BASE_URL,
+    //         username: userInfo.username,
+    //         studyUID: studyInfo.studyUID,
+    //     });
+
+    //     if (progressData?.error) {
+    //         console.warn('⚠️ Could not fetch progress:', progressData.error);
+    //         return;
+    //     }
+
+    //     const currentSeriesProgress = progressData.series_progress?.find(
+    //         entry => entry.seriesUID === seriesInstanceUID
+    //     );
+
+    //     const isDone = currentSeriesProgress?.status === 'done';
+    //     setSeriesAnnotationsCompleted(isDone);
+    //     isSeriesAnnotationsCompletedRef.current = isDone;
+
+    //     // 4️⃣ Lock annotations
+    //     const allAnnotations = annotation.state.getAllAnnotations();
+    //     allAnnotations.forEach(ann => {
+    //         const annSeriesUID = getSeriesUIDFromMeasurement(ann);
+    //         if (annSeriesUID !== seriesInstanceUID) return;
+    //         ann.isLocked = userInfo?.role === 'admin' || isDone;
+    //     });
+
+    //     console.log(
+    //         `${isDone ? '🔒' : '🔓'} Locked annotations for series ${seriesInstanceUID}`
+    //     );
+    //     } catch (err) {
+    //     console.error('[annotationViewportSetup] Error fetching progress or locking:', err);
+    //     }
+    // };
+
+    // hydrateAndLockAnnotations();
+
+    // return () => {
+    //     subscription?.unsubscribe?.();
+    // };
+    // }, [annotationsLoaded, studyInfo?.studyUID, seriesInstanceUID, viewportGridService, userInfo?.role]);
 
 
     //=========================================================
