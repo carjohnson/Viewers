@@ -15,7 +15,7 @@ export function handleMeasurementAdded({
   pendingAnnotationUIDRef,
   isSeriesValidRef,
   listOfUsersAnnotationsRef,
-  isSeriesAnnotationsCompletedRef,
+  isStudyCompletedRef,
 }: {
   measurement: any;
   measurementService: any;
@@ -30,14 +30,14 @@ export function handleMeasurementAdded({
   pendingAnnotationUIDRef: React.MutableRefObject<string | null>;
   isSeriesValidRef: React.MutableRefObject<boolean>;
   listOfUsersAnnotationsRef: React.MutableRefObject<Record<string, any> | null>;
-  isSeriesAnnotationsCompletedRef: React.MutableRefObject<boolean>;
+  isStudyCompletedRef: React.MutableRefObject<boolean>;
 }) {
 
-  if (isSeriesAnnotationsCompletedRef.current) {
+  if (isStudyCompletedRef.current) {
     measurementService.remove(measurement?.uid);
     showModal({
-      title: 'Series Locked',
-      message: 'This series has been marked completed. No further annotations allowed.',
+      title: 'Case Locked',
+      message: 'This case has been marked completed. No further annotations allowed.',
       showCancel: false,
     });
     return;
@@ -105,30 +105,14 @@ export const handleAnnotationChanged = ({
   event,
   debouncedUpdateStats,
   pendingAnnotationUIDRef,
-  isSeriesAnnotationsCompletedRef,
-  seriesInstanceUID,
 }: {
   event: any;
   debouncedUpdateStats: () => void;
   pendingAnnotationUIDRef: React.MutableRefObject<string | null>;
-  isSeriesAnnotationsCompletedRef: React.MutableRefObject<boolean>;
-  seriesInstanceUID: string;
 }) => {
   try {
     const { annotation: changedAnnotation } = event?.detail ?? {};
     if (!changedAnnotation) return;
-
-   if (isSeriesAnnotationsCompletedRef.current) {
-      if (changedAnnotation.seriesUID === seriesInstanceUID) {
-        changedAnnotation.isLocked = true;
-        return;
-      }
-    
-      console.warn(
-        `Blocked modification on locked annotation ${changedAnnotation.annotationUID}`
-      );
-      return;
-    }
 
     pendingAnnotationUIDRef.current = changedAnnotation.annotationUID;
 
@@ -147,12 +131,10 @@ export const handleAnnotationChanged = ({
 // this handler takes effect AFTER the removal of the measurement - it is reactive
 export const handleMeasurementRemoved = ({
   measurement,
-  measurementService,
   setDropdownSelectionMap,
   triggerPost,
 }: {
   measurement: any;
-  measurementService: any;
   setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   triggerPost: (args: TriggerPostArgs) => void;
 }) => {

@@ -1,12 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useSystem } from '@ohif/core';
-import { handleAnnotationRemoved } from './../handlers/annotationEventHandlers'
-import { TriggerPostArgs } from '../models/TriggerPostArgs';
 
 
 interface CustomizeAnnotationMenuProps {
   userInfo: { username: string; role: string };
-  isSeriesAnnotationsCompletedRef: React.MutableRefObject<boolean>;
+  isStudyCompletedRef: React.MutableRefObject<boolean>;
   measurementService: any;
   showModal: (modalProps: {
     title: string;
@@ -14,20 +12,14 @@ interface CustomizeAnnotationMenuProps {
     showCancel?: boolean;
     onCancel?: () => void;
   }) => void;
-  debouncedUpdateStats: () => void;
-  setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
-  triggerPost: (args: TriggerPostArgs) => void;
 }
 
 
 export default function useCustomizeAnnotationMenu({
   userInfo,
-  isSeriesAnnotationsCompletedRef,
+  isStudyCompletedRef,
   measurementService,
   showModal,
-  debouncedUpdateStats,
-  setDropdownSelectionMap,
-  triggerPost,
 
 }: CustomizeAnnotationMenuProps) {
 
@@ -45,7 +37,7 @@ useEffect(() => {
               id: 'measurementMenu',
               selector: ({ nearbyToolData }) => !!nearbyToolData,
               items: [
-                ...(isSeriesAnnotationsCompletedRef?.current || userInfo?.role === 'admin'
+                ...(isStudyCompletedRef?.current || userInfo?.role === 'admin'
                   ? [
                       {
                         id: 'locked',
@@ -54,7 +46,7 @@ useEffect(() => {
                           const msg =
                             userInfo?.role === 'admin'
                               ? 'Admin not allowed to delete measurements or modify the labels.'
-                              : 'Series is locked. No further changes allowed.';
+                              : 'Case is locked. No further changes allowed.';
 
                           showModal({
                             title: 'Changes Disabled',
@@ -92,5 +84,5 @@ useEffect(() => {
       showCancel: false,
     });
   }
-}, [userInfo, isSeriesAnnotationsCompletedRef, measurementService, showModal]);
+}, [userInfo, isStudyCompletedRef, measurementService, showModal]);
 }

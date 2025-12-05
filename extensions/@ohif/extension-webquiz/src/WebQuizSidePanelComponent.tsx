@@ -17,17 +17,20 @@ import { useSystem } from '@ohif/core';
 import { AnnotationList } from './components/AnnotationList/AnnotationList';
 import { ScoreModal } from './components/ScoreModal';
 import { handleMeasurementAdded, handleAnnotationChanged, handleMeasurementRemoved } from './handlers/annotationEventHandlers';
+
 import { createDebouncedStatsUpdater,
         createDebouncedShowScoreModalTrigger,
         buildDropdownSelectionMapFromState,
-        getSeriesUIDFromMeasurement
+        getSeriesUIDFromMeasurement,
+        lockAllAnnotations,
         } from './utils/annotationUtils';
 
 import MarkSeriesCompletedButton from './components/MarkSeriesCompletedButton';
+import MarkStudyCompletedButton from './components/MarkStudyCompletedButton';
 import { useSeriesValidation } from './hooks/useSeriesValidation';
 import { useCurrentSeriesUID } from './hooks/useCurrentSeriesUID';
 import  useCustomizeAnnotationMenu  from './hooks/useCustomizeAnnotationMenu'
-import { postStudyProgress, fetchStudyProgressFromDB } from './handlers/studyProgressHandlers';
+import { postStudyProgress, postSeriesProgress, fetchStudyProgressFromDB } from './handlers/studyProgressHandlers';
 import { ModalComponent } from './components/ModalComponent';
 
 
@@ -46,6 +49,8 @@ function WebQuizSidePanelComponent() {
     const [listOfUsersAnnotations, setListOfUsersAnnotations] = useState(null);
     const [isSeriesAnnotationsCompleted, setSeriesAnnotationsCompleted] = useState(false);
     const isSeriesAnnotationsCompletedRef = useRef(isSeriesAnnotationsCompleted);
+    const [isStudyCompleted, setStudyCompleted] = useState(false);
+    const isStudyCompletedRef = useRef(isStudyCompleted);
     const isSeriesValidRef = useRef<boolean | null>(null);
     const [validatedSeriesUID, setValidatedSeriesUID] = useState(null);
     const [activeViewportId, setActiveViewportId] = useState<string | null>(null);
@@ -58,6 +63,8 @@ function WebQuizSidePanelComponent() {
     const pendingAnnotationUIDRef = useRef<string | null>(null);
     const { cornerstoneViewportService, displaySetService } = servicesManager.services;
     const listOfUsersAnnotationsRef = useRef<any>(null);
+    const [dropdownMapVersion, setDropdownMapVersion] = useState(0);
+
 
     //~~~~~~~~~~~~~~~~~
     const [modalInfo, setModalInfo] = useState<null | { 
@@ -283,7 +290,7 @@ function WebQuizSidePanelComponent() {
             setDropdownSelectionMap,
             triggerPost,
             annotation,
-            isSeriesAnnotationsCompletedRef,
+            isStudyCompletedRef,
             showModal,
         });
     };    
@@ -298,18 +305,12 @@ function WebQuizSidePanelComponent() {
         setShowScoreModal,
     });
 
-
-
-
     //~~~~~~~~~~~~~~~~~
     useCustomizeAnnotationMenu ({
         userInfo,
-        isSeriesAnnotationsCompletedRef,
+        isStudyCompletedRef,
         measurementService,
         showModal,
-        debouncedUpdateStats,
-        setDropdownSelectionMap,
-        triggerPost,
     });
 
 
@@ -319,16 +320,6 @@ function WebQuizSidePanelComponent() {
     // set up useEffect hooks to manage gathering all data from services
     //  as the other components may be updating asynchronously and this
     //  component needs to be subscribed to those updates
-
-
-
-
-    
-
-    
-
-
-
 
     
     // //=========================================================
@@ -377,7 +368,7 @@ function WebQuizSidePanelComponent() {
 
             console.log(`✅ Series ${seriesInstanceUID} validated — posting wip`);
 
-            const progressResult = await postStudyProgress({
+            const progressResult = await postSeriesProgress({
                 baseUrl: API_BASE_URL,
                 username: userInfo.username,
                 studyUID: studyInfo.studyUID,
@@ -396,12 +387,21 @@ function WebQuizSidePanelComponent() {
     }, [validatedSeriesUID, studyInfo?.studyUID, seriesInstanceUID]);
 
     //=========================================================
+    // mirroring the state to use current setting when series has been selected
     useEffect(() => {
         isSeriesAnnotationsCompletedRef.current = isSeriesAnnotationsCompleted;
     }, [isSeriesAnnotationsCompleted]);
 
+    //=========================================================
+    // mirroring the state to use current setting when button is pressed
+    useEffect(() => {
+        isStudyCompletedRef.current = isStudyCompleted;
+    }, [isStudyCompleted]);
+
 
     //=========================================================
+    // rebuild the dropdown score map whenever there are changes to annotations
+    //      being loaded or if the viewport id has changed 
     useEffect(() => {
     if (!annotationsLoaded) return;
 
@@ -422,6 +422,8 @@ function WebQuizSidePanelComponent() {
 
     //=========================================================
     // hydrate + lock annotations when series/annotations change
+    //      wait for all annotations to be loaded, then set to locked 
+    //      if the study has been marked as completed
     useEffect(() => {
     const hydrateAndLockAnnotations = async () => {
         if (!annotationsLoaded || !studyInfo?.studyUID || !seriesInstanceUID) {
@@ -445,24 +447,25 @@ function WebQuizSidePanelComponent() {
         entry => entry.seriesUID === seriesInstanceUID
         );
 
-        const isDone = currentSeriesProgress?.status === 'done';
-        setSeriesAnnotationsCompleted(isDone);
-        isSeriesAnnotationsCompletedRef.current = isDone;
+        const isSeriesDone = currentSeriesProgress?.status === 'done';
+        setSeriesAnnotationsCompleted(isSeriesDone);
+        isSeriesAnnotationsCompletedRef.current = isSeriesDone;
 
-        const allAnnotations = annotation.state.getAllAnnotations();
-        allAnnotations.forEach(ann => {
-        const annSeriesUID = getSeriesUIDFromMeasurement(ann);
-        if (annSeriesUID !== seriesInstanceUID) return;
-        ann.isLocked = userInfo?.role === 'admin' || isDone;
-        });
+
+        const isStudyDone = progressData?.study_status === 'done';
+        setStudyCompleted(isStudyDone);
+        isStudyCompletedRef.current = isStudyDone;
+        // console.log(' *** IN HYDRATE seriesProgress, studyProgress:', isSeriesAnnotationsCompletedRef.current, isStudyCompletedRef.current)
+
+        lockAllAnnotations({annotation, userInfo, isStudyCompletedRef});
 
         console.log(
-        `${isDone ? '🔒' : '🔓'} Locked annotations for series ${seriesInstanceUID}`
+        `${isStudyCompletedRef.current ? '🔒' : '🔓'} Lock state annotations for study ${studyInfo?.studyUID}`
         );
     };
 
     hydrateAndLockAnnotations();
-    }, [annotationsLoaded, studyInfo?.studyUID, seriesInstanceUID, userInfo?.role]);
+    }, [annotationsLoaded, studyInfo?.studyUID, seriesInstanceUID, userInfo?.role, viewportGridService]);
 
     //=========================================================
     // When the extension is collapsed and reloaded,
@@ -471,80 +474,7 @@ function WebQuizSidePanelComponent() {
         const allAnnotations = annotation.state.getAllAnnotations?.() || [];
         const newMap = buildDropdownSelectionMapFromState(allAnnotations);
         setDropdownSelectionMap(newMap);
-    }, []);
-
-    // //=========================================================
-    // // wait for all annotations to be loaded, then set to locked 
-    // //     if the selected series has been marked as completed
-    // useEffect(() => {
-    // let subscription: any;
-
-    // const hydrateAndLockAnnotations = async () => {
-    //     // 1️⃣ Wait until annotations are loaded
-    //     if (!annotationsLoaded) {
-    //     console.log('[annotationViewportSetup] annotations not yet loaded, skipping');
-    //     return;
-    //     }
-
-    //     // 2️⃣ Get the active viewport
-    //     const initialViewportId = viewportGridService.getActiveViewportId?.();
-    //     setActiveViewportId(initialViewportId);
-    //     activeViewportIdRef.current = initialViewportId;
-    //     console.log('[hydrateAndLockAnnotations] activeViewportId:', initialViewportId);
-
-    //     // Subscribe to viewport changes
-    //     subscription = viewportGridService.subscribe(
-    //     viewportGridService.EVENTS.ACTIVE_VIEWPORT_ID_CHANGED,
-    //     (evt: { viewportId: string }) => {
-    //         setActiveViewportId(evt.viewportId);
-    //     }
-    //     );
-
-    //     // 3️⃣ Fetch progress data
-    //     if (!studyInfo?.studyUID || !seriesInstanceUID) return;
-
-    //     try {
-    //     const progressData = await fetchStudyProgressFromDB({
-    //         baseUrl: API_BASE_URL,
-    //         username: userInfo.username,
-    //         studyUID: studyInfo.studyUID,
-    //     });
-
-    //     if (progressData?.error) {
-    //         console.warn('⚠️ Could not fetch progress:', progressData.error);
-    //         return;
-    //     }
-
-    //     const currentSeriesProgress = progressData.series_progress?.find(
-    //         entry => entry.seriesUID === seriesInstanceUID
-    //     );
-
-    //     const isDone = currentSeriesProgress?.status === 'done';
-    //     setSeriesAnnotationsCompleted(isDone);
-    //     isSeriesAnnotationsCompletedRef.current = isDone;
-
-    //     // 4️⃣ Lock annotations
-    //     const allAnnotations = annotation.state.getAllAnnotations();
-    //     allAnnotations.forEach(ann => {
-    //         const annSeriesUID = getSeriesUIDFromMeasurement(ann);
-    //         if (annSeriesUID !== seriesInstanceUID) return;
-    //         ann.isLocked = userInfo?.role === 'admin' || isDone;
-    //     });
-
-    //     console.log(
-    //         `${isDone ? '🔒' : '🔓'} Locked annotations for series ${seriesInstanceUID}`
-    //     );
-    //     } catch (err) {
-    //     console.error('[annotationViewportSetup] Error fetching progress or locking:', err);
-    //     }
-    // };
-
-    // hydrateAndLockAnnotations();
-
-    // return () => {
-    //     subscription?.unsubscribe?.();
-    // };
-    // }, [annotationsLoaded, studyInfo?.studyUID, seriesInstanceUID, viewportGridService, userInfo?.role]);
+    }, [dropdownMapVersion]);
 
 
     //=========================================================
@@ -570,12 +500,11 @@ function WebQuizSidePanelComponent() {
             pendingAnnotationUIDRef,
             isSeriesValidRef,
             listOfUsersAnnotationsRef,
-            isSeriesAnnotationsCompletedRef,
+            isStudyCompletedRef,
         });
 
         const wrappedMeasurementRemovedHandler = ({ measurement } : any) => handleMeasurementRemoved({
             measurement,
-            measurementService,
             setDropdownSelectionMap,
             triggerPost,
         });
@@ -584,8 +513,6 @@ function WebQuizSidePanelComponent() {
             event,
             debouncedUpdateStats,
             pendingAnnotationUIDRef,
-            isSeriesAnnotationsCompletedRef,
-            seriesInstanceUID,
         });
 
         const subscriptionAdd = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_ADDED,wrappedMeasurementAddedHandler);
@@ -595,9 +522,11 @@ function WebQuizSidePanelComponent() {
 
         return () => {
           subscriptionAdd.unsubscribe();
+          subscriptionRemove.unsubscribe();
+          cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangedHandler);
         }
 
-    }, [patientName, studyInfo?.studyUID, seriesInstanceUID]);
+    }, [patientName, studyInfo?.studyUID]);
 
 
 
@@ -613,20 +542,19 @@ function WebQuizSidePanelComponent() {
                     padding: '0 0.5rem',
                 }}
              >
-            <MarkSeriesCompletedButton
+            <MarkStudyCompletedButton
                 baseUrl={API_BASE_URL}
                 getUserInfo={getUserInfo}
                 studyInstanceUID={studyInfoFromHook?.studyUID}
-                seriesInstanceUID={seriesInstanceUID}
-                isSeriesAnnotationsCompleted={isSeriesAnnotationsCompleted}
-                setSeriesAnnotationsCompleted={setSeriesAnnotationsCompleted}
-                isSeriesAnnotationsCompletedRef={isSeriesAnnotationsCompletedRef}
-                onMarkCompleted={(studyUID, seriesInstanceUID) => {
-                console.log(`🧠 Study ${studyUID}, Series ${seriesInstanceUID} marked as completed`);
+                isStudyCompleted={isStudyCompleted}
+                setStudyCompleted={setStudyCompleted}
+                isStudyCompletedRef={isStudyCompletedRef}
+                onMarkCompleted={(studyInstanceUID) => {
+                    lockAllAnnotations({ annotation, userInfo, isStudyCompletedRef });
+                    setDropdownMapVersion(v => v + 1); // triggers effect after render
                 }}
                 showModal={showModal}
                 closeModal={closeModal}
-                isSeriesValid={isSeriesValid}
             />
             <div className="text-white w-full text-center"
                  style={{ flexGrow: 1, minHeight: 0 }}

@@ -193,3 +193,26 @@ export function getSeriesUIDFromMeasurement(measurement: any): string | null {
     return null;
   }
 }
+
+//=========================================================
+// utility to lock the annotations when rehydrating after changing studies
+//  or when the study is marked as complete.
+export const lockAllAnnotations = ({
+  annotation,
+  userInfo,
+  isStudyCompletedRef,
+}: {
+  annotation: any;
+  userInfo: { role?: string };
+  isStudyCompletedRef: React.MutableRefObject<boolean>;
+}) => {
+  // console.log(' *** IN UTILS LOCK', userInfo?.role, isStudyCompletedRef.current, annotation)
+  const allAnnotations = annotation.state.getAllAnnotations();
+  allAnnotations.forEach(ann => {
+    ann.isLocked = userInfo?.role === 'admin' || isStudyCompletedRef.current;
+  });
+
+  console.log(
+    `${isStudyCompletedRef.current ? '🔒' : '🔓'} In utils - Locked state annotations for study`
+  );
+};

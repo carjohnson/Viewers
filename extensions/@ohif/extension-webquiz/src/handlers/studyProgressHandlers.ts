@@ -1,5 +1,5 @@
 //=========================================================
-export const postStudyProgress = async ({
+export const postSeriesProgress = async ({
   baseUrl,
   username,
   studyUID,
@@ -13,7 +13,7 @@ export const postStudyProgress = async ({
   status?: 'new' | 'wip' | 'done';
 }) => {
   try {
-    const res = await fetch(`${baseUrl}/api/study-progress`, {
+    const res = await fetch(`${baseUrl}/api/series-progress`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -22,7 +22,31 @@ export const postStudyProgress = async ({
     const result = await res.json();
     return result;
   } catch (err) {
-    console.error('🚨 Error posting study progress:', err);
+    console.error('🚨 Error posting series progress:', err);
+    return { error: err };
+  }
+};
+//=========================================================
+export const postStudyProgressComplete = async ({
+  baseUrl,
+  username,
+  studyUID,
+}: {
+  baseUrl: string;
+  username: string;
+  studyUID: string;
+}) => {
+  try {
+    const res = await fetch(`${baseUrl}/api/study-complete`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, studyUID }),
+    });
+    const result = await res.json();
+    return result;
+  } catch (err) {
+    console.error('🚨 Error posting study complete progress:', err);
     return { error: err };
   }
 };

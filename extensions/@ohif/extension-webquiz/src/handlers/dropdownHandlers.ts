@@ -10,7 +10,7 @@ export const handleDropdownChange = ({
   setDropdownSelectionMap,
   triggerPost,
   annotation,
-  isSeriesAnnotationsCompletedRef,
+  isStudyCompletedRef,
   showModal,
 }: {
   uid: string;
@@ -19,7 +19,7 @@ export const handleDropdownChange = ({
   setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   triggerPost: (args: TriggerPostArgs) => void;
   annotation: any;
-  isSeriesAnnotationsCompletedRef: React.MutableRefObject<boolean>;
+  isStudyCompletedRef: React.MutableRefObject<boolean>;
   showModal: (modalProps: {
     title: string;
     message: string;
@@ -28,15 +28,16 @@ export const handleDropdownChange = ({
   }) => void;
 }) => {
   const userInfo = getUserInfo();
+  // console.log(' *** IN DROPDOWN CHANGE HANDLER', isStudyCompletedRef);
   var sMsg = '';
   if (userInfo?.role === 'admin') { 
     sMsg = 'Admins are not allowed to modify annotations.';
   } else {
-    if (isSeriesAnnotationsCompletedRef) { 
-      sMsg = 'Changes not allowed for series marked as completed.';
+    if (isStudyCompletedRef.current) { 
+      sMsg = 'Changes not allowed for cases marked as completed.';
     }
   }
-  if (userInfo.role === 'admin' || isSeriesAnnotationsCompletedRef.current) {
+  if (userInfo.role === 'admin' || isStudyCompletedRef.current) {
     showModal({
       title: 'Score Changes Blocked',
       message: sMsg,
