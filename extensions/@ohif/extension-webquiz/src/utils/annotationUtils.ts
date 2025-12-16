@@ -206,7 +206,6 @@ export const lockAllAnnotations = ({
   userInfo: { role?: string };
   isStudyCompletedRef: React.MutableRefObject<boolean>;
 }) => {
-  // console.log(' *** IN UTILS LOCK', userInfo?.role, isStudyCompletedRef.current, annotation)
   const allAnnotations = annotation.state.getAllAnnotations();
   allAnnotations.forEach(ann => {
     ann.isLocked = userInfo?.role === 'admin' || isStudyCompletedRef.current;
@@ -216,3 +215,21 @@ export const lockAllAnnotations = ({
     `${isStudyCompletedRef.current ? '🔒' : '🔓'} In utils - Locked state annotations for study`
   );
 };
+
+//=========================================================
+    // if extension panel is collapsed and re-opened,
+    //    cornerstone's 'annotation' will hold all annotations
+    //    prior to the panel close, and then push the current 
+    //    annotations shown when the panel is reopened causing duplicates
+export const removeDuplicatesByUID = (annotations: any[]) => {
+  const seen = new Set<string>();
+  return annotations.filter(a => {
+    const uid = a.uid || a.annotationUID;
+    if (!uid) return true; // keep if no uid
+    if (seen.has(uid)) return false;
+    seen.add(uid);
+    return true;
+  });
+}
+
+//=========================================================

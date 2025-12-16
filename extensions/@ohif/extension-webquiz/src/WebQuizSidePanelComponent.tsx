@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 
 import * as cornerstone from '@cornerstonejs/core';
 import * as cornerstoneTools from '@cornerstonejs/tools';
@@ -16,7 +16,10 @@ import { handleMeasurementClick, toggleVisibility, closeScoreModal } from './han
 import { useSystem } from '@ohif/core';
 import { AnnotationList } from './components/AnnotationList/AnnotationList';
 import { ScoreModal } from './components/ScoreModal';
-import { handleMeasurementAdded, handleAnnotationChanged, handleMeasurementRemoved } from './handlers/annotationEventHandlers';
+import { handleMeasurementAdded, handleAnnotationChanged, handleMeasurementRemoved, handleMeasurementUpdated } from './handlers/annotationEventHandlers';
+import { ToolGroupManager } from '@cornerstonejs/tools';
+
+
 
 import { createDebouncedStatsUpdater,
         createDebouncedShowScoreModalTrigger,
@@ -32,6 +35,9 @@ import { useCurrentSeriesUID } from './hooks/useCurrentSeriesUID';
 import  useCustomizeAnnotationMenu  from './hooks/useCustomizeAnnotationMenu'
 import { postStudyProgress, postSeriesProgress, fetchStudyProgressFromDB } from './handlers/studyProgressHandlers';
 import { ModalComponent } from './components/ModalComponent';
+import { useActiveViewportId } from './hooks/useActiveViewport';
+import { TriggerPostArgs } from './models/TriggerPostArgs';
+
 
 
 function WebQuizSidePanelComponent() {
@@ -53,8 +59,6 @@ function WebQuizSidePanelComponent() {
     const isStudyCompletedRef = useRef(isStudyCompleted);
     const isSeriesValidRef = useRef<boolean | null>(null);
     const [validatedSeriesUID, setValidatedSeriesUID] = useState(null);
-    const [activeViewportId, setActiveViewportId] = useState<string | null>(null);
-    const activeViewportIdRef = useRef<string | null>(null);
 
     const { servicesManager } = useSystem();
     const { measurementService, viewportGridService } = servicesManager.services;
@@ -64,7 +68,8 @@ function WebQuizSidePanelComponent() {
     const { cornerstoneViewportService, displaySetService } = servicesManager.services;
     const listOfUsersAnnotationsRef = useRef<any>(null);
     const [dropdownMapVersion, setDropdownMapVersion] = useState(0);
-
+    const [isOpen, setIsOpen] = React.useState(false);
+    const isOpenRef = useRef<boolean | null>(null);
 
     //~~~~~~~~~~~~~~~~~
     const [modalInfo, setModalInfo] = useState<null | { 
@@ -103,7 +108,17 @@ function WebQuizSidePanelComponent() {
         { value: 5, label: '5' },
     ];
 
-
+    // This useEffect sets the state to open when the extension is mounted
+    //      and to false when the extension is unmounted
+    //      Introduced to monitor when the extension is collapsed and reopened
+    useEffect(() => {
+        setIsOpen(true);
+        isOpenRef.current = true;
+        return () => {
+            setIsOpen(false);
+            isOpenRef.current = false;
+        }
+    }, []);
 
 
     // ************************************************************
@@ -128,7 +143,8 @@ function WebQuizSidePanelComponent() {
     const { patientInfo } = usePatientInfo();
     const studyInfoFromHook = useStudyInfo();
     const { studyInfo, setStudyInfo } = useStudyInfoStore();
-    const patientName = patientInfo?.PatientName;
+    const patientName = useStudyInfoStore(state => state.studyInfo?.patientName);
+
     const userInfo = getUserInfo();
 
     //=========================================================
@@ -151,12 +167,73 @@ function WebQuizSidePanelComponent() {
         // console.log('✅ Setting full study info in Zustand:', fullInfo);
         setStudyInfo(fullInfo);
 
-    }, [studyInfoFromHook, patientInfo]);
+    }, [studyInfoFromHook, patientInfo, isOpen]);
 
     // //>>>>> for debug <<<<<
     // console.log('🧠 useStudyInfo() returned:', studyInfoFromHook);
     // console.log('📦 Zustand store currently holds:', studyInfo);
 
+    // ************************************************************
+    // ********************** Viewports ***************************
+    // ************************************************************
+    //=========================================================
+
+    const { activeViewportId, activeViewportIdRef, activeViewportElementRef } =
+        useActiveViewportId(viewportGridService, annotationsLoaded, cornerstoneViewportService);
+
+
+    //=========================================================
+    // to rebind the element tools after collapse/reopen of extension panel
+// Subscribe to annotationModified events
+// useEffect(() => {
+//   if (!isOpen || !element) return;
+
+//   const wrappedAnnotationChangedHandler = (event: any) =>
+//     handleAnnotationChanged({
+//       event,
+//     });
+
+//   cornerstone.eventTarget.addEventListener(
+//     cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED,
+//     wrappedAnnotationChangedHandler
+//   );
+
+//   return () => {
+//     cornerstone.eventTarget.removeEventListener(
+//       cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED,
+//       wrappedAnnotationChangedHandler
+//     );
+//   };
+// }, [isOpen, element]);
+
+// // Activate the tool when panel opens
+// useEffect(() => {
+
+//   console.log(' *** IN EFFECT TO ACTIVATE TOOL ... isOpen, vpId, Viewport, element', isOpen, element);
+  
+//   if (!isOpen || !element) return;
+
+//   const toolGroup = ToolGroupManager.getToolGroupForViewport(vpId);
+//   console.log(' *** IN EFFECT TO ACTIVATE TOOL ... toolGroup', toolGroup);
+//   if (toolGroup) {
+//     toolGroup.setToolActive('Length', {
+//       bindings: [{ mouseButton: 1 }],
+//     });
+//   }
+// }, [isOpen, element, activeViewportId]);
+
+    // useEffect(() => {
+    //     if (!isOpen || !activeViewportElement) return;
+    //   const toolGroup = ToolGroupManager.getToolGroupForViewport(activeViewportId);
+    //   const tgViewportInfo = toolGroup.getViewportsInfo();
+    //     if (toolGroup) {
+    //         toolGroup.setToolActive('Length', {
+    //         bindings: [{ mouseButton: 1 }],
+    //         });
+    //     }
+    //   console.log(' *** IN EFFECT FOR ISOPEN ...  info',  tgViewportInfo);
+
+    // }, [isOpen, activeViewportElement, activeViewportId]);
 
 
     // ************************************************************
@@ -201,9 +278,16 @@ function WebQuizSidePanelComponent() {
     // ************************************************************
 
     //=========================================================
+    const postingApi = useAnnotationPosting({
+        patientName,
+        measurementListRef,
+    });
+
     // fetch annotations from DB based on user role
     useEffect(() => {
-        if (!userInfo?.username || !patientName) return;
+        if (!userInfo?.username || !patientName ) {
+            return;
+        }
 
         fetchAnnotationsFromDB({
         userInfo,
@@ -215,39 +299,35 @@ function WebQuizSidePanelComponent() {
         setAnnotationsLoaded,
         listOfUsersAnnotationsRef,
         });
+
     }, [userInfo, patientName]);
 
+
     //=========================================================
-    // Memorize the trigger for POST of annotations to the database
+    // Use a callback for the trigger for POST of annotations to the database
     //      to make sure all handlers who use
     //      triggerPost access it once the patientName is available 
-    const triggerPost = useMemo(() => {
-        try {
-            if (!patientName) return null;
-
-            const userInfo = getUserInfo();
-            if (userInfo?.role === 'admin') {
-            console.warn('🚫 Admins cannot post to database');
-            // Return a no‑op function instead of undefined
-            return () => {
-                console.warn('Post suppressed for admin role');
-            };
-            }
-
-            return useAnnotationPosting({
-            patientName,
-            measurementListRef,
-            });
-        } catch (err) {
-            console.error('Error initializing annotation posting:', err);
-            // Return a safe fallback so OHIF doesn’t explode
-            return () => {
-            console.error('Annotation posting unavailable due to error');
-            };
+    const triggerPost = useCallback((message: TriggerPostArgs) => {
+        // console.log(' *** IN CALLBACK FOR TRIGGERPOST  isOpen, Ref:', isOpen, isOpenRef.current);
+        if (!patientName || !postingApi) return;
+        const userInfo = getUserInfo();
+        if (userInfo?.role === 'admin') {
+            console.warn('Post suppressed for admin role');
+            return;
         }
-    }, [patientName, measurementListRef]);
+        if (!isOpenRef.current) {
+            console.warn('Extension panel closed — skipping postMessage');
+            return;
+        }
+        if (isStudyCompletedRef.current) {
+            console.warn('Post suppressed - study marked as complete');
+            return;
+        }
+        postingApi(message);
+    }, [patientName, postingApi, isOpen]);
 
-    //=========================================================
+
+//=========================================================
     // ensure debounced definitions are stable across renders using useMemo
 
     //~~~~~~~~~~~~~~~~~
@@ -282,6 +362,7 @@ function WebQuizSidePanelComponent() {
             console.warn('⏳ triggerPost not ready yet — skipping dropdown change post');
             return;
         }
+        // console.log(' *** IN ONDROPDOWNCHANGE:', annotation.state.getAllAnnotations());
 
         handleDropdownChange({
             uid,
@@ -293,7 +374,14 @@ function WebQuizSidePanelComponent() {
             isStudyCompletedRef,
             showModal,
         });
-    };    
+    };
+
+    //~~~~~~~~~~~~~~~~~
+    const rebuildDropdownMap = () => {
+        const allAnnotations = annotation.state.getAllAnnotations?.() || [];
+        const newMap = buildDropdownSelectionMapFromState(allAnnotations);
+        setDropdownSelectionMap(newMap);
+    };
 
     //~~~~~~~~~~~~~~~~~
     const onCloseScoreModal = () =>
@@ -329,6 +417,8 @@ function WebQuizSidePanelComponent() {
     // // // Watch for changes to the viewports (eg. when changing studies or series)
     // //=========================================================
     // // Re-enable button when moving to a different series if valid
+
+
 
     //=========================================================
     // Post status to database as wip when a new series is selected (if valid)
@@ -402,23 +492,37 @@ function WebQuizSidePanelComponent() {
     //=========================================================
     // rebuild the dropdown score map whenever there are changes to annotations
     //      being loaded or if the viewport id has changed 
+    //  Without this, the dropdown change would not take effect
+// useEffect(() => {
+//   if (!annotationsLoaded) {
+//     console.log('skipping subscription, annotations not loaded');
+//     return;
+//   }
+
+// //   console.log('subscribing to ACTIVE_VIEWPORT_ID_CHANGED');
+//   const subscription = viewportGridService.subscribe(
+//     viewportGridService.EVENTS.ACTIVE_VIEWPORT_ID_CHANGED,
+//     (evt: { viewportId: string }) => {
+//       console.log('event fired', evt);
+//       setActiveViewportId(evt.viewportId);
+//       activeViewportIdRef.current = evt.viewportId;
+//       rebuildDropdownMap();
+//     }
+//   );
+
+//   return () => {
+//       subscription.unsubscribe();
+//   };
+// }, [annotationsLoaded, viewportGridService]);
+
     useEffect(() => {
-    if (!annotationsLoaded) return;
-
-    const subscription = viewportGridService.subscribe(
-        viewportGridService.EVENTS.ACTIVE_VIEWPORT_ID_CHANGED,
-        (evt: { viewportId: string }) => {
-        setActiveViewportId(evt.viewportId);
-        activeViewportIdRef.current = evt.viewportId;
-
-        const allAnnotations = annotation.state.getAllAnnotations?.() || [];
-        const newMap = buildDropdownSelectionMapFromState(allAnnotations);
-        setDropdownSelectionMap(newMap);
+        if (!annotationsLoaded) {
+            console.log('skipping subscription, annotations not loaded');
+            return;
         }
-    );
+            rebuildDropdownMap();
+    }, [annotationsLoaded, viewportGridService, activeViewportId, isOpen]);
 
-    return () => subscription.unsubscribe();
-    }, [annotationsLoaded, viewportGridService]);
 
     //=========================================================
     // hydrate + lock annotations when series/annotations change
@@ -427,7 +531,7 @@ function WebQuizSidePanelComponent() {
     useEffect(() => {
     const hydrateAndLockAnnotations = async () => {
         if (!annotationsLoaded || !studyInfo?.studyUID || !seriesInstanceUID) {
-        console.log('[annotationViewportSetup] prerequisites not ready, skipping');
+        console.log('[annotationViewportSetup] prerequisites not ready, skipping ... loaded flag', annotationsLoaded);
         return;
         }
 
@@ -468,12 +572,9 @@ function WebQuizSidePanelComponent() {
     }, [annotationsLoaded, studyInfo?.studyUID, seriesInstanceUID, userInfo?.role, viewportGridService]);
 
     //=========================================================
-    // When the extension is collapsed and reloaded,
-    //  then the scores can be 're-fetched' from the database
+
     useEffect(() => {
-        const allAnnotations = annotation.state.getAllAnnotations?.() || [];
-        const newMap = buildDropdownSelectionMapFromState(allAnnotations);
-        setDropdownSelectionMap(newMap);
+        rebuildDropdownMap();
     }, [dropdownMapVersion]);
 
 
@@ -509,21 +610,26 @@ function WebQuizSidePanelComponent() {
             triggerPost,
         });
 
-        const wrappedAnnotationChangedHandler = (event: any) => handleAnnotationChanged({
-            event,
+        const wrappedMeasurementUpdatedHandler = ( { measurement } : any) => handleMeasurementUpdated({
+            measurement,
             debouncedUpdateStats,
             pendingAnnotationUIDRef,
+
+        })
+        const wrappedAnnotationChangedHandler = (event: any) => handleAnnotationChanged({
+            event,
         });
 
         const subscriptionAdd = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_ADDED,wrappedMeasurementAddedHandler);
         const subscriptionRemove = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_REMOVED,wrappedMeasurementRemovedHandler);
-        cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangedHandler);
-
+        const subscriptionUpdated = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_UPDATED,wrappedMeasurementUpdatedHandler);
+        // cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangedHandler);
 
         return () => {
           subscriptionAdd.unsubscribe();
           subscriptionRemove.unsubscribe();
-          cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangedHandler);
+          subscriptionUpdated.unsubscribe();
+        //   cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangedHandler);
         }
 
     }, [patientName, studyInfo?.studyUID]);
@@ -591,7 +697,8 @@ function WebQuizSidePanelComponent() {
                 />
             )}
             </div>
-    );
+
+        );
 
 }
 

@@ -103,29 +103,44 @@ export function handleMeasurementAdded({
 
 export const handleAnnotationChanged = ({
   event,
-  debouncedUpdateStats,
-  pendingAnnotationUIDRef,
 }: {
   event: any;
-  debouncedUpdateStats: () => void;
-  pendingAnnotationUIDRef: React.MutableRefObject<string | null>;
 }) => {
   try {
     const { annotation: changedAnnotation } = event?.detail ?? {};
     if (!changedAnnotation) return;
-
-    pendingAnnotationUIDRef.current = changedAnnotation.annotationUID;
-
-    // Defensive guard: only call if defined
-    if (typeof debouncedUpdateStats === 'function') {
-      debouncedUpdateStats();
-    }
+    console.log(' *** IN HANDLE ANNOTATION CHANGE ... changedAnnotation', changedAnnotation);
   } catch (err) {
     console.error('Error in handleAnnotationChanged:', err);
   }
 };
 
 
+
+//=========================================================
+export const handleMeasurementUpdated = ({
+  measurement,
+  debouncedUpdateStats,
+  pendingAnnotationUIDRef,
+}: {
+  measurement: any;
+  debouncedUpdateStats: () => void;
+  pendingAnnotationUIDRef: React.MutableRefObject<string | null>;
+}) => {
+  try {
+    if (!measurement) return;
+
+    // console.log(' *** IN HANDLE MEASURMENT CHANGE ... measurement', measurement);
+
+    pendingAnnotationUIDRef.current = measurement.uid;
+
+    if (typeof debouncedUpdateStats === 'function') {
+      debouncedUpdateStats();
+    }
+  } catch (err) {
+    console.error('Error in handleMeasurementUpdated:', err);
+  }
+};
 
 //=========================================================
 // this handler takes effect AFTER the removal of the measurement - it is reactive
@@ -153,3 +168,5 @@ export const handleMeasurementRemoved = ({
 
   rebuildMapAndPostAnnotations(setDropdownSelectionMap, triggerPost, annotationUID);
 };
+
+//=========================================================
