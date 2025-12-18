@@ -10,7 +10,7 @@ import { API_BASE_URL } from './config/config';
 import { AnnotationStats } from './models/AnnotationStats';
 import { setUserInfo, getUserInfo, onUserInfoReady } from './../../../../modes/@ohif/mode-webquiz/src/userInfoService';
 import { useAnnotationPosting } from './hooks/useAnnotationPosting';
-import { fetchAnnotationsFromDB } from './handlers/fetchAnnotations';
+import { fetchAnnotationsFromDB, convertAnnotationsToMeasurements } from './handlers/fetchAnnotations';
 import { handleDropdownChange } from './handlers/dropdownHandlers';
 import { handleMeasurementClick, toggleVisibility, closeScoreModal } from './handlers/guiHandlers';
 import { useSystem } from '@ohif/core';
@@ -118,7 +118,18 @@ function WebQuizSidePanelComponent() {
             setIsOpen(false);
             isOpenRef.current = false;
         }
-    }, []);
+        }, []);
+
+    // useEffect(() => {
+    //     setIsOpen(true);
+    //         isOpenRef.current = true;
+    //     console.log("WebQuizSidePanelComponent mounted → setting isOpen = true ... Ref:", isOpenRef);
+    //     return () => {
+    //     setIsOpen(false);
+    //         isOpenRef.current = false;
+    //     console.log("WebQuizSidePanelComponent unmounted → setting isOpen = false ... Ref:", isOpenRef);
+    //     };
+    // }, []);
 
 
     // ************************************************************
@@ -302,7 +313,20 @@ function WebQuizSidePanelComponent() {
 
     }, [userInfo, patientName]);
 
+    //=========================================================
+    useEffect(() => {
+        console.log(' *** IN USE EFFECT FOR CONVERT... ann loaded, viewportIdRef, viewportElement', annotationsLoaded, activeViewportIdRef.current, activeViewportElementRef.current);
+        if (!annotationsLoaded || !activeViewportIdRef.current ) {
+            return;
+        }
+        convertAnnotationsToMeasurements({
+            annotationsList: listOfUsersAnnotations,
+            measurementService,
+            displaySetService,
 
+        })
+    }, [annotationsLoaded, viewportGridService]);
+    
     //=========================================================
     // Use a callback for the trigger for POST of annotations to the database
     //      to make sure all handlers who use
