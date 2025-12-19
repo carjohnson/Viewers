@@ -6,7 +6,7 @@ import { extensionManager } from 'platform/app/src/App';
 import { Enums as CSExtensionEnums } from '@ohif/extension-cornerstone';
 
 
-
+//=========================================================
 export const fetchAnnotationsFromDB = async ({
   userInfo,
   patientName,
@@ -29,7 +29,6 @@ export const fetchAnnotationsFromDB = async ({
   const username = userInfo.role === 'reader' ? userInfo.username : 'all';
 
   try {
-    console.log(' *** IN FETCH ');
     const response = await fetch(
       `${baseUrl}/webquiz/list-users-annotations?username=${username}&patientid=${patientName}`,
       { credentials: 'include' }
@@ -45,19 +44,6 @@ export const fetchAnnotationsFromDB = async ({
     const newMap = buildDropdownSelectionMapFromFetched(annotationsList);
     setDropdownSelectionMap(newMap);
 
-    // annotationsList.forEach(({ data, color }) => {
-    //   data.forEach(annotationObj => {
-    //     if (
-    //       annotationObj &&
-    //       typeof annotationObj.annotationUID === 'string' &&
-    //       annotationObj.annotationUID.length > 0
-    //     ) {
-    //       annotation.config.style.setAnnotationStyles(annotationObj.annotationUID, { color });
-    //       annotation.state.addAnnotation(annotationObj);
-    //     }
-    //   });
-    // });
-
     setAnnotationsLoaded(true);
 
     window.parent.postMessage({ type: 'update-legend', legend }, '*');
@@ -65,92 +51,6 @@ export const fetchAnnotationsFromDB = async ({
     console.error('❌ Error fetching annotations:', error);
   }
 };
-
-
-//=========================================================
-// export const fetchAnnotationsFromDB = async ({
-//   userInfo,
-//   patientName,
-//   baseUrl,
-//   setListOfUsersAnnotations,
-//   setDropdownSelectionMap,
-//   setAnnotationsLoaded,
-//   listOfUsersAnnotationsRef,
-//   measurementService,
-//   viewportGridService,
-//   displaySetService,  // Pass utilities.DisplaySetService
-//               viewportId,
-//             viewportElement,
-// }: {
-//   userInfo: { username: string; role: string };
-//   patientName: string;
-//   baseUrl: string;
-//   setListOfUsersAnnotations: (list: any[]) => void;
-//   setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
-//   setAnnotationsLoaded: (loaded: boolean) => void;
-//   listOfUsersAnnotationsRef: React.MutableRefObject<Record<string, any> | null>;
-//   measurementService: any;
-//   viewportGridService: any;
-//   displaySetService: any;
-//   viewportId: any;
-//   viewportElement: any;
-// }) => {
-//   const username = userInfo.role === 'reader' ? userInfo.username : 'all';
-//   const csToolsSource = measurementService.getSource('CornerstoneTools', '4'); // Existing source
-//   console.log(' *** IN FETCH ... activeViewportID:',viewportId);
-//   try {
-
-//     const response = await fetch(
-//       `${baseUrl}/webquiz/list-users-annotations?username=${username}&patientid=${patientName}`,
-//       { credentials: 'include' }
-//     );
-
-//     if (!response.ok) throw new Error('Failed to fetch annotations from DB');
-
-    
-//     const { payload: annotationsList, legend } = await response.json();
-    
-//     // ... set state ...
-
-//     setListOfUsersAnnotations(annotationsList);
-//     listOfUsersAnnotationsRef.current = annotationsList;
-
-//     const newMap = buildDropdownSelectionMapFromFetched(annotationsList);
-//     setDropdownSelectionMap(newMap);
-
-    
-//     // Transform DB data to OHIF measurements
-//     annotationsList.forEach(({ data, color }) => {
-//       data.forEach(async (annotationObj) => {
-//         if (!annotationObj?.annotationUID) return;
-//         console.log('📦 Raw DB annotation:', annotationObj);
-
-//         // // 1. Build OHIF measurement from your DB data
-//         // const measurement = buildMeasurementFromDB(annotationObj, displaySetService, currentVpId);
-//         // console.log('🛠️ Converted measurement:', measurement);
-        
-//         // // 2. Add via MeasurementService (fires MEASUREMENT_ADDED, creates annotation)
-//         // measurementService.addMeasurement(csToolsSource, 'Length', measurement);
-//         // console.log('✅ Added measurement to service:', {
-//         //   source: csToolsSource,
-//         //   type: 'Length',
-//         //   measurement,
-//         // });
-
-//         // // 3. Apply custom style AFTER it's added
-//         // setTimeout(() => {
-//         //   annotationObj.config.style.setAnnotationStyles(annotationObj.annotationUID, { color });
-//         // }, 100);
-//       });
-//     });
-
-//     setAnnotationsLoaded(true);
-
-//   } catch (error) {
-//     console.error('❌ Error fetching annotations:', error);
-//   }
-
-// };
 
 
 //=========================================================
@@ -189,44 +89,48 @@ export const convertAnnotationsToMeasurements = ({
       console.log('📦 Raw DB annotation:', annotationObj);
 
       // Build OHIF measurement
-      // NOTE: The variable name 'annotation' is required for the toMeasurementSchema function
-      const annotation = annotationToRawMeasurement(
+      const rawMeasurement = annotationToRawMeasurement(
                 annotationObj,
                 displaySetService,
               );
       
-      console.log('🛠️ Converted measurement:', annotation);
+      console.log('🛠️ Converted measurement shaped for addRawMeasurement:', rawMeasurement);
+
+      const annotation = rawMeasurement;  // required name for function addRawMeasurement
+      const oNewMeasurement = measurementService.addRawMeasurement(
+        csToolsSource,
+        'Length',
+        { annotation }, 
+        matchingMapping.toMeasurementSchema,
+      );
+
+      // // Store the mapping immediately
+      // storeAnnotationMeasurementLink({
+      //   annotationUID: dbAnnotation.annotationUID,
+      //   measurementUID: newMeasurementUID
+      // });
+
+      // Update the measurement with explicit annotationUID reference
+      // measurementService.updateMeasurement(newMeasurementUID, {
+      //   annotationUID: annotationObj?.annotationUID
+      // });
+
+      console.log( ' *** IN CONVERT ... uid:',oNewMeasurement.uid);
 
 
-    measurementService.addRawMeasurement(
-      csToolsSource,
-      'Length',
-      { annotation }, 
-      matchingMapping.toMeasurementSchema,
-    );
+      // console.log('✅ Added measurement via addRawMeasurement');
+      console.log( ' *** IN CONVERT ... measurements, annotation', measurementService.getMeasurements(), annotationObj);
 
-    console.log('✅ Added measurement via addRawMeasurement');
-    console.log(measurementService.getMeasurements());
-
-      // Apply custom style AFTER it's added
-      setTimeout(() => {
-        annotationObj.config?.style?.setAnnotationStyles(annotationObj.annotationUID, { color });
-      }, 100);
+        // Apply custom style AFTER it's added
+        setTimeout(() => {
+          annotationObj.config?.style?.setAnnotationStyles(annotationObj.annotationUID, { color });
+        }, 100);
     });
   });
 };
 
 
-
-///////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////
-///////////////  ,,,,,,,,,,,,,,  start again ,,,,,, Dec 17   //////////////////////
-///////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////
-
-
-
-
+//=========================================================
 /**
  * Convert a DB annotation into a valid raw measurement
  * for MeasurementService.addRawMeasurement.
@@ -246,10 +150,6 @@ export const annotationToRawMeasurement = (dbAnnotation, displaySetService) => {
     frameNumber,
     strippedReferencedImageId,
   } = parseReferenceImageId(referencedImageId);
-
-  // Measurement values
-  const length = cachedStats[referencedImageId]?.length;
-  const unit = cachedStats[referencedImageId]?.unit;
 
   // Geometry
   const handles = dbAnnotation.data.handles;
@@ -281,12 +181,13 @@ export const annotationToRawMeasurement = (dbAnnotation, displaySetService) => {
     displaySetInstanceUID: displaySet?.displaySetInstanceUID,
 
     type: 'value_type::polyline',
-    label: dbAnnotation.data.label || 'Length',
     description: dbAnnotation.data.description || dbAnnotation.data.label,
 
     // Measurement-specific values go inside `data`
     data: {
       handles: { points },
+      label: dbAnnotation.data.label || 'Length',
+      suspicionScore: dbAnnotation.data.suspicionScore,
       cachedStats: dbAnnotation.data.cachedStats, // contains measurement values
     },
 
@@ -294,6 +195,7 @@ export const annotationToRawMeasurement = (dbAnnotation, displaySetService) => {
 };
 
 
+//=========================================================
 function parseReferenceImageId(referenceImageId: string) {
   // strip scheme
   const strippedReferencedImageId = referenceImageId.replace(/^imageId:/, '');
