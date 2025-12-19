@@ -3,6 +3,7 @@ import CornerstoneViewportService from 'extensions/cornerstone/src/services/View
 import { buildDropdownSelectionMapFromFetched } from '../utils/annotationUtils';
 import * as cornerstone from '@cornerstonejs/core';
 import { extensionManager } from 'platform/app/src/App';
+import { Enums as CSExtensionEnums } from '@ohif/extension-cornerstone';
 
 
 
@@ -163,14 +164,23 @@ export const convertAnnotationsToMeasurements = ({
   displaySetService: any;
 }) => {
   console.log(' *** IN CONVERT TO MEASUREMENTS ... annList', annotationsList);
+  const { 
+    CORNERSTONE_3D_TOOLS_SOURCE_NAME,
+    CORNERSTONE_3D_TOOLS_SOURCE_VERSION,
+  } = CSExtensionEnums;
 
 
 
-  const csToolsSource = measurementService.getSource('Cornerstone3DTools', '0.1');
+  const csToolsSource = measurementService.getSource(CORNERSTONE_3D_TOOLS_SOURCE_NAME, CORNERSTONE_3D_TOOLS_SOURCE_VERSION);
   if (!csToolsSource) {
     console.error('CornerstoneTools source not found');
     return;
   }
+
+  const mappings = measurementService.getSourceMappings(CORNERSTONE_3D_TOOLS_SOURCE_NAME,CORNERSTONE_3D_TOOLS_SOURCE_VERSION);
+  // const matchingMapping = mappings.find(m => m.annotationType === annotationType);
+  const matchingMapping = mappings.find(m => m.annotationType === "Length");
+
 
   annotationsList.forEach(({ data, color }) => {
     data.forEach((annotationObj: any) => {
@@ -179,27 +189,20 @@ export const convertAnnotationsToMeasurements = ({
       console.log('📦 Raw DB annotation:', annotationObj);
 
       // Build OHIF measurement
-      const rawMeasurement = annotationToRawMeasurement(
+      // NOTE: The variable name 'annotation' is required for the toMeasurementSchema function
+      const annotation = annotationToRawMeasurement(
                 annotationObj,
                 displaySetService,
               );
       
-      console.log('🛠️ Converted measurement:', rawMeasurement);
+      console.log('🛠️ Converted measurement:', annotation);
 
-      // Add via MeasurementService (fires MEASUREMENT_ADDED)
-      //      also tried .addMeasurement - neither function available
-      // measurementService.createMeasurement(csToolsSource, rawMeasurement);
-      // console.log('✅ Added measurement to service:', {
-      //   source: csToolsSource,
-      //   type: 'Length',
-      //   rawMeasurement,
-      // });
 
     measurementService.addRawMeasurement(
       csToolsSource,
       'Length',
-      { rawMeasurement }, 
-      ({ data }) => data ,
+      { annotation }, 
+      matchingMapping.toMeasurementSchema,
     );
 
     console.log('✅ Added measurement via addRawMeasurement');
@@ -231,10 +234,6 @@ export const convertAnnotationsToMeasurements = ({
 export const annotationToRawMeasurement = (dbAnnotation, displaySetService) => {
   // Extract cached stats
   const cachedStats = dbAnnotation.data.cachedStats;
-  // let referencedImageId = '';
-  // Object.keys(cachedStats).forEach(imageId => {
-  //   referencedImageId = imageId;
-  // });
   const referencedImageId = Object.keys(cachedStats).find(key =>
       key.startsWith('imageId:')
 );
@@ -263,10 +262,10 @@ export const annotationToRawMeasurement = (dbAnnotation, displaySetService) => {
   );
 
   return {
+    // shape of object required for 'toMeasurementSchema' function
     uid: dbAnnotation.annotationUID, // required unique identifier
     SOPInstanceUID,
     FrameOfReferenceUID: dbAnnotation.metadata.FrameOfReferenceUID,
-    points,
     isLocked: false,
     isVisible: true,
     metadata: {
@@ -281,17 +280,16 @@ export const annotationToRawMeasurement = (dbAnnotation, displaySetService) => {
     frameNumber,
     displaySetInstanceUID: displaySet?.displaySetInstanceUID,
 
-    type: 'LENGTH',
+    type: 'value_type::polyline',
     label: dbAnnotation.data.label || 'Length',
     description: dbAnnotation.data.description || dbAnnotation.data.label,
 
     // Measurement-specific values go inside `data`
     data: {
-      [referencedImageId]: {
-      unit,
-      length,
-      },
+      handles: { points },
+      cachedStats: dbAnnotation.data.cachedStats, // contains measurement values
     },
+
   };
 };
 
