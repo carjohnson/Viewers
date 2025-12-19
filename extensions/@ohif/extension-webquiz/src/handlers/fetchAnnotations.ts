@@ -186,12 +186,13 @@ export const convertAnnotationsToMeasurements = ({
       
       console.log('🛠️ Converted measurement:', rawMeasurement);
 
-      // // Add via MeasurementService (fires MEASUREMENT_ADDED)
-      // measurementService.addMeasurement(csToolsSource, measurement);
+      // Add via MeasurementService (fires MEASUREMENT_ADDED)
+      //      also tried .addMeasurement - neither function available
+      // measurementService.createMeasurement(csToolsSource, rawMeasurement);
       // console.log('✅ Added measurement to service:', {
       //   source: csToolsSource,
       //   type: 'Length',
-      //   measurement,
+      //   rawMeasurement,
       // });
 
     measurementService.addRawMeasurement(
@@ -230,10 +231,13 @@ export const convertAnnotationsToMeasurements = ({
 export const annotationToRawMeasurement = (dbAnnotation, displaySetService) => {
   // Extract cached stats
   const cachedStats = dbAnnotation.data.cachedStats;
-  let referencedImageId = '';
-  Object.keys(cachedStats).forEach(imageId => {
-    referencedImageId = imageId;
-  });
+  // let referencedImageId = '';
+  // Object.keys(cachedStats).forEach(imageId => {
+  //   referencedImageId = imageId;
+  // });
+  const referencedImageId = Object.keys(cachedStats).find(key =>
+      key.startsWith('imageId:')
+);
 
   // Parse identifiers from imageId
   const {
