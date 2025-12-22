@@ -81,45 +81,42 @@ export const convertAnnotationsToMeasurements = ({
   // const matchingMapping = mappings.find(m => m.annotationType === annotationType);
   const matchingMapping = mappings.find(m => m.annotationType === "Length");
 
+  const currentMeasurements = measurementService.getMeasurements();
+
 
   annotationsList.forEach(({ data, color }) => {
     data.forEach((annotationObj: any) => {
       if (!annotationObj?.annotationUID) return;
 
-      console.log('📦 Raw DB annotation:', annotationObj);
+      // console.log('📦 Raw DB annotation:', annotationObj);
 
-      // Build OHIF measurement
-      const rawMeasurement = annotationToRawMeasurement(
+      // skip if this annotation has already been loaded in measurements 
+
+      if (hasAnnotationInMeasurements(annotationObj, currentMeasurements)) {
+        return;
+      }
+
+
+      // Build OHIF measurement   - required name is 'annotation' 
+      const annotation = annotationToRawMeasurement(
                 annotationObj,
                 displaySetService,
               );
       
-      console.log('🛠️ Converted measurement shaped for addRawMeasurement:', rawMeasurement);
+   
+    //  console.log('🛠️ Converted measurement shaped for addRawMeasurement:', annotation);
 
-      const annotation = rawMeasurement;  // required name for function addRawMeasurement
-      const oNewMeasurement = measurementService.addRawMeasurement(
+      measurementService.addRawMeasurement(
         csToolsSource,
         'Length',
         { annotation }, 
         matchingMapping.toMeasurementSchema,
       );
 
-      // // Store the mapping immediately
-      // storeAnnotationMeasurementLink({
-      //   annotationUID: dbAnnotation.annotationUID,
-      //   measurementUID: newMeasurementUID
-      // });
-
-      // Update the measurement with explicit annotationUID reference
-      // measurementService.updateMeasurement(newMeasurementUID, {
-      //   annotationUID: annotationObj?.annotationUID
-      // });
-
-      console.log( ' *** IN CONVERT ... uid:',oNewMeasurement.uid);
-
-
+      // ////////// FOR DEBUG
       // console.log('✅ Added measurement via addRawMeasurement');
-      console.log( ' *** IN CONVERT ... measurements, annotation', measurementService.getMeasurements(), annotationObj);
+      // const measurements = measurementService.getMeasurements();
+      // console.log( ' *** IN CONVERT ... measurements, annotation', measurements, annotationObj);
 
         // Apply custom style AFTER it's added
         setTimeout(() => {
@@ -187,13 +184,12 @@ export const annotationToRawMeasurement = (dbAnnotation, displaySetService) => {
     data: {
       handles: { points },
       label: dbAnnotation.data.label || 'Length',
-      suspicionScore: dbAnnotation.data.suspicionScore,
+      suspicionScore: dbAnnotation.data.suspicionScore, //custom field for display of scores
       cachedStats: dbAnnotation.data.cachedStats, // contains measurement values
     },
 
   };
 };
-
 
 //=========================================================
 function parseReferenceImageId(referenceImageId: string) {
@@ -217,6 +213,36 @@ function parseReferenceImageId(referenceImageId: string) {
     strippedReferencedImageId,
   };
 }
+
+//=========================================================
+// function to check if the annotation fetched from the database
+//    matches any of the measurements currently loaded 
+function hasAnnotationInMeasurements(fetchedAnnotation, currentMeasurements) {
+  if (!currentMeasurements?.length) return null;
+
+  const { metadata, data } = fetchedAnnotation;
+  const fetchedPoints = data?.handles?.points;
+  const fetchedImageId = metadata?.referencedImageId;
+  const fetchedTool = metadata?.toolName;
+
+  return currentMeasurements.find(meas => {
+    const sameImage = meas.referencedImageId === fetchedImageId;
+    const sameTool = meas.toolName === fetchedTool;
+
+    const measPoints =
+      meas.points ||
+      meas.data?.handles?.points ||
+      meas.data?.points;
+
+    const sameGeometry =
+      JSON.stringify(measPoints) === JSON.stringify(fetchedPoints);
+
+    if (sameImage && sameTool && sameGeometry) return true;
+  }) || false;
+}
+
+//=========================================================
+
 
 ////////////  >>>>>>>>>>>>>>>>>>>  Shape of Measurement Object  <<<<<<<<<<<<<<<
 ///////////                     captured in handleMeasurementAdded
