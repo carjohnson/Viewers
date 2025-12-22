@@ -224,6 +224,7 @@ function hasAnnotationInMeasurements(fetchedAnnotation, currentMeasurements) {
   const fetchedPoints = data?.handles?.points;
   const fetchedImageId = metadata?.referencedImageId;
   const fetchedTool = metadata?.toolName;
+  const fetchedLabel = data?.label;
 
   return currentMeasurements.find(meas => {
     const sameImage = meas.referencedImageId === fetchedImageId;
@@ -234,10 +235,14 @@ function hasAnnotationInMeasurements(fetchedAnnotation, currentMeasurements) {
       meas.data?.handles?.points ||
       meas.data?.points;
 
-    const sameGeometry =
-      JSON.stringify(measPoints) === JSON.stringify(fetchedPoints);
+    // NOTE: Geometry may change when collapsed
+    // const sameGeometry =
+    //   JSON.stringify(measPoints) === JSON.stringify(fetchedPoints);
 
-    if (sameImage && sameTool && sameGeometry) return true;
+    const sameLabel = 
+      meas.label === fetchedLabel;
+
+    if (sameImage && sameTool && sameLabel) return true;
   }) || false;
 }
 
