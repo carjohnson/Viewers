@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 
+import './WebQuizSidePanelComponent.css';
 import * as cornerstone from '@cornerstonejs/core';
 import * as cornerstoneTools from '@cornerstonejs/tools';
 import { annotation } from '@cornerstonejs/tools';
@@ -39,7 +40,6 @@ import { useActiveViewportId } from './hooks/useActiveViewport';
 import { TriggerPostArgs } from './models/TriggerPostArgs';
 
 
-
 function WebQuizSidePanelComponent() {
 
     // ************************************************************
@@ -71,8 +71,10 @@ function WebQuizSidePanelComponent() {
     const [isOpen, setIsOpen] = React.useState(false);
     const isOpenRef = useRef<boolean | null>(null);
 
+    const [isMinimized, setIsMinimized] = useState(false);
+
     //~~~~~~~~~~~~~~~~~
-    const [modalInfo, setModalInfo] = useState<null | { 
+     const [modalInfo, setModalInfo] = useState<null | { 
         title: string;
         message: string;
         onClose?: () => void;
@@ -110,7 +112,7 @@ function WebQuizSidePanelComponent() {
 
     // This useEffect sets the state to open when the extension is mounted
     //      and to false when the extension is unmounted
-    //      Introduced to monitor when the extension is collapsed and reopened
+    //      Introduced to monitor when the OHIF panel is collapsed and reopened
     useEffect(() => {
         setIsOpen(true);
         isOpenRef.current = true;
@@ -658,20 +660,76 @@ function WebQuizSidePanelComponent() {
 
     }, [patientName, studyInfo?.studyUID]);
 
+    //=========================================================
+    // UseEffect to block the events when you click on the 'collapse'
+    //     button for the OHIF panel
+    useEffect(() => {
+        const blockCloseClick = (e: MouseEvent) => {
+            const el = (e.target as Element).closest('[data-cy="side-panel-header-right"]');
+            if (el) {
+            e.stopPropagation();
+            e.preventDefault();
+            e.stopImmediatePropagation(); // Stop other listeners too
+            return false;
+            }
+        };
 
+        // Capture phase (runs before React event handlers)
+        document.addEventListener('click', blockCloseClick, true);
+        
+        return () => {
+            document.removeEventListener('click', blockCloseClick, true);
+        };
+    }, []); // Empty deps - runs once
+
+    //=========================================================
 
 
     //=========================================================
     ////////////////////////////////////////////
+
     return (
-            <div style={{
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflowX: 'hidden',
-                    padding: '0 0.5rem',
-                }}
-             >
+        <>
+        <div className="webquiz-panel">
+
+        {/* --- PANEL HEADER (always visible) --- */}
+        <div className="panel-header">
+        <button
+            className="minimize-btn"
+            onClick={() => {
+                setIsMinimized(prev => {
+                const newState = !prev;
+
+                const panel = document.getElementById('viewerLayoutResizableRightPanel');
+                if (panel) {
+                    if (newState) {
+                    panel.classList.add('minimized-panel');
+                    } else {
+                    panel.classList.remove('minimized-panel');
+                    }
+                }
+
+                return newState;
+                });
+            }}
+            >
+            {isMinimized ? '◀' : '▶'}
+            </button>
+        <span className="title">Web Quiz</span>
+        </div>  // panel-header
+
+        {/* --- COLLAPSIBLE CONTENT --- */}
+        {!isMinimized && (
+        <div className="panel-content">
+            <div
+            style={{
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                overflowX: 'hidden',
+                padding: '0 0.5rem',
+            }}
+            >
             <MarkStudyCompletedButton
                 baseUrl={API_BASE_URL}
                 getUserInfo={getUserInfo}
@@ -686,10 +744,12 @@ function WebQuizSidePanelComponent() {
                 showModal={showModal}
                 closeModal={closeModal}
             />
-            <div className="text-white w-full text-center"
-                 style={{ flexGrow: 1, minHeight: 0 }}
+
+            <div
+                className="text-white w-full text-center"
+                style={{ flexGrow: 1, minHeight: 0 }}
             >
-            <AnnotationList
+                <AnnotationList
                 measurementList={measurementList}
                 dropdownSelectionMap={dropdownSelectionMap}
                 visibilityMap={visibilityMap}
@@ -699,32 +759,40 @@ function WebQuizSidePanelComponent() {
                 onToggleVisibility={onToggleVisibility}
                 triggerPost={triggerPost}
                 annotation={annotation}
-            />
-            </div>
-            <ScoreModal
-            isOpen={showScoreModal}
-            scoreOptions={scoreOptions}
-            selectedScore={selectedScore}
-            setSelectedScore={setSelectedScore}
-            onClose={onCloseScoreModal}
-            pendingAnnotationUIDRef={pendingAnnotationUIDRef}
-            setDropdownSelectionMap={setDropdownSelectionMap}
-            triggerPost={triggerPost}
-            />
-            {modalInfo && (
-                <ModalComponent
-                    title={modalInfo.title}
-                    message={modalInfo.message}
-                    onClose={modalInfo.onClose ?? closeModal}
-                    showCancel={modalInfo.showCancel}
-                    onCancel={modalInfo.onCancel}
                 />
-            )}
             </div>
 
-        );
+            </div>  // measurement list
+        </div>  // panel-content
+        )}
+    </div>  // extension panel
 
+    {/* --- Extension Panel siblings --- */}
+    <ScoreModal
+        isOpen={showScoreModal}
+        scoreOptions={scoreOptions}
+        selectedScore={selectedScore}
+        setSelectedScore={setSelectedScore}
+        onClose={onCloseScoreModal}
+        pendingAnnotationUIDRef={pendingAnnotationUIDRef}
+        setDropdownSelectionMap={setDropdownSelectionMap}
+        triggerPost={triggerPost}
+    />
+
+        {modalInfo && (
+            <ModalComponent
+            title={modalInfo.title}
+            message={modalInfo.message}
+            onClose={modalInfo.onClose ?? closeModal}
+            showCancel={modalInfo.showCancel}
+            onCancel={modalInfo.onCancel}
+            />
+        )}
+
+    </> // end panel and siblings
+    );    
 }
+    
 
 
 export default WebQuizSidePanelComponent;

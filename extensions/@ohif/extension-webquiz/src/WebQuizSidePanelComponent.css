@@ -1,0 +1,58 @@
+/* Container for the entire panel */
+.webquiz-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Content wrapper */
+.panel-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* //////////////////////////////////// */
+/* Stylize the minimize button */
+    /* Header always visible */
+.webquiz-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  background: #1a1a1a;
+  border-bottom: 1px solid #333;
+  color: white;
+  font-weight: 500;
+}
+    /* Minimize button */
+.minimize-btn {
+  background: #444;
+  color: white;
+  border: 1px solid #666;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* //////////////////////////////////// */
+/* Reduce width of the right panel */
+    /* Default width (expanded) */
+#viewerLayoutResizableRightPanel {
+  min-width: 280px !important;
+  max-width: 280px !important;
+  flex: 0 0 280px !important;
+}
+
+    /* Collapsed width */
+#viewerLayoutResizableRightPanel.minimized-panel {
+  min-width: 40px !important;
+  max-width: 40px !important;
+  flex: 0 0 40px !important;
+}
+
+/* Hide OHIF's built‑in panel close/collapse button */
+[data-cy="side-panel-header-right"] {
+  opacity: 0.3;
+  /* display: none */
+}
+
