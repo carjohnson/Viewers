@@ -89,7 +89,7 @@ export const fetchStudyListFromDB = async({
 }) => {
     try {
         const res = await fetch(
-        `${baseUrl}/api/studies`,
+        `${baseUrl}/api/study`,
         { credentials: 'include' }
         );
 

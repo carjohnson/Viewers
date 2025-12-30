@@ -9,7 +9,7 @@ export const validateSeriesFromDB = async ({
 }) => {
   try {
     const res = await fetch(
-      `${baseUrl}/api/studies/${studyUID}/validate/${seriesUID}`,
+      `${baseUrl}/api/study/${studyUID}/validate/${seriesUID}`,
       { credentials: 'include' }
     );
     const result = await res.json();
