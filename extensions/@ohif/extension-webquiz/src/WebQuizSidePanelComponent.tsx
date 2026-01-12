@@ -178,9 +178,27 @@ function WebQuizSidePanelComponent() {
     // This call to the hook validates the series against those in the database.
     //      The database holds the list of studyUIDs and the seriesUIDs within
     //      the study that are to be annotated.
+
+
+    // to gate validation
+    const shouldValidate =
+    Boolean(activeViewportId) &&
+    Boolean(seriesInstanceUID) &&
+    Boolean(studyUID);
+
+
+    // to avoid unnecessary re-runs when nothing meaningful changes
+    const validationInput = useMemo(() => {
+        const input = {
+            studyUID,
+            seriesUID: shouldValidate ? seriesInstanceUID : null,
+        };
+        return input;
+    }, [studyUID, seriesInstanceUID, shouldValidate]);
+
+
     const isSeriesValid = useSeriesValidation({
-        studyUID,
-        seriesUID: seriesInstanceUID,
+        ...validationInput,
         onValidated: (uid, valid) => {
             if (valid) {
             setValidatedSeriesUID(uid);
