@@ -52,8 +52,6 @@ function WebQuizSidePanelComponent() {
     const [selectedScore, setSelectedScore] = useState<number | null>(null);
     const [activeUID, setActiveUID] = useState<string | null>(null);
     const [listOfUsersAnnotations, setListOfUsersAnnotations] = useState(null);
-    const [isSeriesAnnotationsCompleted, setSeriesAnnotationsCompleted] = useState(false);
-    const isSeriesAnnotationsCompletedRef = useRef(isSeriesAnnotationsCompleted);
     const [isStudyCompleted, setStudyCompleted] = useState(false);
     const isStudyCompletedRef = useRef(isStudyCompleted);
     const isSeriesValidRef = useRef<boolean | null>(null);
@@ -429,12 +427,6 @@ function WebQuizSidePanelComponent() {
     }, [validatedSeriesUID, studyUID, seriesInstanceUID]);
 
     //=========================================================
-    // mirroring the state to use current setting when series has been selected
-    useEffect(() => {
-        isSeriesAnnotationsCompletedRef.current = isSeriesAnnotationsCompleted;
-    }, [isSeriesAnnotationsCompleted]);
-
-    //=========================================================
     // mirroring the state to use current setting when button is pressed
     useEffect(() => {
         isStudyCompletedRef.current = isStudyCompleted;
@@ -482,15 +474,11 @@ function WebQuizSidePanelComponent() {
         entry => entry.seriesUID === seriesInstanceUID
         );
 
-        const isSeriesDone = currentSeriesProgress?.status === 'done';
-        setSeriesAnnotationsCompleted(isSeriesDone);
-        isSeriesAnnotationsCompletedRef.current = isSeriesDone;
-
 
         const isStudyDone = progressData?.study_status === 'done';
         setStudyCompleted(isStudyDone);
         isStudyCompletedRef.current = isStudyDone;
-        // console.log(' *** IN HYDRATE seriesProgress, studyProgress:', isSeriesAnnotationsCompletedRef.current, isStudyCompletedRef.current)
+        // console.log(' *** IN HYDRATE seriesProgress, studyProgress:', isStudyCompletedRef.current)
 
         lockAllAnnotations({annotation, userInfo, isStudyCompletedRef});
 
