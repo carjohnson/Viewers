@@ -13,7 +13,6 @@ export const fetchAnnotationsFromDB = async ({
   baseUrl,
   setListOfUsersAnnotations,
   setDropdownSelectionMap,
-  annotation,
   setAnnotationsLoaded,
   listOfUsersAnnotationsRef,
 }: {
@@ -22,9 +21,9 @@ export const fetchAnnotationsFromDB = async ({
   baseUrl: string;
   setListOfUsersAnnotations: (list: any[]) => void;
   setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
-  annotation: any;
   setAnnotationsLoaded: (loaded: boolean) => void;
   listOfUsersAnnotationsRef: React.MutableRefObject<Record<string, any> | null>;
+
 }) => {
   const username = userInfo.role === 'reader' ? userInfo.username : 'all';
 
@@ -40,6 +39,7 @@ export const fetchAnnotationsFromDB = async ({
 
     setListOfUsersAnnotations(annotationsList);
     listOfUsersAnnotationsRef.current = annotationsList;
+    console.log(' *** IN FETCH ... patientName, listRef', patientName, listOfUsersAnnotationsRef.current);
 
     const newMap = buildDropdownSelectionMapFromFetched(annotationsList);
     setDropdownSelectionMap(newMap);
@@ -54,77 +54,83 @@ export const fetchAnnotationsFromDB = async ({
 
 
 //=========================================================
+
 export const convertAnnotationsToMeasurements = ({
   annotationsList,
   measurementService,
   displaySetService,
+  onComplete,
+  onError, 
 }: {
-  annotationsList: any[];
+  annotationsList: React.MutableRefObject<Record<string, any> | null>;
   measurementService: any;
   displaySetService: any;
+  onComplete?: () => void;
+  onError?: (error: string) => void;
 }) => {
-  console.log(' *** IN CONVERT TO MEASUREMENTS ... annList', annotationsList);
-  const { 
-    CORNERSTONE_3D_TOOLS_SOURCE_NAME,
-    CORNERSTONE_3D_TOOLS_SOURCE_VERSION,
-  } = CSExtensionEnums;
+  try {
+    console.log(' *** IN CONVERT TO MEASUREMENTS ... annList', annotationsList.current);
+    
+    const { 
+      CORNERSTONE_3D_TOOLS_SOURCE_NAME,
+      CORNERSTONE_3D_TOOLS_SOURCE_VERSION,
+    } = CSExtensionEnums;
 
+    const csToolsSource = measurementService.getSource(CORNERSTONE_3D_TOOLS_SOURCE_NAME, CORNERSTONE_3D_TOOLS_SOURCE_VERSION);
+    if (!csToolsSource) {
+      const error = 'CornerstoneTools source not found';
+      console.error(error);
+      onError?.(error);
+      return;
+    }
 
+    const mappings = measurementService.getSourceMappings(CORNERSTONE_3D_TOOLS_SOURCE_NAME, CORNERSTONE_3D_TOOLS_SOURCE_VERSION);
+    const matchingMapping = mappings.find(m => m.annotationType === "Length");
 
-  const csToolsSource = measurementService.getSource(CORNERSTONE_3D_TOOLS_SOURCE_NAME, CORNERSTONE_3D_TOOLS_SOURCE_VERSION);
-  if (!csToolsSource) {
-    console.error('CornerstoneTools source not found');
-    return;
-  }
+    const currentMeasurements = measurementService.getMeasurements();
 
-  const mappings = measurementService.getSourceMappings(CORNERSTONE_3D_TOOLS_SOURCE_NAME,CORNERSTONE_3D_TOOLS_SOURCE_VERSION);
-  // const matchingMapping = mappings.find(m => m.annotationType === annotationType);
-  const matchingMapping = mappings.find(m => m.annotationType === "Length");
+    let processedCount = 0;
+    const totalAnnotations = annotationsList.current?.size || 0;
 
-  const currentMeasurements = measurementService.getMeasurements();
+    annotationsList.current?.forEach(({ data, color }) => {
+      data.forEach((annotationObj: any) => {
+        if (!annotationObj?.annotationUID) return;
 
+        if (hasAnnotationInMeasurements(annotationObj, currentMeasurements)) {
+          return;
+        }
 
-  annotationsList.forEach(({ data, color }) => {
-    data.forEach((annotationObj: any) => {
-      if (!annotationObj?.annotationUID) return;
+        const annotation = annotationToRawMeasurement(annotationObj, displaySetService);
+        
+        measurementService.addRawMeasurement(
+          csToolsSource,
+          'Length',
+          { annotation }, 
+          matchingMapping.toMeasurementSchema,
+        );
 
-      // console.log('📦 Raw DB annotation:', annotationObj);
-
-      // skip if this annotation has already been loaded in measurements 
-
-      if (hasAnnotationInMeasurements(annotationObj, currentMeasurements)) {
-        return;
-      }
-
-
-      // Build OHIF measurement   - required name is 'annotation' 
-      const annotation = annotationToRawMeasurement(
-                annotationObj,
-                displaySetService,
-              );
-      
-   
-    //  console.log('🛠️ Converted measurement shaped for addRawMeasurement:', annotation);
-
-      measurementService.addRawMeasurement(
-        csToolsSource,
-        'Length',
-        { annotation }, 
-        matchingMapping.toMeasurementSchema,
-      );
-
-      // ////////// FOR DEBUG
-      // console.log('✅ Added measurement via addRawMeasurement');
-      // const measurements = measurementService.getMeasurements();
-      // console.log( ' *** IN CONVERT ... measurements, annotation', measurements, annotationObj);
-
-        // Apply custom style AFTER it's added
+        // Apply custom style
         setTimeout(() => {
           annotationObj.config?.style?.setAnnotationStyles(annotationObj.annotationUID, { color });
+          
+          // Count completion for last style update
+          processedCount++;
+          if (processedCount === totalAnnotations) {
+            console.log('✅ All measurements converted and styled');
+            onComplete?.();  // ← Fire when ALL done (including styles)
+          }
         }, 100);
+      });
     });
-  });
+
+  } catch (error) {
+    console.error('❌ convertAnnotationsToMeasurements failed:', error);
+    onError?.(error as string);
+  }
 };
+
+
+
 
 
 //=========================================================
@@ -148,16 +154,24 @@ export const annotationToRawMeasurement = (dbAnnotation, displaySetService) => {
     strippedReferencedImageId,
   } = parseReferenceImageId(referencedImageId);
 
+  console.log(' *** IN ANN TO RAW ... SOPInstance, StudyUID, SeriesUID:', SOPInstanceUID, StudyInstanceUID, SeriesInstanceUID, displaySetService);
+
   // Geometry
   const handles = dbAnnotation.data.handles;
   const points = handles?.points ?? [];
 
+  const lDisplaySets = displaySetService.getDisplaySetsForSeries(SeriesInstanceUID);
+  console.log(' *** IN ANN TO RAW ... displaySets', lDisplaySets);
   // DisplaySet linkage
   const displaySet = displaySetService.getDisplaySetForSOPInstanceUID(
     SOPInstanceUID,
     SeriesInstanceUID
   );
 
+  if (!displaySet) {
+    console.warn(' No valid displaySet for this series - skipping');
+    return;
+  }
   return {
     // shape of object required for 'toMeasurementSchema' function
     uid: dbAnnotation.annotationUID, // required unique identifier

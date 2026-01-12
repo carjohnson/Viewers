@@ -32,11 +32,10 @@ import { createDebouncedStatsUpdater,
 import MarkSeriesCompletedButton from './components/MarkSeriesCompletedButton';
 import MarkStudyCompletedButton from './components/MarkStudyCompletedButton';
 import { useSeriesValidation } from './hooks/useSeriesValidation';
-import { useCurrentSeriesUID } from './hooks/useCurrentSeriesUID';
+import { useViewportAndSeriesSync } from './hooks/useViewportAndSeriesSync';
 import  useCustomizeAnnotationMenu  from './hooks/useCustomizeAnnotationMenu'
 import { postStudyProgress, postSeriesProgress, fetchStudyProgressFromDB } from './handlers/studyProgressHandlers';
 import { ModalComponent } from './components/ModalComponent';
-import { useActiveViewportId } from './hooks/useActiveViewport';
 import { TriggerPostArgs } from './models/TriggerPostArgs';
 
 
@@ -157,12 +156,14 @@ function WebQuizSidePanelComponent() {
     const studyInfoFromHook = useStudyInfo();
     const { studyInfo, setStudyInfo } = useStudyInfoStore();
     const patientName = useStudyInfoStore(state => state.studyInfo?.patientName);
+    const studyUID = studyInfo?.studyUID;
 
     const userInfo = getUserInfo();
 
     //=========================================================
-    // This useEffect will keep the patient and study metadata
-    //      up-to-date
+    // This useEffect will keep the patient and study metadata up-to-date
+    //      if the user selects a different study.
+    //      Store in Zustand so that the metadata is persistent across extensions.
     useEffect(() => {
         if (!studyInfoFromHook?.studyUID ||
             !patientInfo?.PatientName
@@ -177,7 +178,7 @@ function WebQuizSidePanelComponent() {
             patientId: patientInfo.PatientID,
         };
 
-        // console.log('✅ Setting full study info in Zustand:', fullInfo);
+        console.log('✅ Setting full study info in Zustand:', fullInfo);
         setStudyInfo(fullInfo);
 
     }, [studyInfoFromHook, patientInfo, isOpen]);
@@ -187,13 +188,15 @@ function WebQuizSidePanelComponent() {
     // console.log('📦 Zustand store currently holds:', studyInfo);
 
     // ************************************************************
-    // ********************** Viewports ***************************
+    // ************* Viewports and Series *************************
     // ************************************************************
     //=========================================================
 
-    const { activeViewportId, activeViewportIdRef, activeViewportElementRef } =
-        useActiveViewportId(viewportGridService, annotationsLoaded, cornerstoneViewportService);
-
+    const {
+        activeViewportId,
+        activeViewportIdRef,
+        seriesInstanceUID,
+    } = useViewportAndSeriesSync({viewportGridService, displaySetService, cornerstoneViewportService});
 
     //=========================================================
     // to rebind the element tools after collapse/reopen of extension panel
@@ -254,21 +257,14 @@ function WebQuizSidePanelComponent() {
     // ************************************************************
     //=========================================================
     // Call to hook to get the current series 
-    const seriesInstanceUID = useCurrentSeriesUID({
-        viewportGridService,
-        displaySetService,
-        cornerstoneViewportService,
-        studyUID: studyInfo?.studyUID,
-        isSeriesAnnotationsCompletedRef,
-        setSeriesAnnotationsCompleted,
-    });    
+
 
     //=========================================================
     // This call to the hook validates the series against those in the database.
     //      The database holds the list of studyUIDs and the seriesUIDs within
     //      the study that are to be annotated.
     const isSeriesValid = useSeriesValidation({
-        studyUID: studyInfo?.studyUID,
+        studyUID,
         seriesUID: seriesInstanceUID,
         onValidated: (uid, valid) => {
             if (valid) {
@@ -297,10 +293,20 @@ function WebQuizSidePanelComponent() {
     });
 
     // fetch annotations from DB based on user role
+    // Dependencies - rerun this if the study changes
     useEffect(() => {
+        console.log(' *** IN USE EFFECT FOR FETCH ... annloaded flag, studyUID', annotationsLoaded, studyUID);
+        
         if (!userInfo?.username || !patientName ) {
             return;
         }
+        if (!studyUID) {
+            setAnnotationsLoaded(false);
+            return;
+        }
+
+        // reset for new patient / study
+        setAnnotationsLoaded(false);
 
         fetchAnnotationsFromDB({
         userInfo,
@@ -308,27 +314,51 @@ function WebQuizSidePanelComponent() {
         baseUrl: API_BASE_URL,
         setListOfUsersAnnotations,
         setDropdownSelectionMap,
-        annotation,
         setAnnotationsLoaded,
         listOfUsersAnnotationsRef,
+
         });
 
-    }, [userInfo, patientName]);
+    // }, [studyUID]);
+    // }, [userInfo?.username, patientName, studyUID, seriesInstanceUID, viewportGridService]);
+    }, [userInfo?.username, patientName, studyUID, viewportGridService]);
+    // }, [userInfo?.username, patientName, studyUID]);
 
     //=========================================================
-    useEffect(() => {
-        console.log(' *** IN USE EFFECT FOR CONVERT... ann loaded, viewportIdRef, viewportElement', annotationsLoaded, activeViewportIdRef.current, activeViewportElementRef.current);
-        if (!annotationsLoaded || !activeViewportIdRef.current ) {
-            return;
-        }
-        convertAnnotationsToMeasurements({
-            annotationsList: listOfUsersAnnotations,
-            measurementService,
-            displaySetService,
+    // To convert the stored annotation object from the db into a measurement object
+    //  - Dependency of viewportGridService is required for the jumpToMeasurement functionality when
+    //      working with multi-series studies
+    //  - Rerun this when the study changes
 
-        })
-    }, [annotationsLoaded, viewportGridService]);
-    
+
+    // useEffect(() => {
+    //     console.log(' *** IN USE EFFECT FOR CONVERT... ann loaded, viewportIdRef, viewportElement', annotationsLoaded, activeViewportIdRef.current, activeViewportElementRef.current);
+    //     if (!annotationsLoaded || !activeViewportIdRef.current ) {
+    //         return;
+    //     }
+    //     convertAnnotationsToMeasurements({
+    //         annotationsList: listOfUsersAnnotationsRef,
+    //         measurementService,
+    //         displaySetService,
+    //     });
+    // }, [annotationsLoaded, viewportGridService, studyInfo?.studyUID, seriesInstanceUID ]);
+    // // }, [annotationsLoaded, viewportGridService, studyInfo?.studyUID ]);
+
+    useEffect(() => {
+        console.log(' *** IN USE EFFECT FOR CONVERT ... annLoaded, studyUID', annotationsLoaded, studyUID)
+        if (annotationsLoaded  && studyUID) {
+            console.log('🚀 Converting annotations for study:', studyUID);
+            convertAnnotationsToMeasurements({
+                annotationsList: listOfUsersAnnotationsRef,
+                measurementService,
+                displaySetService,
+                onComplete: () => { console.log('🎉 Conversion complete'); },
+                onError: (error) => { console.error('Conversion failed:', error); },
+            });
+        }
+    }, [annotationsLoaded, studyUID]);
+
+
     //=========================================================
     // Use a callback for the trigger for POST of annotations to the database
     //      to make sure all handlers who use
@@ -353,7 +383,7 @@ function WebQuizSidePanelComponent() {
     }, [patientName, postingApi, isOpen]);
 
 
-//=========================================================
+    //=========================================================
     // ensure debounced definitions are stable across renders using useMemo
 
     //~~~~~~~~~~~~~~~~~
@@ -448,17 +478,15 @@ function WebQuizSidePanelComponent() {
 
     //=========================================================
     // Post status to database as wip when a new series is selected (if valid)
-    //  Leave any series already marked as "done"
+    //  Leave any series already marked as "done" 
+    //      (Remnants of functionality of flagging individual series as done.
+    //       This was changed to mark the entire study as done when button is clicked.)
     useEffect(() => {
         if (!validatedSeriesUID || validatedSeriesUID !== seriesInstanceUID) return;
-        if (!studyInfo?.studyUID) return;
+        if (!studyUID) return;
 
 
         const postProgress = async () => {
-            // if (userInfo?.role === 'admin') {
-            //     console.log('🚫 Admins cannot post study progress — skipping');
-            //     return;
-            // }
 
             const progressData = await fetchStudyProgressFromDB({
                 baseUrl: API_BASE_URL,
@@ -500,7 +528,7 @@ function WebQuizSidePanelComponent() {
         };
 
         postProgress();
-    }, [validatedSeriesUID, studyInfo?.studyUID, seriesInstanceUID]);
+    }, [validatedSeriesUID, studyUID, seriesInstanceUID]);
 
     //=========================================================
     // mirroring the state to use current setting when series has been selected
@@ -556,7 +584,7 @@ function WebQuizSidePanelComponent() {
     //      if the study has been marked as completed
     useEffect(() => {
     const hydrateAndLockAnnotations = async () => {
-        if (!annotationsLoaded || !studyInfo?.studyUID || !seriesInstanceUID) {
+        if (!annotationsLoaded || !studyUID || !seriesInstanceUID) {
         console.log('[annotationViewportSetup] prerequisites not ready, skipping ... loaded flag', annotationsLoaded);
         return;
         }
@@ -590,12 +618,12 @@ function WebQuizSidePanelComponent() {
         lockAllAnnotations({annotation, userInfo, isStudyCompletedRef});
 
         console.log(
-        `${isStudyCompletedRef.current ? '🔒' : '🔓'} Lock state annotations for study ${studyInfo?.studyUID}`
+        `${isStudyCompletedRef.current ? '🔒' : '🔓'} Lock state annotations for study ${studyUID}`
         );
     };
 
     hydrateAndLockAnnotations();
-    }, [annotationsLoaded, studyInfo?.studyUID, seriesInstanceUID, userInfo?.role, viewportGridService]);
+    }, [annotationsLoaded, studyUID, seriesInstanceUID, userInfo?.role, viewportGridService]);
 
     //=========================================================
 
@@ -658,7 +686,7 @@ function WebQuizSidePanelComponent() {
         //   cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangedHandler);
         }
 
-    }, [patientName, studyInfo?.studyUID]);
+    }, [patientName, studyUID]);
 
     //=========================================================
     // UseEffect to block the events when you click on the 'collapse'
