@@ -67,8 +67,8 @@ function WebQuizSidePanelComponent() {
     const { cornerstoneViewportService, displaySetService } = servicesManager.services;
     const listOfUsersAnnotationsRef = useRef<any>(null);
     const [dropdownMapVersion, setDropdownMapVersion] = useState(0);
-    const [isOpen, setIsOpen] = React.useState(false);
-    const isOpenRef = useRef<boolean | null>(null);
+    // const [isOpen, setIsOpen] = React.useState(false);
+    // const isOpenRef = useRef<boolean | null>(null);
 
     const [isMinimized, setIsMinimized] = useState(false);
 
@@ -109,28 +109,6 @@ function WebQuizSidePanelComponent() {
         { value: 5, label: '5' },
     ];
 
-    // This useEffect sets the state to open when the extension is mounted
-    //      and to false when the extension is unmounted
-    //      Introduced to monitor when the OHIF panel is collapsed and reopened
-    useEffect(() => {
-        setIsOpen(true);
-        isOpenRef.current = true;
-        return () => {
-            setIsOpen(false);
-            isOpenRef.current = false;
-        }
-        }, []);
-
-    // useEffect(() => {
-    //     setIsOpen(true);
-    //         isOpenRef.current = true;
-    //     console.log("WebQuizSidePanelComponent mounted → setting isOpen = true ... Ref:", isOpenRef);
-    //     return () => {
-    //     setIsOpen(false);
-    //         isOpenRef.current = false;
-    //     console.log("WebQuizSidePanelComponent unmounted → setting isOpen = false ... Ref:", isOpenRef);
-    //     };
-    // }, []);
 
 
     // ************************************************************
@@ -181,7 +159,7 @@ function WebQuizSidePanelComponent() {
         console.log('✅ Setting full study info in Zustand:', fullInfo);
         setStudyInfo(fullInfo);
 
-    }, [studyInfoFromHook, patientInfo, isOpen]);
+    }, [studyInfoFromHook, patientInfo]);
 
     // //>>>>> for debug <<<<<
     // console.log('🧠 useStudyInfo() returned:', studyInfoFromHook);
@@ -197,67 +175,6 @@ function WebQuizSidePanelComponent() {
         activeViewportIdRef,
         seriesInstanceUID,
     } = useViewportAndSeriesSync({viewportGridService, displaySetService, cornerstoneViewportService});
-
-    //=========================================================
-    // to rebind the element tools after collapse/reopen of extension panel
-// Subscribe to annotationModified events
-// useEffect(() => {
-//   if (!isOpen || !element) return;
-
-//   const wrappedAnnotationChangedHandler = (event: any) =>
-//     handleAnnotationChanged({
-//       event,
-//     });
-
-//   cornerstone.eventTarget.addEventListener(
-//     cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED,
-//     wrappedAnnotationChangedHandler
-//   );
-
-//   return () => {
-//     cornerstone.eventTarget.removeEventListener(
-//       cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED,
-//       wrappedAnnotationChangedHandler
-//     );
-//   };
-// }, [isOpen, element]);
-
-// // Activate the tool when panel opens
-// useEffect(() => {
-
-//   console.log(' *** IN EFFECT TO ACTIVATE TOOL ... isOpen, vpId, Viewport, element', isOpen, element);
-  
-//   if (!isOpen || !element) return;
-
-//   const toolGroup = ToolGroupManager.getToolGroupForViewport(vpId);
-//   console.log(' *** IN EFFECT TO ACTIVATE TOOL ... toolGroup', toolGroup);
-//   if (toolGroup) {
-//     toolGroup.setToolActive('Length', {
-//       bindings: [{ mouseButton: 1 }],
-//     });
-//   }
-// }, [isOpen, element, activeViewportId]);
-
-    // useEffect(() => {
-    //     if (!isOpen || !activeViewportElement) return;
-    //   const toolGroup = ToolGroupManager.getToolGroupForViewport(activeViewportId);
-    //   const tgViewportInfo = toolGroup.getViewportsInfo();
-    //     if (toolGroup) {
-    //         toolGroup.setToolActive('Length', {
-    //         bindings: [{ mouseButton: 1 }],
-    //         });
-    //     }
-    //   console.log(' *** IN EFFECT FOR ISOPEN ...  info',  tgViewportInfo);
-
-    // }, [isOpen, activeViewportElement, activeViewportId]);
-
-
-    // ************************************************************
-    // ****************** series validation ***********************
-    // ************************************************************
-    //=========================================================
-    // Call to hook to get the current series 
-
 
     //=========================================================
     // This call to the hook validates the series against those in the database.
@@ -295,7 +212,7 @@ function WebQuizSidePanelComponent() {
     // fetch annotations from DB based on user role
     // Dependencies - rerun this if the study changes
     useEffect(() => {
-        console.log(' *** IN USE EFFECT FOR FETCH ... annloaded flag, studyUID', annotationsLoaded, studyUID);
+        // console.log(' *** IN USE EFFECT FOR FETCH ... annloaded flag, studyUID', annotationsLoaded, studyUID);
         
         if (!userInfo?.username || !patientName ) {
             return;
@@ -330,22 +247,8 @@ function WebQuizSidePanelComponent() {
     //      working with multi-series studies
     //  - Rerun this when the study changes
 
-
-    // useEffect(() => {
-    //     console.log(' *** IN USE EFFECT FOR CONVERT... ann loaded, viewportIdRef, viewportElement', annotationsLoaded, activeViewportIdRef.current, activeViewportElementRef.current);
-    //     if (!annotationsLoaded || !activeViewportIdRef.current ) {
-    //         return;
-    //     }
-    //     convertAnnotationsToMeasurements({
-    //         annotationsList: listOfUsersAnnotationsRef,
-    //         measurementService,
-    //         displaySetService,
-    //     });
-    // }, [annotationsLoaded, viewportGridService, studyInfo?.studyUID, seriesInstanceUID ]);
-    // // }, [annotationsLoaded, viewportGridService, studyInfo?.studyUID ]);
-
     useEffect(() => {
-        console.log(' *** IN USE EFFECT FOR CONVERT ... annLoaded, studyUID', annotationsLoaded, studyUID)
+        // console.log(' *** IN USE EFFECT FOR CONVERT ... annLoaded, studyUID', annotationsLoaded, studyUID)
         if (annotationsLoaded  && studyUID) {
             console.log('🚀 Converting annotations for study:', studyUID);
             convertAnnotationsToMeasurements({
@@ -364,15 +267,10 @@ function WebQuizSidePanelComponent() {
     //      to make sure all handlers who use
     //      triggerPost access it once the patientName is available 
     const triggerPost = useCallback((message: TriggerPostArgs) => {
-        // console.log(' *** IN CALLBACK FOR TRIGGERPOST  isOpen, Ref:', isOpen, isOpenRef.current);
         if (!patientName || !postingApi) return;
         const userInfo = getUserInfo();
         if (userInfo?.role === 'admin') {
             console.warn('Post suppressed for admin role');
-            return;
-        }
-        if (!isOpenRef.current) {
-            console.warn('Extension panel closed — skipping postMessage');
             return;
         }
         if (isStudyCompletedRef.current) {
@@ -380,7 +278,7 @@ function WebQuizSidePanelComponent() {
             return;
         }
         postingApi(message);
-    }, [patientName, postingApi, isOpen]);
+    }, [patientName, postingApi]);
 
 
     //=========================================================
@@ -547,27 +445,6 @@ function WebQuizSidePanelComponent() {
     // rebuild the dropdown score map whenever there are changes to annotations
     //      being loaded or if the viewport id has changed 
     //  Without this, the dropdown change would not take effect
-// useEffect(() => {
-//   if (!annotationsLoaded) {
-//     console.log('skipping subscription, annotations not loaded');
-//     return;
-//   }
-
-// //   console.log('subscribing to ACTIVE_VIEWPORT_ID_CHANGED');
-//   const subscription = viewportGridService.subscribe(
-//     viewportGridService.EVENTS.ACTIVE_VIEWPORT_ID_CHANGED,
-//     (evt: { viewportId: string }) => {
-//       console.log('event fired', evt);
-//       setActiveViewportId(evt.viewportId);
-//       activeViewportIdRef.current = evt.viewportId;
-//       rebuildDropdownMap();
-//     }
-//   );
-
-//   return () => {
-//       subscription.unsubscribe();
-//   };
-// }, [annotationsLoaded, viewportGridService]);
 
     useEffect(() => {
         if (!annotationsLoaded) {
@@ -575,7 +452,7 @@ function WebQuizSidePanelComponent() {
             return;
         }
             rebuildDropdownMap();
-    }, [annotationsLoaded, viewportGridService, activeViewportId, isOpen]);
+    }, [annotationsLoaded, viewportGridService, activeViewportId]);
 
 
     //=========================================================

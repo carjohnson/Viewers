@@ -39,7 +39,7 @@ export const fetchAnnotationsFromDB = async ({
 
     setListOfUsersAnnotations(annotationsList);
     listOfUsersAnnotationsRef.current = annotationsList;
-    console.log(' *** IN FETCH ... patientName, listRef', patientName, listOfUsersAnnotationsRef.current);
+    // console.log(' *** IN FETCH ... patientName, listRef', patientName, listOfUsersAnnotationsRef.current);
 
     const newMap = buildDropdownSelectionMapFromFetched(annotationsList);
     setDropdownSelectionMap(newMap);
@@ -69,7 +69,7 @@ export const convertAnnotationsToMeasurements = ({
   onError?: (error: string) => void;
 }) => {
   try {
-    console.log(' *** IN CONVERT TO MEASUREMENTS ... annList', annotationsList.current);
+    // console.log(' *** IN CONVERT TO MEASUREMENTS ... annList', annotationsList.current);
     
     const { 
       CORNERSTONE_3D_TOOLS_SOURCE_NAME,
@@ -154,14 +154,14 @@ export const annotationToRawMeasurement = (dbAnnotation, displaySetService) => {
     strippedReferencedImageId,
   } = parseReferenceImageId(referencedImageId);
 
-  console.log(' *** IN ANN TO RAW ... SOPInstance, StudyUID, SeriesUID:', SOPInstanceUID, StudyInstanceUID, SeriesInstanceUID, displaySetService);
+  // console.log(' *** IN ANN TO RAW ... SOPInstance, StudyUID, SeriesUID:', SOPInstanceUID, StudyInstanceUID, SeriesInstanceUID, displaySetService);
 
   // Geometry
   const handles = dbAnnotation.data.handles;
   const points = handles?.points ?? [];
 
   const lDisplaySets = displaySetService.getDisplaySetsForSeries(SeriesInstanceUID);
-  console.log(' *** IN ANN TO RAW ... displaySets', lDisplaySets);
+  // console.log(' *** IN ANN TO RAW ... displaySets', lDisplaySets);
   // DisplaySet linkage
   const displaySet = displaySetService.getDisplaySetForSOPInstanceUID(
     SOPInstanceUID,

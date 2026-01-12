@@ -109,7 +109,7 @@ export const handleAnnotationChanged = ({
   try {
     const { annotation: changedAnnotation } = event?.detail ?? {};
     if (!changedAnnotation) return;
-    console.log(' *** IN HANDLE ANNOTATION CHANGE ... changedAnnotation', changedAnnotation);
+    // console.log(' *** IN HANDLE ANNOTATION CHANGE ... changedAnnotation', changedAnnotation);
   } catch (err) {
     console.error('Error in handleAnnotationChanged:', err);
   }
