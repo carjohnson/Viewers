@@ -221,7 +221,6 @@ function WebQuizSidePanelComponent() {
 
     //=========================================================
     const postingApi = useAnnotationPosting({
-        patientName,
         studyUID,
         measurementListRef,
     });
@@ -231,9 +230,6 @@ function WebQuizSidePanelComponent() {
     useEffect(() => {
         // console.log(' *** IN USE EFFECT FOR FETCH ... annloaded flag, studyUID', annotationsLoaded, studyUID);
         
-        if (!userInfo?.username || !patientName ) {
-            return;
-        }
         if (!studyUID) {
             setAnnotationsLoaded(false);
             return;
@@ -245,7 +241,6 @@ function WebQuizSidePanelComponent() {
         fetchAnnotationsFromDB({
         userInfo,
         studyUID,
-        patientName,
         baseUrl: API_BASE_URL,
         setListOfUsersAnnotations,
         setDropdownSelectionMap,
@@ -254,10 +249,7 @@ function WebQuizSidePanelComponent() {
 
         });
 
-    // }, [studyUID]);
-    // }, [userInfo?.username, patientName, studyUID, seriesInstanceUID, viewportGridService]);
-    }, [userInfo?.username, patientName, studyUID, viewportGridService]);
-    // }, [userInfo?.username, patientName, studyUID]);
+    }, [userInfo?.username, studyUID, viewportGridService]);
 
     //=========================================================
     // To convert the stored annotation object from the db into a measurement object
@@ -268,7 +260,7 @@ function WebQuizSidePanelComponent() {
     useEffect(() => {
         // console.log(' *** IN USE EFFECT FOR CONVERT ... annLoaded, studyUID', annotationsLoaded, studyUID)
         if (annotationsLoaded  && studyUID) {
-            console.log('🚀 Converting annotations for study:', studyUID);
+            // console.log('🚀 Converting annotations for study:', studyUID);
             convertAnnotationsToMeasurements({
                 annotationsList: listOfUsersAnnotationsRef,
                 measurementService,
@@ -283,9 +275,9 @@ function WebQuizSidePanelComponent() {
     //=========================================================
     // Use a callback for the trigger for POST of annotations to the database
     //      to make sure all handlers who use
-    //      triggerPost access it once the patientName is available 
+    //      triggerPost access it once the studyUID is available 
     const triggerPost = useCallback((message: TriggerPostArgs) => {
-        if (!patientName || !postingApi) return;
+        if (!studyUID || !postingApi) return;
         const userInfo = getUserInfo();
         if (userInfo?.role === 'admin') {
             console.warn('Post suppressed for admin role');
@@ -296,7 +288,7 @@ function WebQuizSidePanelComponent() {
             return;
         }
         postingApi(message);
-    }, [patientName, postingApi]);
+    }, [studyUID, postingApi]);
 
 
     //=========================================================
@@ -524,8 +516,8 @@ function WebQuizSidePanelComponent() {
     //=========================================================
     // add listeners with handlers
     useEffect(() => {
-        if (!patientName) {
-            console.log('⏳ Waiting for patientName before setting up listeners...');
+        if (!patientName || !studyUID) {
+            console.log('⏳ Waiting for patientName and studyUID before setting up listeners...');
             return;
         }
 

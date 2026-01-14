@@ -1,8 +1,5 @@
 // src/handlers/fetchAnnotations.ts
-import CornerstoneViewportService from 'extensions/cornerstone/src/services/ViewportService/CornerstoneViewportService';
 import { buildDropdownSelectionMapFromFetched } from '../utils/annotationUtils';
-import * as cornerstone from '@cornerstonejs/core';
-import { extensionManager } from 'platform/app/src/App';
 import { Enums as CSExtensionEnums } from '@ohif/extension-cornerstone';
 
 
@@ -10,7 +7,6 @@ import { Enums as CSExtensionEnums } from '@ohif/extension-cornerstone';
 export const fetchAnnotationsFromDB = async ({
   userInfo,
   studyUID,
-  patientName,
   baseUrl,
   setListOfUsersAnnotations,
   setDropdownSelectionMap,
@@ -19,7 +15,6 @@ export const fetchAnnotationsFromDB = async ({
 }: {
   userInfo: { username: string; role: string };
   studyUID: string;
-  patientName: string;
   baseUrl: string;
   setListOfUsersAnnotations: (list: any[]) => void;
   setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
@@ -31,7 +26,6 @@ export const fetchAnnotationsFromDB = async ({
 
   try {
     const response = await fetch(
-      // `${baseUrl}/webquiz/list-users-annotations?username=${username}&patientid=${patientName}`,
       `${baseUrl}/webquiz/list-users-annotations?username=${username}&studyUID=${studyUID}`,
       { credentials: 'include' }
     );
@@ -42,7 +36,7 @@ export const fetchAnnotationsFromDB = async ({
 
     setListOfUsersAnnotations(annotationsList);
     listOfUsersAnnotationsRef.current = annotationsList;
-    console.log(' *** IN FETCH ... patientName, studyUID, listRef', patientName, studyUID, listOfUsersAnnotationsRef.current);
+    console.log(' *** IN FETCH ... studyUID, listRef', studyUID, listOfUsersAnnotationsRef.current);
 
     const newMap = buildDropdownSelectionMapFromFetched(annotationsList);
     setDropdownSelectionMap(newMap);

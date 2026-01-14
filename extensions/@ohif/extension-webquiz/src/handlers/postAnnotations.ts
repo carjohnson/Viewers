@@ -5,13 +5,11 @@ import { getSeriesUIDFromMeasurement } from './../utils/annotationUtils';
 export const postAnnotations = ({
   allAnnotations,
   dropdownSelectionMap,
-  patientName,
   studyUID,
   measurementListRef,
 }: {
   allAnnotations: any[];
   dropdownSelectionMap: Record<string, number>;
-  patientName: string;
   studyUID: string;
   measurementListRef: React.MutableRefObject<any[]>;
 }) => {
@@ -48,7 +46,6 @@ export const postAnnotations = ({
       {
         type: 'annotations',
         annotationObjects: measurementListRef.current,
-        patientid: patientName,
         studyUID,
       },
       '*'
