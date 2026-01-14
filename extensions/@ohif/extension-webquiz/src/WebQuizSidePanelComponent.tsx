@@ -222,6 +222,7 @@ function WebQuizSidePanelComponent() {
     //=========================================================
     const postingApi = useAnnotationPosting({
         patientName,
+        studyUID,
         measurementListRef,
     });
 
@@ -243,6 +244,7 @@ function WebQuizSidePanelComponent() {
 
         fetchAnnotationsFromDB({
         userInfo,
+        studyUID,
         patientName,
         baseUrl: API_BASE_URL,
         setListOfUsersAnnotations,

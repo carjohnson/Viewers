@@ -9,6 +9,7 @@ import { Enums as CSExtensionEnums } from '@ohif/extension-cornerstone';
 //=========================================================
 export const fetchAnnotationsFromDB = async ({
   userInfo,
+  studyUID,
   patientName,
   baseUrl,
   setListOfUsersAnnotations,
@@ -17,6 +18,7 @@ export const fetchAnnotationsFromDB = async ({
   listOfUsersAnnotationsRef,
 }: {
   userInfo: { username: string; role: string };
+  studyUID: string;
   patientName: string;
   baseUrl: string;
   setListOfUsersAnnotations: (list: any[]) => void;
@@ -29,7 +31,8 @@ export const fetchAnnotationsFromDB = async ({
 
   try {
     const response = await fetch(
-      `${baseUrl}/webquiz/list-users-annotations?username=${username}&patientid=${patientName}`,
+      // `${baseUrl}/webquiz/list-users-annotations?username=${username}&patientid=${patientName}`,
+      `${baseUrl}/webquiz/list-users-annotations?username=${username}&studyUID=${studyUID}`,
       { credentials: 'include' }
     );
 
@@ -39,7 +42,7 @@ export const fetchAnnotationsFromDB = async ({
 
     setListOfUsersAnnotations(annotationsList);
     listOfUsersAnnotationsRef.current = annotationsList;
-    // console.log(' *** IN FETCH ... patientName, listRef', patientName, listOfUsersAnnotationsRef.current);
+    console.log(' *** IN FETCH ... patientName, studyUID, listRef', patientName, studyUID, listOfUsersAnnotationsRef.current);
 
     const newMap = buildDropdownSelectionMapFromFetched(annotationsList);
     setDropdownSelectionMap(newMap);

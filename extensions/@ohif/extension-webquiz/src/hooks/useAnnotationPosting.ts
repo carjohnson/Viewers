@@ -5,6 +5,7 @@ import { removeDuplicatesByUID } from '../utils/annotationUtils';
 
 export const useAnnotationPosting = ({
   patientName,
+  studyUID,
   measurementListRef,
   }) => {
   return ({ allAnnotations, dropdownSelectionMap  } : TriggerPostArgs) => {
@@ -14,6 +15,7 @@ export const useAnnotationPosting = ({
       allAnnotations: uniqueAnnotations,
       dropdownSelectionMap,
       patientName,
+      studyUID,
       measurementListRef,
     });
   };
