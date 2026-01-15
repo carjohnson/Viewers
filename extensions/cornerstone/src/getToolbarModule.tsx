@@ -1,4 +1,5 @@
 import { Enums } from '@cornerstonejs/tools';
+import i18n from '@ohif/i18n';
 import { utils } from '@ohif/ui-next';
 import { ViewportDataOverlayMenuWrapper } from './components/ViewportDataOverlaySettingMenu/ViewportDataOverlayMenuWrapper';
 import { ViewportOrientationMenuWrapper } from './components/ViewportOrientationMenu/ViewportOrientationMenuWrapper';
@@ -14,7 +15,7 @@ import AdvancedRenderingControls from './components/AdvancedRenderingControls';
 
 const getDisabledState = (disabledText?: string) => ({
   disabled: true,
-  disabledText: disabledText ?? 'Not available on the current viewport',
+  disabledText: disabledText ?? i18n.t('Buttons:Not available on the current viewport'),
 });
 
 export default function getToolbarModule({ servicesManager, extensionManager }: withAppTypes) {
@@ -396,7 +397,9 @@ export default function getToolbarModule({ servicesManager, extensionManager }: 
           );
 
           if (!hasAnySupportedModality) {
-            return getDisabledState(disabledText || 'Tool not available for this modality');
+            return getDisabledState(
+              disabledText || i18n.t('Buttons:Tool not available for this modality')
+            );
           }
         }
       },
@@ -463,17 +466,17 @@ export default function getToolbarModule({ servicesManager, extensionManager }: 
       evaluate: ({ viewportId, button }) => {
         let synchronizers = syncGroupService.getSynchronizersForViewport(viewportId);
 
-        if (!synchronizers?.length) {
+        if (!synchronizers?.length || synchronizers.length <= 1) {
           return {
             className: utils.getToggledClassName(false),
           };
         }
 
-        const isArray = Array.isArray(button.commands);
+        const isArray = Array.isArray(button.props?.commands);
 
         const synchronizerType = isArray
-          ? button.commands?.[0].commandOptions.type
-          : button.commands?.commandOptions.type;
+          ? button.props?.commands?.[0].commandOptions.type
+          : button.props?.commands?.commandOptions.type;
 
         synchronizers = syncGroupService.getSynchronizersOfType(synchronizerType);
 

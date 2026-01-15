@@ -40,14 +40,6 @@ import { Types } from '@ohif/ui';
 
 import { preserveQueryParameters, preserveQueryStrings } from '../../utils/preserveQueryParameters';
 
-import { setUserInfo, getUserInfo, onUserInfoReady } from './../../../../../modes/@ohif/mode-webquiz/src/userInfoService';
-import { API_BASE_URL } from './../../../../../extensions/@ohif/extension-webquiz/src/config/config';
-import { fetchStudyListFromDB, fetchStudyProgressFromDB } from './../../../../../extensions/@ohif/extension-webquiz/src/handlers/studyProgressHandlers';
-import { fetchSessionUserInfo } from './../../../../../extensions/@ohif/extension-webquiz/src/handlers/fetchSessionInfo';
-import {Study} from './../../../../../extensions/@ohif/extension-webquiz/src/models/Study';
-import {UserInfo} from './../../../../../extensions/@ohif/extension-webquiz/src/models/UserInfo';
-
-
 const PatientInfoVisibility = Types.PatientInfoVisibility;
 
 const { sortBySeriesDate } = utils;
@@ -254,70 +246,6 @@ function WorkList({
     return !isEqual(filterValues, defaultFilterValues);
   };
 
-
-  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-  const [studyList, setStudyList] = useState<Study[]>([]);
-  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
-  const [studyStatusMap, setStudyStatusMap] = useState<Record<string, 'new' | 'wip' | 'done'>>({});
-
-  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  useEffect(() => {
-    const fetchUser = async () => {
-      const user = await fetchSessionUserInfo({ baseUrl: API_BASE_URL });
-      if (user) {
-        setUserInfo(user);
-      }
-    };
-
-    fetchUser();
-  }, []);
-
-  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  useEffect(() => {
-    const fetchList = async () => {
-      const result = await fetchStudyListFromDB({ baseUrl: API_BASE_URL });
-      if (result && !result.error) {
-        setStudyList(result);
-      } else {
-        console.warn('⚠️ Failed to load study list:', result?.error);
-      }
-    };
-
-    fetchList();
-  }, []);
-
-  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  useEffect(() => {
-    if (!userInfo || studyList.length === 0) return;
-
-    const fetchAllProgress = async () => {
-      const statusMap: Record<string, 'new' | 'wip' | 'done'> = {};
-
-      for (const study of studyList) {
-        const result = await fetchStudyProgressFromDB({
-          baseUrl: API_BASE_URL,
-          username: userInfo.username,
-          studyUID: study.studyUID,
-        });
-
-        if (result?.study_status) {
-          statusMap[study.studyUID] = result.study_status;
-        }
-      }
-      setStudyStatusMap(statusMap);
-    };
-
-    if (userInfo.username && studyList.length > 0) {
-      fetchAllProgress();
-    }
-  }, [userInfo, studyList]);
-
-  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-
-
   const rollingPageNumberMod = Math.floor(101 / resultsPerPage);
   const rollingPageNumber = (pageNumber - 1) % rollingPageNumberMod;
   const offset = resultsPerPage * rollingPageNumber;
@@ -366,36 +294,10 @@ function WorkList({
       );
     };
 
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    const status = studyStatusMap[studyInstanceUid] || 'new';
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
     return {
       dataCY: `studyRow-${studyInstanceUid}`,
       clickableCY: studyInstanceUid,
       row: [
-
-        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        {
-          key: 'status',
-          content: (
-            <span
-              className={`text-center text-lg font-semibold ${
-                status === 'done'
-                  ? 'text-green-400'
-                  : status === 'wip'
-                  ? 'text-yellow-400'
-                  : 'text-red-400'
-              }`}
-            >
-              {status === 'done' ? '✅' : status === 'wip' ? '🟡' : '❌'}
-            </span>
-          ),
-          title: status === 'done' ? 'Completed' : status === 'wip' ? 'In Progress' : 'New',
-          gridCol: 2,
-        },
-        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
         {
           key: 'patientName',
           content: patientName ? makeCopyTooltipCell(patientName) : null,
@@ -489,12 +391,21 @@ function WorkList({
                 })
               : appConfig.loadedModes
             ).map((mode, i) => {
+              if (mode.hide) {
+                // Hide this mode from display
+                return null;
+              }
               const modalitiesToCheck = modalities.replaceAll('/', '\\');
 
               const { valid: isValidMode, description: invalidModeDescription } = mode.isValidMode({
                 modalities: modalitiesToCheck,
                 study,
               });
+              if (isValidMode === null) {
+                // Hide this as a computed result.
+                return null;
+              }
+
               // TODO: Modes need a default/target route? We mostly support a single one for now.
               // We should also be using the route path, but currently are not
               // mode.routeName
@@ -526,7 +437,7 @@ function WorkList({
                     {/* TODO revisit the completely rounded style of buttons used for launching a mode from the worklist later */}
                     <Button
                       type={ButtonEnums.type.primary}
-                      size={ButtonEnums.size.medium}
+                      size={ButtonEnums.size.smallTall}
                       disabled={!isValidMode}
                       startIconTooltip={
                         !isValidMode ? (
@@ -544,7 +455,7 @@ function WorkList({
                       }
                       onClick={() => {}}
                       dataCY={`mode-${mode.routeName}-${studyInstanceUid}`}
-                      className={isValidMode ? 'text-[13px]' : 'bg-[#222d44] text-[13px]'}
+                      className={!isValidMode && 'bg-[#222d44]'}
                     >
                       {mode.displayName}
                     </Button>
@@ -613,6 +524,7 @@ function WorkList({
     DicomUploadComponent && dataSource.getConfig()?.dicomUploadEnabled
       ? {
           title: 'Upload files',
+          containerClassName: DicomUploadComponent?.containerClassName,
           closeButton: true,
           shouldCloseOnEsc: false,
           shouldCloseOnOverlayClick: false,

@@ -4,7 +4,6 @@ const path = require('path');
 const { merge } = require('webpack-merge');
 const webpack = require('webpack');
 const webpackBase = require('./../../../.webpack/webpack.base.js');
-const fs = require('fs');
 // ~~ Plugins
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
@@ -32,6 +31,7 @@ const ENTRY_TARGET = process.env.ENTRY_TARGET || `${SRC_DIR}/index.js`;
 const Dotenv = require('dotenv-webpack');
 const writePluginImportFile = require('./writePluginImportsFile.js');
 // const MillionLint = require('@million/lint');
+const open = process.env.OHIF_OPEN !== 'false';
 
 const copyPluginFromExtensions = writePluginImportFile(SRC_DIR, DIST_DIR);
 
@@ -80,8 +80,6 @@ module.exports = (env, argv) => {
         // Hoisted Yarn Workspace Modules
         path.resolve(__dirname, '../../../node_modules'),
         SRC_DIR,
-        path.resolve(__dirname, 'modes/@ohif/mode-webquiz/node_modules'),
-        path.resolve(__dirname, 'extensions/@ohif/extension-webquiz/node_modules'),
       ],
     },
     plugins: [
@@ -119,14 +117,6 @@ module.exports = (env, argv) => {
             from: `${PUBLIC_DIR}/${APP_CONFIG}`,
             to: `${DIST_DIR}/app-config.js`,
           },
-          // Copy Dicom Microscopy Viewer build files
-          {
-            from: '../../../node_modules/dicom-microscopy-viewer/dist/dynamic-import',
-            to: DIST_DIR,
-            globOptions: {
-              ignore: ['**/*.min.js.map'],
-            },
-          },
         ],
       }),
       // Generate "index.html" w/ correct includes/imports
@@ -153,54 +143,21 @@ module.exports = (env, argv) => {
     ],
     // https://webpack.js.org/configuration/dev-server/
     devServer: {
-      /**
-       * Webpack Dev Server Configuration for OHIF Viewer
-       *
-       * This config supports two development modes:
-       * 1. Direct OHIF Viewer access via `yarn start:https` at https://localhost:3000/ohif
-       *    - Useful for isolated viewer testing and debugging
-       *    - WebSocket client connects to wss://localhost:3000/ws
-       *
-       * 2. Integrated Express app access via iframe at https://localhost/ohif
-       *    - Viewer is served from /dist and embedded in the Express app
-       *    - WebSocket client connects to wss://localhost/ws via Nginx or Express proxy
-       *
-       * Notes:
-       * - When switching from dev mode to Express app, a full rebuild is required:
-       *     - Delete node_modules and platform/app/dist
-       *     - Run `yarn cache clean`
-       *     - Run `yarn build`
-       * - This ensures the dev client is removed and the static build is clean
-       * - Avoid running `yarn start:https` after `yarn build` unless you intend to test the dev server
-       */
       // gzip compression of everything served
       // Causes Cypress: `wait-on` issue in CI
       // compress: true,
       // http2: true,
-      https: {
-        key: fs.readFileSync('./.recipes/Nginx-Orthanc/config/nginx.key'),
-        cert: fs.readFileSync('./.recipes/Nginx-Orthanc/config/nginx.crt'),
-      },
-      open: true,
+      // https: true,
+      open,
       port: OHIF_PORT,
-      webSocketServer: 'ws',
       client: {
-        webSocketURL: {
-          hostname: 'localhost',
-          protocol: 'wss',
-          pathname: '/ws',
-        },
         overlay: { errors: true, warnings: false },
       },
-      proxy: {
-        '/dicomweb': 'http://localhost:5000',
-        '/dicom-microscopy-viewer': {
-          target: 'http://localhost:3000',
-          pathRewrite: {
-            '^/dicom-microscopy-viewer': `/${PUBLIC_URL}/dicom-microscopy-viewer`,
-          },
+      proxy: [
+        {
+          '/dicomweb': 'http://localhost:5000',
         },
-      },
+      ],
       static: [
         {
           directory: '../../testdata',
@@ -227,15 +184,16 @@ module.exports = (env, argv) => {
 
   if (hasProxy) {
     mergedConfig.devServer.proxy = mergedConfig.devServer.proxy || {};
-    mergedConfig.devServer.proxy = {
-      [PROXY_TARGET]: {
+    mergedConfig.devServer.proxy = [
+      {
+        context: [PROXY_PATH_REWRITE_FROM || '/dicomweb'],
         target: PROXY_DOMAIN,
         changeOrigin: true,
         pathRewrite: {
           [`^${PROXY_PATH_REWRITE_FROM}`]: PROXY_PATH_REWRITE_TO,
         },
       },
-    };
+    ];
   }
 
   if (isProdBuild) {

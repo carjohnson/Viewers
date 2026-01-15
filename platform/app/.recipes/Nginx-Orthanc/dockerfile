@@ -16,29 +16,15 @@ COPY ./ /usr/src/app/
 
 # Install node dependencies
 RUN yarn config set workspaces-experimental true
-RUN yarn install
+RUN yarn install --frozen-lockfile
 
 # Copy the rest of the application code
 
 # set QUICK_BUILD to true to make the build faster for dev
 ENV APP_CONFIG=config/docker-nginx-orthanc.js
 
-ENV PUBLIC_URL=/ohif/
-ENV USE_HASH_ROUTER=false
-
 # Build the application
-# RUN yarn run build
-RUN yarn run build && \
-    echo "✅ Build complete" && \
-    ls -la /usr/src/app/platform/app/dist > /var/log/debug_build_output.txt || \
-    { echo "❌ Build failed or no dist directory" && \
-      echo "📁 Contents of /usr/src/app/platform/app:" && \
-      ls -la /usr/src/app/platform/app && \
-      echo "📁 Contents of /usr/src/app/platform/app/dist:" && \
-      ls -la /usr/src/app/platform/app/dist && \
-      exit 1; }
-
-
+RUN yarn run build
 
 # # Stage 2: Bundle the built application into a Docker container which runs NGINX using Alpine Linux
 FROM nginx:alpine
@@ -47,8 +33,8 @@ FROM nginx:alpine
 RUN mkdir -p /var/log/nginx /var/www/html
 
 
-# # Copy build output to serve static files - matches location /ohif/ defined in nginx.conf
-COPY --from=builder /usr/src/app/platform/app/dist /usr/share/nginx/html/ohif
+# # Copy build output to serve static files
+COPY --from=builder /usr/src/app/platform/app/dist /var/www/html
 
 # # Expose HTTP and HTTPS ports
 EXPOSE 80 443
