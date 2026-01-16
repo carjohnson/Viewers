@@ -2,6 +2,11 @@ import React from 'react';
 import Select from 'react-select';
 import { EyeIcon, EyeOffIcon } from '../../utils/CreateCustomIcon';
 
+/** Define display of each annotation item in the list. 
+ *  If the user role is admin, an invalid score is assigned and
+ *  because it is out of the allowed range, the dropdown title is displayed.
+ */
+
 type Props = {
   uid: string;
   label: string;
@@ -12,6 +17,7 @@ type Props = {
   onDropdownChange: (value: number) => void;
   onClick: () => void;
   onToggleVisibility: () => void;
+  isAdmin: boolean;
 };
 
 export const AnnotationItem = ({
@@ -24,13 +30,15 @@ export const AnnotationItem = ({
   onDropdownChange,
   onClick,
   onToggleVisibility,
+  isAdmin,
 }: Props) => (
   <li className="annotation-item">
     <Select
       options={scoreOptions}
-      value={scoreOptions.find(opt => opt.value === selectedScore)}
-      onMenuOpen={onMenuOpen}
-      onChange={(option) => onDropdownChange(option!.value)}
+      value={isAdmin ? scoreOptions.find(opt => opt.value === 99) : scoreOptions.find(opt => opt.value === selectedScore)}
+      isDisabled={isAdmin}
+      onMenuOpen={!isAdmin ? onMenuOpen: undefined}
+      onChange={(option) => !isAdmin && onDropdownChange(option!.value)}
       getOptionLabel={(e) => e.label}
       styles={{
         control: (base) => ({

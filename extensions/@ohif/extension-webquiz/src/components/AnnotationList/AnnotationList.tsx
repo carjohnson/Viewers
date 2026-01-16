@@ -3,6 +3,8 @@
 import React, { useMemo } from 'react';
 import { AnnotationItem } from './AnnotationItem';
 import { TriggerPostArgs } from '../../models/TriggerPostArgs';
+import { getUserInfo } from './../../../../../../modes/@ohif/mode-webquiz/src/userInfoService';
+
 import './AnnotationList.css';
 
 
@@ -44,6 +46,10 @@ export const AnnotationList = ({
     });
   };
 
+  const userInfo = getUserInfo();
+  const isAdmin = userInfo?.role === 'admin';
+
+
   return (
     <fieldset className="annotation-group">
       <legend>Annotations</legend>
@@ -73,6 +79,7 @@ export const AnnotationList = ({
                 onDropdownChange={(value) => onDropdownChange(uid, value)}
                 onClick={() => onMeasurementClick(uid)}
                 onToggleVisibility={() => onToggleVisibility(uid)}
+                isAdmin={isAdmin}
               />
             );
           })}
