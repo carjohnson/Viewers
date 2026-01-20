@@ -15,8 +15,20 @@ services:
     volumes:
       # Nginx config
       - ./config/nginx.conf:/etc/nginx/nginx.conf
+      # ### cj July 2025 ### added
+      # ### Mount built OHIF files directly into container
+      # ###  this avoids having to repeat the container build
+
+  ##### CAUSING PROBLEMS - THIS IS OVERRIDING THE FRESH BUILD 2026-01-19
+      # - ../../dist:/usr/share/nginx/html/ohif
+      
+      
+      
       # Logs
       - ./logs/nginx:/var/logs/nginx
+      # ### cj Aug 2025 ### added      
+      # ? Mount cert directory
+      - ./config:/etc/nginx/ssl
       # Let's Encrypt
       # - letsencrypt_certificates:/etc/letsencrypt
       # - letsencrypt_challenges:/var/www/letsencrypt
@@ -26,7 +38,9 @@ services:
     depends_on:
       #   - keycloak
       - orthanc
-    restart: on-failure
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
 
   # LINK: https://hub.docker.com/r/jodogne/orthanc-plugins/
   # TODO: Update to use Postgres
