@@ -66,3 +66,11 @@
   border-radius: 4px;
   font-size: 0.9rem;
 }
+
+/* to prevent the double scrollbar 
+    - one from the right panel (introduced by newer version of OHIF) - hide this one
+    - one from the customized list of annotations for this app
+*/
+.panel-content > div:has(.annotation-group) {
+  overflow-y: hidden !important;
+}

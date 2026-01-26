@@ -2,45 +2,29 @@ import i18n from 'i18next';
 import { id } from './id';
 import initToolGroups from './initToolGroups';
 import toolbarButtons from './toolbarButtons';
+
+import setUpAutoTabSwitchHandler from './../../../segmentation/src/utils/setUpAutoTabSwitchHandler';
 import { hotkeys } from '@ohif/core';
 import { setUserInfo, getUserInfo, onUserInfoReady } from './userInfoService';
+import cornerstoneExtension from '@ohif/extension-cornerstone';
+import { ohif, cornerstone, extensionDependencies, dicomRT, segmentation } from '@ohif/mode-basic';
+export * from './toolbarButtons';
+
+
 
 const configs = {
   Length: {},
   //
 };
-const ohif = {
-  layout: '@ohif/extension-default.layoutTemplateModule.viewerLayout',
-  sopClassHandler: '@ohif/extension-default.sopClassHandlerModule.stack',
-  thumbnailList: '@ohif/extension-default.panelModule.seriesList',
-  hangingProtocol: '@ohif/extension-default.hangingProtocolModule.default',
-};
 
-const cornerstone = {
-  measurements: '@ohif/extension-cornerstone.panelModule.panelMeasurement',
-  segmentation: '@ohif/extension-cornerstone.panelModule.panelSegmentationWithTools',
-  viewport: '@ohif/extension-cornerstone.viewportModule.cornerstone',
-};
+const href = window.location.search;
+const params = new URLSearchParams(window.location.search);
+const userRole = params.get('role');
+console.log(' *** IN MODE INDEX ... userRole:', userRole, 'href:',href, 'params:', params);
 
-const segmentation = {
-  sopClassHandler: '@ohif/extension-cornerstone-dicom-seg.sopClassHandlerModule.dicom-seg',
-  viewport: '@ohif/extension-cornerstone-dicom-seg.viewportModule.dicom-seg',
-};
-
-const dicomRT = {
-  viewport: '@ohif/extension-cornerstone-dicom-rt.viewportModule.dicom-rt',
-  sopClassHandler: '@ohif/extension-cornerstone-dicom-rt.sopClassHandlerModule.dicom-rt',
-};
-
-const extensionDependencies = {
-  '@ohif/extension-default': '^3.0.0',
-  '@ohif/extension-cornerstone': '^3.0.0',
-  '@ohif/extension-cornerstone-dicom-seg': '^3.0.0',
-  '@ohif/extension-cornerstone-dicom-rt': '^3.0.0',
-  '@ohif/extension-webquiz': '^0.0.1',
-};
 
 function modeFactory({ modeConfiguration }) {
+    const _unsubscriptions = [];
   return {
     id,
     routeName: 'webquiz',
@@ -48,8 +32,14 @@ function modeFactory({ modeConfiguration }) {
 
     onModeEnter:({servicesManager, extensionManager, commandsManager }: withAppTypes) => {
 
-      const { measurementService, toolbarService, toolGroupService, customizationService } =
-        servicesManager.services;
+      const { 
+        measurementService,
+        toolbarService,
+        toolGroupService,
+        segmentationService,
+        viewportGridService,
+        panelService,
+        } = servicesManager.services;
 
       measurementService.clearMeasurements();
 
@@ -101,46 +91,64 @@ function modeFactory({ modeConfiguration }) {
         'Reset',
         'rotate-right',
         'flipHorizontal',
-        'ImageSliceSync',
         'ReferenceLines',
         'ImageOverlayViewer',
         'StackScroll',
         'invert',
-        'Probe',
         'Cine',
-        'Angle',
-        'CobbAngle',
         'Magnify',
-        'CalibrationLine',
         'TagBrowser',
-        'AdvancedMagnify',
-        'UltrasoundDirectionalTool',
-        'WindowLevelRegion',
       ]);
 
-      customizationService.setCustomizations({
-        'panelSegmentation.disableEditing': {
-          $set: false,
-        },
-      });
-
-      // segmentation tools
-      toolbarService.updateSection(toolbarService.sections.segmentationToolbox, [
-        'SegmentationUtilities',
-        'SegmentationTools',
+      // >>>>>>>>>> Segmentation Setup <<<<<<<<<<<<<<
+      toolbarService.updateSection(toolbarService.sections.labelMapSegmentationToolbox, [
+        'LabelMapTools',
       ]);
-      toolbarService.updateSection('SegmentationUtilities', [
+      toolbarService.updateSection(toolbarService.sections.contourSegmentationToolbox, [
+        'ContourTools',
+      ]);
+
+      toolbarService.updateSection('LabelMapTools', [
         'LabelmapSlicePropagation',
-        'InterpolateLabelmap',
-        'SegmentBidirectional',
-      ]);
-      toolbarService.updateSection('SegmentationTools', [
         'BrushTools',
         'MarkerLabelmap',
         'RegionSegmentPlus',
         'Shapes',
+        'LabelMapEditWithContour',
       ]);
-      toolbarService.updateSection('BrushTools', ['Brush', 'Eraser', 'Threshold']);
+      toolbarService.updateSection('ContourTools', [
+        'PlanarFreehandContourSegmentationTool',
+        'SculptorTool',
+        'SplineContourSegmentationTool',
+        'LivewireContourSegmentationTool',
+      ]);
+
+      toolbarService.updateSection(toolbarService.sections.labelMapSegmentationUtilities, [
+        'LabelMapUtilities',
+      ]);
+      toolbarService.updateSection(toolbarService.sections.contourSegmentationUtilities, [
+        'ContourUtilities',
+      ]);
+
+      toolbarService.updateSection('LabelMapUtilities', [
+        'InterpolateLabelmap',
+        'SegmentBidirectional',
+      ]);
+      toolbarService.updateSection('ContourUtilities', [
+        'LogicalContourOperations',
+        'SimplifyContours',
+        'SmoothContours',
+      ]);
+
+      toolbarService.updateSection('BrushTools', [
+          'Brush',
+          'Eraser',
+          'Threshold',
+          'SphereBrush',
+          'SphereEraser',
+          'ThresholdSphereBrush',
+        ]);
+
 
       //=============================
       //Primary tools are based on the user's role
@@ -186,6 +194,17 @@ function modeFactory({ modeConfiguration }) {
 
       });
 
+
+      const { unsubscribeAutoTabSwitchEvents } = setUpAutoTabSwitchHandler({
+        segmentationService,
+        viewportGridService,
+        panelService,
+      });
+
+      _unsubscriptions.push(...unsubscribeAutoTabSwitchEvents);
+
+
+
       //=============================
 
     },  // end onModeEnter
@@ -199,6 +218,9 @@ function modeFactory({ modeConfiguration }) {
         uiDialogService,
         uiModalService,
       } = servicesManager.services;
+
+      _unsubscriptions.forEach(unsubscribe => unsubscribe());
+      _unsubscriptions.length = 0;
 
       uiDialogService.hideAll();
       uiModalService.hide();
@@ -252,13 +274,20 @@ function modeFactory({ modeConfiguration }) {
       {
         path: 'webquiz',
         layoutTemplate: ({ location, servicesManager }) => {
+          let rightPanels = ['@ohif/extension-webquiz.panelModule.webquiz'];
+          if (userRole === 'admin') {
+                // rightPanels = [ '@ohif/extension-webquiz.panelModule.webquiz', cornerstone.segLabelMap, cornerstone.segContour];
+            rightPanels = [ '@ohif/extension-webquiz.panelModule.webquiz',
+              cornerstone.labelMapSegmentationPanel,
+              cornerstone.contourSegmentationPanel,
+            ]
+          }
           return {
             id: ohif.layout,
             props: {
               leftPanels: [ ohif.thumbnailList],
               leftPanelResizable: true,
-              // rightPanels: [ '@ohif/extension-webquiz.panelModule.webquiz', cornerstone.segmentation, cornerstone.measurements ],
-              rightPanels: [ '@ohif/extension-webquiz.panelModule.webquiz' ],
+              rightPanels,
               rightPanelResizable: true,
               viewports: [
                 {
