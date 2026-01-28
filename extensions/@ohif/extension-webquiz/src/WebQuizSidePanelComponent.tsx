@@ -31,6 +31,7 @@ import { createDebouncedStatsUpdater,
 
 import MarkSeriesCompletedButton from './components/MarkSeriesCompletedButton';
 import MarkStudyCompletedButton from './components/MarkStudyCompletedButton';
+import SaveSegmentationsButton from './components/SaveSegmentationsButton';
 import { useSeriesValidation } from './hooks/useSeriesValidation';
 import { useViewportAndSeriesSync } from './hooks/useViewportAndSeriesSync';
 import  useCustomizeAnnotationMenu  from './hooks/useCustomizeAnnotationMenu'
@@ -635,6 +636,16 @@ function WebQuizSidePanelComponent() {
                 padding: '0 0.5rem',
             }}
             >
+            <SaveSegmentationsButton
+                getUserInfo={getUserInfo}
+                studyInstanceUID={studyInfoFromHook?.studyUID}
+                seriesInstanceUID={seriesInstanceUID}
+                showModal={showModal}
+                closeModal={closeModal}
+            />
+
+
+
             <MarkStudyCompletedButton
                 baseUrl={API_BASE_URL}
                 getUserInfo={getUserInfo}
