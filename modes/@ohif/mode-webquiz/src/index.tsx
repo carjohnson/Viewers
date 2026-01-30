@@ -20,7 +20,7 @@ const configs = {
 const href = window.location.search;
 const params = new URLSearchParams(window.location.search);
 const userRole = params.get('role');
-console.log(' *** IN MODE INDEX ... userRole:', userRole, 'href:',href, 'params:', params);
+// console.log(' *** IN MODE INDEX ... userRole:', userRole, 'href:',href, 'params:', params);
 
 
 function modeFactory({ modeConfiguration }) {
@@ -301,12 +301,14 @@ function modeFactory({ modeConfiguration }) {
                 {
                   namespace: dicomRT.viewport,
                   displaySetsToDisplay: [dicomRT.sopClassHandler],
-                },              ],
+                },
+              ],
             },
           };
         },
       },
     ],  //routes
+    
     extensions: extensionDependencies,
     /** HangingProtocol used by the mode */
     hangingProtocol: ['default'],

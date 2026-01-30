@@ -8,7 +8,8 @@ type Props = {
   getUserInfo: () => UserInfo | null;
   studyInstanceUID: string;
   seriesInstanceUID: string;
-
+  segmentationService: any;
+  commandsManager: any;
   showModal: (args: {
     title: string;
     message: string;
@@ -23,6 +24,8 @@ const SaveSegmentationsButton: React.FC<Props> = ({
   getUserInfo,
   studyInstanceUID,
   seriesInstanceUID,
+  segmentationService,
+  commandsManager,
   showModal,
   closeModal,
 }) => {
@@ -30,78 +33,46 @@ const SaveSegmentationsButton: React.FC<Props> = ({
 
 
 
-      showModal({
-        title: 'Confirm Save Segmentations',
-        message: 'Are you sure?',
-        showCancel: true,
-        onCancel: () => {
-          console.log('❌ Cancelled save segmentations to DB');
-          closeModal();
-        },
-        onClose: confirmCompletion,
-      });
-    
+    //   showModal({
+    //     title: 'Confirm Save Segmentations',
+    //     message: 'Are you sure?',
+    //     showCancel: true,
+    //     onCancel: () => {
+    //       console.log('❌ Cancelled save segmentations to DB');
+    //       closeModal();
+    //     },
+    //     onClose: confirmCompletion,
+    //   });
+    confirmCompletion();
   };
 
 
   const confirmCompletion = async () => {
+    
+    const allSegmentations = segmentationService.getSegmentations();
+    console.log(' *** In SaveSegmentationsButton ... all Segmentations', allSegmentations);
 
-    // test post
-    console.log("OHIF window:", window.location.href);
-    // console.log("OHIF parent:", window.parent.location.href);
-    const segmentationObjects = [
-        
-        
-        {
-        "segmentationId": "uuid-1",
-        "seriesInstanceUid": seriesInstanceUID,
-        "label": "Segmentation 1a",
-        "segments": [
-            {
-            "segmentIndex": 1,
-            "label": "Segment 1",
-            "location": "zone-1a",
-            "referenceScore": "follow-up",
-            "color": [255, 0, 0, 1],
-            "opacity": 0.8,
-            "visibility": true,
-            "isLocked": false
-            }
-        ],
-        "segmentationDataRef": "some-json-or-reference-string"
-        },
-        {
-        "segmentationId": "uuid-2",
-        "seriesInstanceUid": seriesInstanceUID,
-        "label": "Segmentation 2",
-        "segments": [
-            {
-            "segmentIndex": 1,
-            "label": "Segment 1",
-            "location": "zone-2a",
-            "referenceScore": "follow-up",
-            "color": [0, 255, 0, 1],
-            "opacity": 0.8,
-            "visibility": true,
-            "isLocked": false
-            },
-            {
-            "segmentIndex": 2,
-            "label": "Segment 2",
-            "location": "zone-2a",
-            "referenceScore": "follow-up - 3mos",
-            "color": [0, 0, 255, 1],
-            "opacity": 0.8,
-            "visibility": true,
-            "isLocked": false
-            }            
-        ],
-        "segmentationDataRef": "some-other-json-or-reference-string"
+    let segmentationObjects = [];
+    let lastSegId = "";
+    allSegmentations.forEach((seg) => {
+        const segmentationItem = {
+            "segmentationId": seg.segmentationId,
+            "seriesInstanceUid": seriesInstanceUID,
+            "label": seg.label,
+            "segments": buildSegmentList(seg.segments),
+            "segmentDataRef": "to-be-assigned",
         }
 
-    ]
-    
+        segmentationObjects.push(segmentationItem);
+        lastSegId = segmentationItem.segmentationId;
+            
 
+    });
+        commandsManager.runCommand('downloadSegmentation', {
+            segmentationId: lastSegId});
+        // const blob = await commandsManager.runCommand('generateSegmentation', {
+        //     segmentationId: lastSegId,
+        // });
     const postSegmentationResult = await postSegmentations({
         segmentationObjects,
         studyUID: studyInstanceUID,
@@ -135,3 +106,24 @@ const SaveSegmentationsButton: React.FC<Props> = ({
 };
 
 export default SaveSegmentationsButton;
+
+
+// >>>>>>>>>>>>> Helper functions <<<<<<<<<<<<<
+
+type OhifSegment = {
+  segmentIndex: number;
+  label: string;
+  // add other OHIF fields if needed
+};
+function buildSegmentList(segmentsObj) {
+  if (!segmentsObj) return [];
+
+  const segmentArray = Object.values(segmentsObj) as OhifSegment[]; // OHIF stores segments as an object
+
+  return segmentArray.map(segment => ({
+    segmentIndex: segment.segmentIndex,
+    label: segment.label,
+    location: "zone-1",
+    referenceScore: "follow-up",
+  }));
+}

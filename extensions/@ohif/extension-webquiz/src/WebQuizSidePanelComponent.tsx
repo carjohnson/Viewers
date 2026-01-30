@@ -38,6 +38,7 @@ import  useCustomizeAnnotationMenu  from './hooks/useCustomizeAnnotationMenu'
 import { postStudyProgress, postSeriesProgress, fetchStudyProgressFromDB } from './handlers/studyProgressHandlers';
 import { ModalComponent } from './components/ModalComponent';
 import { TriggerPostArgs } from './models/TriggerPostArgs';
+import { extensionManager } from 'platform/app/src/App';
 
 
 function WebQuizSidePanelComponent() {
@@ -58,8 +59,8 @@ function WebQuizSidePanelComponent() {
     const isSeriesValidRef = useRef<boolean | null>(null);
     const [validatedSeriesUID, setValidatedSeriesUID] = useState(null);
 
-    const { servicesManager } = useSystem();
-    const { measurementService, viewportGridService } = servicesManager.services;
+    const { servicesManager, commandsManager } = useSystem();
+    const { measurementService, viewportGridService, segmentationService } = servicesManager.services;
     const measurementList = measurementService.getMeasurements(); 
     const measurementListRef = useRef([]);    
     const pendingAnnotationUIDRef = useRef<string | null>(null);
@@ -70,6 +71,7 @@ function WebQuizSidePanelComponent() {
     // const isOpenRef = useRef<boolean | null>(null);
 
     const [isMinimized, setIsMinimized] = useState(false);
+
 
     //~~~~~~~~~~~~~~~~~
      const [modalInfo, setModalInfo] = useState<null | { 
@@ -640,10 +642,11 @@ function WebQuizSidePanelComponent() {
                 getUserInfo={getUserInfo}
                 studyInstanceUID={studyInfoFromHook?.studyUID}
                 seriesInstanceUID={seriesInstanceUID}
+                segmentationService={segmentationService}
+                commandsManager={commandsManager}
                 showModal={showModal}
                 closeModal={closeModal}
             />
-
 
 
             <MarkStudyCompletedButton
