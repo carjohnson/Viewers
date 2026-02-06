@@ -175,6 +175,7 @@ function WebQuizSidePanelComponent() {
         activeViewportId,
         activeViewportIdRef,
         seriesInstanceUID,
+        activeViewportImageIds,
     } = useViewportAndSeriesSync({viewportGridService, displaySetService, cornerstoneViewportService});
 
     //=========================================================
@@ -643,6 +644,7 @@ function WebQuizSidePanelComponent() {
                 studyInstanceUID={studyInfoFromHook?.studyUID}
                 seriesInstanceUID={seriesInstanceUID}
                 segmentationService={segmentationService}
+                activeViewportImageIds={activeViewportImageIds}
                 commandsManager={commandsManager}
                 showModal={showModal}
                 closeModal={closeModal}

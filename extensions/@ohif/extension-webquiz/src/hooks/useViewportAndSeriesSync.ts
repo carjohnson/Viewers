@@ -7,6 +7,7 @@ export function useViewportAndSeriesSync({
 }) {
   const [activeViewportId, setActiveViewportId] = useState<string | null>(null);
   const [seriesUID, setSeriesUID] = useState<string | null>(null);
+  const [activeViewportImageIds, setActiveViewportImageIds] = useState(null);
 
   const activeViewportIdRef = useRef<string | null>(null);
 
@@ -41,11 +42,22 @@ export function useViewportAndSeriesSync({
       setActiveViewportId(viewportId);
       activeViewportIdRef.current = viewportId;
 
+            // Get the Cornerstone viewport
+      const csViewport =
+        cornerstoneViewportService.getCornerstoneViewport(viewportId);
+
+      if (csViewport && 'getImageIds' in csViewport) {
+        const imageIds = (csViewport as any).getImageIds() as string[];
+        setActiveViewportImageIds(imageIds);
+        // console.log(' *** IN HOOK FOR VIEWPORT imageId:', imageIds[0]);
+      }
+
       // Optional: sync cornerstone viewport element
       if (viewportId && cornerstoneViewportService) {
         const viewportInfo = cornerstoneViewportService.getViewportInfo(viewportId);
         viewportInfo?.getElement?.() ?? viewportInfo?.element ?? null;
       }
+
 
       updateSeriesUID(viewportId);
     },
@@ -89,5 +101,6 @@ export function useViewportAndSeriesSync({
     activeViewportId,
     activeViewportIdRef,
     seriesInstanceUID: seriesUID,
+    activeViewportImageIds,
   };
 }

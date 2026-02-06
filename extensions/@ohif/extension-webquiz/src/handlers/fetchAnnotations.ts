@@ -36,7 +36,7 @@ export const fetchAnnotationsFromDB = async ({
 
     setListOfUsersAnnotations(annotationsList);
     listOfUsersAnnotationsRef.current = annotationsList;
-    console.log(' *** IN FETCH ... studyUID, listRef', studyUID, listOfUsersAnnotationsRef.current);
+    // console.log(' *** IN FETCH ... studyUID, listRef, legend', studyUID, listOfUsersAnnotationsRef.current, legend);
 
     const newMap = buildDropdownSelectionMapFromFetched(annotationsList);
     setDropdownSelectionMap(newMap);
