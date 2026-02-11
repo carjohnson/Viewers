@@ -10,7 +10,15 @@ const ImplementationClassUID = '2.25.270695996825855179949881587723571202391.2.0
 const ImplementationVersionName = 'OHIF-3.12.0';
 const EXPLICIT_VR_LITTLE_ENDIAN = '1.2.840.10008.1.2.1';
 
-
+interface SegmentWithStats {
+  cachedStats?: {
+    namedStats?: {
+      volume?: {
+        value?: number;
+      };
+    };
+  };
+}
 
 type Props = {
   getUserInfo: () => UserInfo | null;
@@ -69,9 +77,11 @@ const SaveSegmentationsButton: React.FC<Props> = ({
 
     for (const seg of allSegmentations) {
 
-        // because this is a custom segmentation extension, 
-        //      predecessorImage prop is missing from the seg
-        debugger;
+      // because this is a custom segmentation extension, 
+      //      predecessorImage prop is missing from the seg
+      let generatedSeg;
+      try {
+
         const imageId = activeViewportImageIds[0];
         segmentationService.addOrUpdateSegmentation({
             segmentationId: seg.segmentationId,
@@ -79,15 +89,51 @@ const SaveSegmentationsButton: React.FC<Props> = ({
             predecessorImageId: imageId
         });
         updatedSeg = segmentationService.getSegmentation(seg.segmentationId);
-        // console.log('updatedSeg after update', updatedSeg);
+        console.log('updatedSeg after update', updatedSeg);
 
+        // Check all segments for non-zero volume
+        const segmentIdsToRemove: string[] = [];
+        let hasVolume = false;
+        const segments = (updatedSeg?.segments || {}) as Record<string, SegmentWithStats>;
 
-        const generatedSeg = commandsManager.runCommand('generateSegmentation', {
+        for (const [segIdxStr, segment] of Object.entries(segments)) {
+          const volume = segment.cachedStats?.namedStats?.volume?.value;
+
+          if (typeof volume !== 'number' || volume <=0) {
+            console.log(`Marking unpainted segment ${segIdxStr} (volume=${volume}) for removal`);
+            segmentIdsToRemove.push(segIdxStr);
+          } else {
+            // check that one of the segments has volume for generateSegmentation
+            if (typeof volume === 'number' && volume > 0) {
+              hasVolume = true;
+            }
+          }
+        } // end for each segment
+
+        // Remove empty segments
+        for (const segIdxStr of segmentIdsToRemove) {
+          const segIndex = parseInt(segIdxStr);
+          segmentationService.removeSegment(seg.segmentationId, segIndex);
+          console.log(`✅ Removed empty segment ${segIdxStr}`);
+        }
+
+        // if any of the segments were painted, generate a segmentation object
+        if (hasVolume) {
+          generatedSeg = commandsManager.runCommand('generateSegmentation', {
             segmentationId: seg.segmentationId,
-            });
-        console.log(' *** GENERATED SEG:', generatedSeg);
+          });
 
+          if (!generatedSeg || !generatedSeg.dataset) {
+            console.warn(
+              `Skipping segmentation ${seg.segmentationId}: generation failed`
+            );
+            continue;
+          }
+          console.log(' *** GENERATED SEG:', generatedSeg);
+
+        // //////////// Create blob from generatedSeg ////////////
         // generate the meta data 
+        let segBlob;
         const meta = {
               FileMetaInformationVersion: generatedSeg.dataset._meta?.FileMetaInformationVersion?.Value,
               MediaStorageSOPClassUID: generatedSeg.dataset.SOPClassUID,
@@ -101,33 +147,38 @@ const SaveSegmentationsButton: React.FC<Props> = ({
         const denaturalizedDataset = dcmjs.data.DicomMetaDictionary.denaturalizeDataset(generatedSeg.dataset);
         const dicomDict = new DicomDict(denaturalizedMetadata);
         dicomDict.dict = denaturalizedDataset;
-        const arrayBuffer = dicomDict.write();
 
-        let segBlob = undefined;
         try {
-        segBlob = new Blob([arrayBuffer], { type: 'application/dicom' });
-        console.log('Blob created successfully, size:', segBlob.size, 'type:', segBlob.type);
-        console.log('segBlob:', segBlob);
+          const arrayBuffer = dicomDict.write();
+          segBlob = new Blob([arrayBuffer], { type: 'application/dicom' });
+          console.log('Blob created successfully, size:', segBlob.size, 'type:', segBlob.type);
+          console.log('segBlob:', segBlob);
         
         } catch (blobError) {
-        console.error('Blob creation FAILED:', blobError);
-        console.error('Stack:', blobError.stack);
+          console.warn(`Skipping segmentation ${seg.segmentationId}: blob creation failed`, blobError);
+          console.warn('Stack:', blobError.stack);
+          continue;
         }
 
-
-        const segmentationItem = {
+        // segmentation and blob generation succeeded
+        segmentationObjects.push({
             segmentationId: seg.segmentationId,
             seriesInstanceUid: seriesInstanceUID,
             label: seg.label,
             segments: buildSegmentList(seg.segments),
             segmentationDataRef: segBlob,
-        };
+        });
 
-        segmentationObjects.push(segmentationItem);
         lastSegId = seg.segmentationId;
     }
 
-    debugger;
+
+      } catch (err) {
+          console.warn(`Skipping segmentation ${seg.segmentationId}: generating seg failed`, err);
+          console.warn('Stack:', err.stack);
+          continue;
+      }
+        }
 
 
     // console.log('=== DEBUG BEFORE DOWNLOAD ===');
@@ -137,8 +188,7 @@ const SaveSegmentationsButton: React.FC<Props> = ({
     // console.log('active imageId:', activeViewportImageIds[0]);
     // console.log('===========================');
 
-
-    // // DEBUG ... Now trigger the download 
+    // // DEBUG ... trigger a download 
     // //    - frontend download for testing import DICOM SEG into other viewer
     // commandsManager.runCommand("downloadSegmentation", {
     //     segmentationId: lastSegId,
@@ -146,19 +196,20 @@ const SaveSegmentationsButton: React.FC<Props> = ({
     // });
 
 
+    if (segmentationObjects.length !== 0) {
+      const postSegmentationResult = await postSegmentations({
+          segmentationObjects,
+          studyUID: studyInstanceUID,
+      });
 
-    const postSegmentationResult = await postSegmentations({
-        segmentationObjects,
-        studyUID: studyInstanceUID,
-    });
-
-    if (postSegmentationResult?.error) {
-      console.warn('⚠️ Failed to post segmentations:', postSegmentationResult.error);
-    } else {
-      console.log(`📌 Segmentations posted for ${studyInstanceUID}`);
+      if (postSegmentationResult?.error) {
+        console.warn('⚠️ Failed to post segmentations:', postSegmentationResult.error);
+      } else {
+        console.log(`📌 Segmentations posted for ${studyInstanceUID}`);
+      }
+      
+      console.log(`📬 Confirmed save segmentations to DB`);
     }
-    
-    console.log(`📬 Confirmed save segmentations to DB`);
 
     closeModal();
 
