@@ -4,6 +4,8 @@ import { postSegmentations } from '../handlers/postSegmentations';
 import {UserInfo} from '../models/UserInfo';
 import dcmjs from 'dcmjs';
 
+
+
 // for creating the blob
 const { DicomMetaDictionary, DicomDict } = dcmjs.data;
 const ImplementationClassUID = '2.25.270695996825855179949881587723571202391.2.0.0';
@@ -23,9 +25,10 @@ interface SegmentWithStats {
 type Props = {
   getUserInfo: () => UserInfo | null;
   studyInstanceUID: string;
-  seriesInstanceUID: string;
   segmentationService: any;
-  activeViewportImageIds: [string] | null;
+  viewportGridService: any;
+  displaySetService: any;
+  activeViewportId: string;
   commandsManager: any;
   showModal: (args: {
     title: string;
@@ -40,28 +43,26 @@ type Props = {
 const SaveSegmentationsButton: React.FC<Props> = ({
   getUserInfo,
   studyInstanceUID,
-  seriesInstanceUID,
   segmentationService,
-  activeViewportImageIds,
+  viewportGridService,
+  displaySetService,
+  activeViewportId,
   commandsManager,
   showModal,
   closeModal,
 }) => {
   const handleClick = () => {
-
-
-
-    //   showModal({
-    //     title: 'Confirm Save Segmentations',
-    //     message: 'Are you sure?',
-    //     showCancel: true,
-    //     onCancel: () => {
-    //       console.log('❌ Cancelled save segmentations to DB');
-    //       closeModal();
-    //     },
-    //     onClose: confirmCompletion,
-    //   });
-    confirmCompletion();
+      showModal({
+        title: 'Confirm Save Segmentations',
+        message: 'Are you sure?',
+        showCancel: true,
+        onCancel: () => {
+          console.log('❌ Cancelled save segmentations to DB');
+          closeModal();
+        },
+        onClose: confirmCompletion,
+      });
+    // confirmCompletion(); // if no modal pop-up - just run it
   };
 
 
@@ -72,24 +73,40 @@ const SaveSegmentationsButton: React.FC<Props> = ({
 
 
     let segmentationObjects = [];
-    let updatedSeg = undefined;
-    let lastSegId = "";
+    let updatedSeg;
+    let lastSegIdForDebug = "";
 
     for (const seg of allSegmentations) {
 
-      // because this is a custom segmentation extension, 
-      //      predecessorImage prop is missing from the seg
       let generatedSeg;
       try {
 
-        const imageId = activeViewportImageIds[0];
+        // because this is a custom segmentation extension, 
+        //      predecessorImage prop is missing from the seg
         segmentationService.addOrUpdateSegmentation({
             segmentationId: seg.segmentationId,
             type: seg.type,
-            predecessorImageId: imageId
+            predecessorImageId: seg.representationData.Labelmap.referencedImageIds[0]
         });
         updatedSeg = segmentationService.getSegmentation(seg.segmentationId);
         console.log('updatedSeg after update', updatedSeg);
+
+        const seriesUid = getSeriesUid(seg.representationData.Labelmap.referencedImageIds[0]);
+        const displaySets = displaySetService.getDisplaySetsForSeries(seriesUid);
+        const displaySetInstanceUID = displaySets[0]?.displaySetInstanceUID;
+
+        await viewportGridService.setDisplaySetsForViewport({
+            viewportId: activeViewportId,
+            displaySetInstanceUIDs: [displaySetInstanceUID],
+          });
+
+          // Give OHIF a moment to render the new stack
+          await new Promise(resolve => setTimeout(resolve, 50));
+
+        if (!displaySetInstanceUID) {
+          console.warn('No displaySet found for series', seriesUid);
+          continue;
+        }
 
         // Check all segments for non-zero volume
         const segmentIdsToRemove: string[] = [];
@@ -108,7 +125,7 @@ const SaveSegmentationsButton: React.FC<Props> = ({
               hasVolume = true;
             }
           }
-        } // end for each segment
+        } // end for each segment - capture unpainted segments
 
         // Remove empty segments
         for (const segIdxStr of segmentIdsToRemove) {
@@ -131,46 +148,47 @@ const SaveSegmentationsButton: React.FC<Props> = ({
           }
           console.log(' *** GENERATED SEG:', generatedSeg);
 
-        // //////////// Create blob from generatedSeg ////////////
-        // generate the meta data 
-        let segBlob;
-        const meta = {
-              FileMetaInformationVersion: generatedSeg.dataset._meta?.FileMetaInformationVersion?.Value,
-              MediaStorageSOPClassUID: generatedSeg.dataset.SOPClassUID,
-              MediaStorageSOPInstanceUID: generatedSeg.dataset.SOPInstanceUID,
-              TransferSyntaxUID: EXPLICIT_VR_LITTLE_ENDIAN,
-              ImplementationClassUID,
-              ImplementationVersionName,
-            };
+          // //////////// Create blob from generatedSeg ////////////
+          // generate the meta data 
+          let segBlob;
+          const meta = {
+                FileMetaInformationVersion: generatedSeg.dataset._meta?.FileMetaInformationVersion?.Value,
+                MediaStorageSOPClassUID: generatedSeg.dataset.SOPClassUID,
+                MediaStorageSOPInstanceUID: generatedSeg.dataset.SOPInstanceUID,
+                TransferSyntaxUID: EXPLICIT_VR_LITTLE_ENDIAN,
+                ImplementationClassUID,
+                ImplementationVersionName,
+              };
 
-        const denaturalizedMetadata = dcmjs.data.DicomMetaDictionary.denaturalizeDataset(meta);
-        const denaturalizedDataset = dcmjs.data.DicomMetaDictionary.denaturalizeDataset(generatedSeg.dataset);
-        const dicomDict = new DicomDict(denaturalizedMetadata);
-        dicomDict.dict = denaturalizedDataset;
+          const denaturalizedMetadata = dcmjs.data.DicomMetaDictionary.denaturalizeDataset(meta);
+          const denaturalizedDataset = dcmjs.data.DicomMetaDictionary.denaturalizeDataset(generatedSeg.dataset);
+          const dicomDict = new DicomDict(denaturalizedMetadata);
+          dicomDict.dict = denaturalizedDataset;
 
-        try {
-          const arrayBuffer = dicomDict.write();
-          segBlob = new Blob([arrayBuffer], { type: 'application/dicom' });
-          console.log('Blob created successfully, size:', segBlob.size, 'type:', segBlob.type);
-          console.log('segBlob:', segBlob);
-        
-        } catch (blobError) {
-          console.warn(`Skipping segmentation ${seg.segmentationId}: blob creation failed`, blobError);
-          console.warn('Stack:', blobError.stack);
-          continue;
+          try {
+            const arrayBuffer = dicomDict.write();
+            segBlob = new Blob([arrayBuffer], { type: 'application/dicom' });
+            console.log('Blob created successfully, size:', segBlob.size, 'type:', segBlob.type);
+            console.log('segBlob:', segBlob);
+          
+          } catch (blobError) {
+            console.warn(`Skipping segmentation ${seg.segmentationId}: blob creation failed`, blobError);
+            console.warn('Stack:', blobError.stack);
+            continue;
+          }
+
+          // segmentation and blob generation succeeded
+          segmentationObjects.push({
+              segmentationId: seg.segmentationId,
+              seriesInstanceUid: seriesUid,
+              label: seg.label,
+              segments: buildSegmentList(seg.segments),
+              segmentationDataRef: segBlob,
+          });
+
+          lastSegIdForDebug = seg.segmentationId;
+          console.log(' *** END OF GENERATE LOOP ... segObjects to post:', segmentationObjects);
         }
-
-        // segmentation and blob generation succeeded
-        segmentationObjects.push({
-            segmentationId: seg.segmentationId,
-            seriesInstanceUid: seriesInstanceUID,
-            label: seg.label,
-            segments: buildSegmentList(seg.segments),
-            segmentationDataRef: segBlob,
-        });
-
-        lastSegId = seg.segmentationId;
-    }
 
 
       } catch (err) {
@@ -178,20 +196,21 @@ const SaveSegmentationsButton: React.FC<Props> = ({
           console.warn('Stack:', err.stack);
           continue;
       }
-        }
+    } // end for to generate segmentation objects
 
 
+    // // DEBUG - needs activeViewportImageIds as a prop
     // console.log('=== DEBUG BEFORE DOWNLOAD ===');
-    // console.log('lastSegId:', lastSegId);
+    // console.log('lastSegId:', lastSegIdForDebug);
     // const segData = segmentationService.getSegmentation(lastSegId);
     // console.log('segData.predecessorImageId:', segData?.predecessorImageId);
     // console.log('active imageId:', activeViewportImageIds[0]);
     // console.log('===========================');
 
-    // // DEBUG ... trigger a download 
+    // // DEBUG ... trigger a download - needs activeViewportImageIds as a prop
     // //    - frontend download for testing import DICOM SEG into other viewer
     // commandsManager.runCommand("downloadSegmentation", {
-    //     segmentationId: lastSegId,
+    //     segmentationId: lastSegIdForDebug,
     //     predecessorImageId: activeViewportImageIds[0],
     // });
 
@@ -235,11 +254,14 @@ export default SaveSegmentationsButton;
 
 // >>>>>>>>>>>>> Helper functions <<<<<<<<<<<<<
 
+// =====================================
 type OhifSegment = {
   segmentIndex: number;
   label: string;
   // add other OHIF fields if needed
 };
+
+// =====================================
 function buildSegmentList(segmentsObj) {
   if (!segmentsObj) return [];
 
@@ -248,7 +270,23 @@ function buildSegmentList(segmentsObj) {
   return segmentArray.map(segment => ({
     segmentIndex: segment.segmentIndex,
     label: segment.label,
-    lesionLocation: ["zone-1","zone-2"],
-    lesionReferenceScore: "follow-up",
+    lesionLocation: ["segment-1","segment-2"],
+    lesionReferenceStandard: "Metastasis",
+    decisionCriteria: ["Follow-up a", "Follow-up b"],
   }));
 }
+
+// =====================================
+function getSeriesUid(imageId: string): string | null {
+  try {
+    const url = new URL(imageId);
+    const parts = url.pathname.split('/').filter(Boolean);
+    const seriesIndex = parts.indexOf('series');
+    return seriesIndex !== -1 && seriesIndex + 1 < parts.length ? parts[seriesIndex + 1] : null;
+  } catch {
+    return null;
+  }
+}
+
+
+

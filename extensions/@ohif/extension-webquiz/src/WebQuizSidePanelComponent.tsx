@@ -642,9 +642,10 @@ function WebQuizSidePanelComponent() {
             <SaveSegmentationsButton
                 getUserInfo={getUserInfo}
                 studyInstanceUID={studyInfoFromHook?.studyUID}
-                seriesInstanceUID={seriesInstanceUID}
                 segmentationService={segmentationService}
-                activeViewportImageIds={activeViewportImageIds}
+                viewportGridService={viewportGridService}
+                displaySetService={displaySetService}
+                activeViewportId={activeViewportId}
                 commandsManager={commandsManager}
                 showModal={showModal}
                 closeModal={closeModal}
