@@ -3,6 +3,9 @@ import { Button } from '@ohif/ui'; // or your preferred button source
 import { postSegmentations } from '../handlers/postSegmentations';
 import {UserInfo} from '../models/UserInfo';
 import dcmjs from 'dcmjs';
+import { useDicomSegSeriesUIDStore } from './../stores/useDicomSegSeriesUIDStore';
+
+
 
 
 
@@ -11,6 +14,7 @@ const { DicomMetaDictionary, DicomDict } = dcmjs.data;
 const ImplementationClassUID = '2.25.270695996825855179949881587723571202391.2.0.0';
 const ImplementationVersionName = 'OHIF-3.12.0';
 const EXPLICIT_VR_LITTLE_ENDIAN = '1.2.840.10008.1.2.1';
+
 
 interface SegmentWithStats {
   cachedStats?: {
@@ -51,6 +55,8 @@ const SaveSegmentationsButton: React.FC<Props> = ({
   showModal,
   closeModal,
 }) => {
+
+  const {getDicomSegSeriesUIDMap, setDicomSegSeriesUIDMap} = useDicomSegSeriesUIDStore();
   const handleClick = () => {
       showModal({
         title: 'Confirm Save Segmentations',
@@ -71,10 +77,11 @@ const SaveSegmentationsButton: React.FC<Props> = ({
     const allSegmentations = segmentationService.getSegmentations();
     console.log(' *** In SaveSegmentationsButton ... all Segmentations', allSegmentations);
 
-
     let segmentationObjects = [];
     let updatedSeg;
     let lastSegIdForDebug = "";
+
+
 
     for (const seg of allSegmentations) {
 
@@ -146,6 +153,31 @@ const SaveSegmentationsButton: React.FC<Props> = ({
             );
             continue;
           }
+
+          // check if modifications are being made to an existing segmentation object
+          try {
+            console.log('segmentationId:', seg.segmentationId);
+            console.log('current SEG SeriesInstanceUID:', generatedSeg.dataset.SeriesInstanceUID);
+
+            let stableUID = getDicomSegSeriesUIDMap(seg.segmentationId);
+
+            if (!stableUID) {
+              // First time this segmentationId is exported
+              stableUID = generatedSeg.dataset.SeriesInstanceUID;
+              setDicomSegSeriesUIDMap(seg.segmentationId, stableUID);
+              console.log('Stored new stableUID for segmentationId', seg.segmentationId, stableUID);
+            } else {
+              // Reuse the stable UID
+              generatedSeg.dataset.SeriesInstanceUID = stableUID;
+              console.log('Reused stableUID for segmentationId', seg.segmentationId, stableUID);
+            }
+          } catch (err) {
+            console.log(' *** In SaveSegmentationsButton ... loading dicomSegSeriesUIDMap:', getDicomSegSeriesUIDMap);
+            console.warn('Stack:', err.stack);
+          }
+
+
+
           console.log(' *** GENERATED SEG:', generatedSeg);
 
           // //////////// Create blob from generatedSeg ////////////
@@ -179,8 +211,8 @@ const SaveSegmentationsButton: React.FC<Props> = ({
 
           // segmentation and blob generation succeeded
           segmentationObjects.push({
-              segmentationId: seg.segmentationId,
-              seriesInstanceUid: seriesUid,
+              dicomSegSeriesUID: generatedSeg.dataset.SeriesInstanceUID,
+              sourceSeriesInstanceUid: seriesUid,
               label: seg.label,
               segments: buildSegmentList(seg.segments),
               segmentationDataRef: segBlob,
