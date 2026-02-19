@@ -7,6 +7,7 @@ import { annotation } from '@cornerstonejs/tools';
 import { useStudyInfoStore } from './stores/useStudyInfoStore';
 import { useStudyInfo } from './hooks/useStudyInfo';
 import { usePatientInfo } from '@ohif/extension-default';
+import { useDicomSegSeriesUIDStore } from './stores/useDicomSegSeriesUIDStore';
 import { API_BASE_URL } from './config/config';
 import { AnnotationStats } from './models/AnnotationStats';
 import { setUserInfo, getUserInfo, onUserInfoReady } from './../../../../modes/@ohif/mode-webquiz/src/userInfoService';
@@ -19,6 +20,8 @@ import { AnnotationList } from './components/AnnotationList/AnnotationList';
 import { ScoreModal } from './components/ScoreModal';
 import { handleMeasurementAdded, handleAnnotationChanged, handleMeasurementRemoved, handleMeasurementUpdated } from './handlers/annotationEventHandlers';
 import { ToolGroupManager } from '@cornerstonejs/tools';
+import { base64ToArrayBuffer } from './utils/dataUtils';
+import { loadDicomSegIntoOHIF } from './utils/segmentationUtils';
 
 
 
@@ -138,7 +141,7 @@ function WebQuizSidePanelComponent() {
     const studyUID = studyInfo?.studyUID;
 
     const userInfo = getUserInfo();
-
+    const { setDicomSegSeriesUIDMap } = useDicomSegSeriesUIDStore();
     //=========================================================
     // This useEffect will keep the patient and study metadata up-to-date
     //      if the user selects a different study.
@@ -295,6 +298,49 @@ function WebQuizSidePanelComponent() {
     }, [studyUID, postingApi]);
 
 
+    // ************************************************************
+    // ********************* Segmentations ************************
+    // ************************************************************
+
+    //=========================================================
+    useEffect(() => {
+        async function loadSegmentations() {
+            const segmentationId = "";  // unknown segmentationId at this point
+            const username = userInfo.username;
+            console.log(' *** IN FETCH SEGMENTATIONS:', username, studyUID)
+            if (!studyUID || !username) return;
+            try {
+                const res = await fetch(
+                    `${API_BASE_URL}/webquiz/list-study-segmentations?username=${username}&studyUID=${studyUID}`,
+                    { credentials: 'include' }
+                // segs.forEach(seg => {
+                //     setDicomSegSeriesUIDMap(segmentationId, seg.dicomSegSeriesUID); 
+                )
+                const data = await res.json();
+                console.log('📥 Segmentations response:', data);
+
+                const { payload } = data;
+                for (const seg of payload) {
+                    if (!seg.base64) continue;
+
+                    const arrayBuffer = base64ToArrayBuffer(seg.base64);
+
+                    await loadDicomSegIntoOHIF({
+                        dicomSegSeriesUID: seg.dicomSegSeriesUID,
+                        referencedSeriesInstanceUID: seg.referencedSeriesUID,
+                        arrayBuffer,
+                        servicesManager,
+                    });
+                }
+
+            } catch (err) {
+                console.error('❌ Error fetching segmentations:', err);
+            }
+        }
+        loadSegmentations();
+    }, [userInfo?.username, studyUID]);
+
+    
     //=========================================================
     // ensure debounced definitions are stable across renders using useMemo
 
