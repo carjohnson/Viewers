@@ -3,7 +3,7 @@ import { metaData, volumeLoader, cache } from '@cornerstonejs/core';
 import { segmentation } from '@cornerstonejs/tools';
 import * as cornerstone from "@cornerstonejs/core";
 import { utilities } from '@cornerstonejs/core';
-
+import * as csTools from '@cornerstonejs/tools';
 
 
 export async function loadDicomSegIntoOHIF({
@@ -13,14 +13,12 @@ export async function loadDicomSegIntoOHIF({
   servicesManager,
 }) {
   const {
-    SegmentationService,
+    segmentationService,
     DisplaySetService,
     ViewportGridService,
   } = servicesManager.services;
 
-    console.log('DisplaySetService methods:', Object.keys(DisplaySetService));
-    console.log('SegmentationService methods:', Object.keys(SegmentationService));
-
+    // console.log('SegmentationService methods:', Object.keys(segmentationService));
   const referencedDisplaySets =
     DisplaySetService.getDisplaySetsForSeries(referencedSeriesInstanceUID);
   const referencedDisplaySet = referencedDisplaySets?.[0];
@@ -30,9 +28,6 @@ export async function loadDicomSegIntoOHIF({
     return;
   }
 
-  // TODO: For Multi-series studies ===> ??
-  // Optionally ensure that referencedDisplaySet is in a viewport (set layout / setActiveDisplaySet)
-  // so that imageIds/volumeId are available.
 
   // 3) Use the SEG adapter to generate tool state from the ArrayBuffer.
   const imageIds = referencedDisplaySet.images?.map(i => i.imageId) ?? [];
@@ -51,102 +46,206 @@ export async function loadDicomSegIntoOHIF({
     console.log('labelmapBufferArray:', segToolState.labelmapBufferArray?.length);
 
     // create one empty labelmap segmentation (returns segmentationId)
-    const segmentationId = await SegmentationService.createLabelmapForDisplaySet(
+    const segmentationId = await segmentationService.createLabelmapForDisplaySet(
         referencedDisplaySet,  // ← Pass the displaySet object directly
         {
         label: `SEG ${dicomSegSeriesUID.slice(-8)}`,
-        }
+        },
     );
     //  Wait for Cornerstone state to catch up (critical!) ?? IS THIS NECESSARY ??
     await new Promise(resolve => setTimeout(resolve, 100)); // 100ms debounce
 
 
-///////////////////////////// Got the segLabelMap loaded ok 
-///////////////////////////// Now to load into the segmentation created
-
-// 1. Create empty segmentation
-const segmentationData = SegmentationService.getSegmentation(segmentationId);
-console.log(' ***** segmentationData:', segmentationData);  // needs a touch or labelmapRep is undefined
+    // 1. Create empty segmentation
+    const segmentationData = segmentationService.getSegmentation(segmentationId);
+    console.log(' ***** segmentationData:', segmentationData);  // needs a touch or labelmapRep is undefined
 
 
-// 2. Create segLabelmap from ArrayBuffer stored in the segToolState
-const labelmapRep = segmentationData.representationData.Labelmap;
-const labelmapImageIds = labelmapRep.imageIds; // derived images
-console.log(' ***** labelmapRep:', labelmapRep);
+    // 2. Create segLabelmap from ArrayBuffer stored in the segToolState
+    const labelmapRep = segmentationData.representationData.Labelmap;
+    const labelmapImageIds = labelmapRep.imageIds; // derived images
+    console.log(' ***** labelmapRep:', labelmapRep);
 
-const segLabelmap = new Uint8Array(segToolState.labelmapBufferArray[0]);
-const bytesPerSlice = segLabelmap.length / labelmapImageIds.length;
+    const segLabelmap = new Uint8Array(segToolState.labelmapBufferArray[0]);
+    bufferCounter_orig(segLabelmap, ' *** SOURCE Buffer with segLabelMap');
+    // console.log('SOURCE buffer - Seg1:', countSeg1, 'Seg2:', countSeg2);
 
-for (let i = 0; i < labelmapImageIds.length; i++) {
-  const sliceStart = i * bytesPerSlice;
-  const sliceEnd = sliceStart + bytesPerSlice;
+    const bytesPerSlice = segLabelmap.length / labelmapImageIds.length;
+    const labelmapBufferArray: Uint8Array[] = [];
+    for (let i = 0; i < labelmapImageIds.length; i++) {
+    const sliceStart = i * bytesPerSlice;
+    const sliceEnd = sliceStart + bytesPerSlice;
+    labelmapBufferArray.push(segLabelmap.subarray(sliceStart, sliceEnd));
 
-  const sliceData = segLabelmap.subarray(sliceStart, sliceEnd);
+    // const sliceData = segLabelmap.subarray(sliceStart, sliceEnd);
+    }
 
-  // Do whatever processing you need on sliceData
-  // e.g., modify values, threshold, etc.
+    // 3. Inject your segLabelmap buffer by creating the .data object
+    labelmapRep.data = {
+        labelmapBufferArray,
+        activeSegmentIndex: 1,
+        segmentsOnLabelmap: [1, 2], // or more if you have multiple segments
+    };
+    bufferCounter(labelmapBufferArray, '*** AFTER ASSIGN with labelmapBufferArray');
+
+
+    // Add metadata for ALL segments found in buffer
+    segmentationService.addSegment(segmentationId, {
+    segmentIndex: 1,
+    label: 'Segment 1',
+    color: [255, 0, 0, 0.5],  // RGBA
+    });
+
+    segmentationService.addSegment(segmentationId, {
+    segmentIndex: 2,           
+    label: 'Segment 2', 
+    color: [0, 255, 0, 0.5],  // Green
+    });
+
+
+    segmentationService.addOrUpdateSegmentation(segmentationData);
+    const updatedSeg = segmentationService.getSegmentation(segmentationId);
+    console.log(' ***** UPDATED SEG OBJECT:', updatedSeg);
+    const finalBuffer = updatedSeg.representationData.Labelmap.data.labelmapBufferArray;
+    bufferCounter(finalBuffer, ' *** FINAL buffer');
+
+
+    // 5. Attach segmentation to the actual viewport (this is what makes it render)
+    // add to the viewport
+    const { Enums: csToolsEnums } = csTools;
+    const viewportId = ViewportGridService.getActiveViewportId();
+    await segmentationService.removeSegmentationRepresentations(viewportId, segmentationId);
+    await segmentationService.addSegmentationRepresentation(viewportId, {
+        segmentationId,
+        type: csToolsEnums.SegmentationRepresentations.Labelmap,
+    });
+    segmentationService.setActiveSegmentation(viewportId, segmentationId);
+
+    const segAfterUpdateRep = segmentationService.getSegmentation(segmentationId);
+    console.log (' ***** AFTER RENDER SEG OBJECT:', segAfterUpdateRep);
+    const afterBuffer = segAfterUpdateRep.representationData.Labelmap.data.labelmapBufferArray;
+    bufferCounter(afterBuffer, ' *** AFTER "RENDER" ');
+
+
+    // MORE DEBUGGING:
+// 1. Get ALL representations in this viewport
+const viewportRepresentations = segmentationService.getSegmentationRepresentations(viewportId);
+console.log('Viewport representations:', viewportRepresentations);
+
+// 2. Get SPECIFIC Labelmap representation
+const [sViewportId, oLabelmapRepStored] = segmentationService.getRepresentationsForSegmentation(segmentationId)
+
+console.log('ViewportId, Specific Labelmap rep:', sViewportId, oLabelmapRepStored);
+
+// // 3. Check active segmentation
+// const activeSegId = segmentationService.getActiveSegmentationId(viewportId);
+// console.log('Active segmentation ID:', activeSegId);
+
+// // 4. Check segment visibilities
+// console.log('Segment 1 visible:', segmentationService.getSegmentVisibility(viewportId, segmentationId, 1));
+// console.log('Segment 2 visible:', segmentationService.getSegmentVisibility(viewportId, segmentationId, 2));
+
+
+
+
+
+    console.log('🎉 Loaded SEG:', dicomSegSeriesUID);
 }
 
-// 3. Inject your segLabelmap buffer by creating the .data object
-labelmapRep.data = {
-  // Your SEG voxel buffer goes here
-  labelmapBufferArray: [new Uint8Array(segLabelmap)],
+///////////////////  DEBUG HELPER
+function bufferCounter (buf, timePoint)  {
 
-  // Required fields
-  activeSegmentIndex: 1,
-  segmentsOnLabelmap: [1], // or more if you have multiple segments
-};
+    const uniqueValues = new Set();
+    let seg1Count = 0, seg2Count = 0;
+    let sampleCount = 0;
+    let nonZeroCount = 0;
+    let firstNonZeroIndex = 9999999;
+    let firstNonZeroIndexInSlice = 9999999;
 
-// 4. (Optional) Add segment metadata
-SegmentationService.addSegment(segmentationId, {
-  segmentIndex: 1,
-  label: "Imported Segment",
-  color: [255, 0, 0],
-});
 
-// 5. Notify Cornerstone that the segmentation changed
-SegmentationService.addOrUpdateSegmentation(segmentationData);
-
-console.log(' ***** UPDATED SEG OBJECT:', segmentationData);
-
-// // add to the viewport
-// const viewportId = ViewportGridService.getActiveViewportId();
-
-// // Add a labelmap representation for this segmentation on this viewport
-// await SegmentationService.addSegmentationRepresentationToViewport(viewportId, {
-//   segmentationId,
-//   type: 'labelmap',
-// });
-
-// // Make it the active segmentation representation
-// SegmentationService.setActiveSegmentationRepresentation(viewportId, {
-//   segmentationId,
-//   type: 'labelmap',
-// });
+    for (let i = 0; i < buf.length; i++) {
+        const perSliceChunk = buf[i];
+        for (let j = 0; j< perSliceChunk.length; j++) {
+            const value = perSliceChunk[j];
+            if (value !== 0) {
+                if (firstNonZeroIndex === 9999999) {firstNonZeroIndex = i; firstNonZeroIndexInSlice = j};
+                nonZeroCount++;
+                uniqueValues.add(value);
+                if (value === 1) seg1Count++;
+                if (value === 2) seg2Count++;
+            }
+        }
+    }
 
 
 
-///////////////////////////////////////////////////////////////////////
+console.log(' ***** DEBUG ACTUAL Buffer contents ... TIMEPOINT:', timePoint);
+console.log('Non-zero voxels:', nonZeroCount);
+console.log('Unique non-zero:', Array.from(uniqueValues));
+console.log('Seg1 count:', seg1Count, 'Seg2 count:', seg2Count);
+console.log('First non zero slice:', firstNonZeroIndex);
+console.log('First non zero index in slice:', firstNonZeroIndexInSlice);
+console.log('Buffer type:', buf.constructor.name, 'length:', buf.length);
 
-//   // 5) Register segmentation in the SegmentationService and attach to tool groups.[web:30][web:32][web:33]
-//   await SegmentationService.createLabelmapForDisplaySet(referencedDisplaySet, {
-//     segmentationId,
-//     label: `SEG ${dicomSegSeriesUID}`,
-//     // Optionally: segments config
-//   });
+return [seg1Count, seg2Count]
 
-//   // Add representation to whatever toolGroup(s) your mode uses
-//   const { toolGroupService } = servicesManager.services;
-//   const toolGroupIds = toolGroupService.getToolGroupIds();
-//   for (const toolGroupId of toolGroupIds) {
-//     await SegmentationService.addSegmentationRepresentationToToolGroup(
-//       toolGroupId,
-//       segmentationId
-//     );
-//   }
-
-  console.log('🎉 Loaded SEG:', dicomSegSeriesUID);
 }
+
+
+    function bufferCounter_orig (buf, timePoint)  {
+
+    const uniqueValues = new Set();
+    let seg1Count = 0, seg2Count = 0;
+    let sampleCount = 0;
+    let nonZeroCount = 0;
+    let firstNonZeroIndex = 9999999;
+
+    for (let i = 0; i < buf.length; i++) {
+    const value = buf[i];
+    if (value !== 0) {
+        if (firstNonZeroIndex === 9999999) firstNonZeroIndex = i;
+        nonZeroCount++;
+        uniqueValues.add(value);
+        if (value === 1) seg1Count++;
+        if (value === 2) seg2Count++;
+    }
+    }
+
+
+console.log(' ***** DEBUG ACTUAL Buffer contents ... TIMEPOINT:', timePoint);
+console.log('Non-zero voxels:', nonZeroCount);
+console.log('Unique non-zero:', Array.from(uniqueValues));
+console.log('Seg1 count:', seg1Count, 'Seg2 count:', seg2Count);
+console.log('First non zero index:', firstNonZeroIndex);
+console.log('Buffer type:', buf.constructor.name, 'length:', buf.length);
+
+return [seg1Count, seg2Count]
+
+}
+
+
+    // const uniqueValues = new Set();
+    // let nonZeroCount = 0;
+    // let segment1Count = 0;
+    // const rows = 500;   // from referenced image dicom
+    // const cols = 640;
+
+    // // const lmMap = segLabelmap;
+    // const lmMap = labelmapRep.data.labelmapBufferArray;
+    // for (let i = 0; i < lmMap.length; i++) {
+    // const value = lmMap[i];
+    // if (value !== 0) {
+    //     nonZeroCount++;
+    //     uniqueValues.add(value);
+    //     if (value === 1) segment1Count++;
+    // }
+    // }
+    // console.log(' *** labelmapRep:', labelmapRep);
+    // console.log('Buffer length:', lmMap.length);
+    // console.log('Non-zero voxels:', nonZeroCount);
+    // console.log('Segment 1 voxels:', segment1Count);
+    // console.log('Unique segment indices:', Array.from(uniqueValues));
+    // console.log('Expected size:', labelmapRep.imageIds.length * rows * cols); // verify shape
 
 
 ///////////////////////////////////////////////////////////////////////
@@ -297,3 +396,21 @@ console.log(' ***** UPDATED SEG OBJECT:', segmentationData);
 // console.log('First slice size:', firstScalarData.length, 'Expected:', bytesPerSlice);
 ////////////////////////////////////////////////////////////////////
 
+///////////////////////////////////////////////////////////////////////
+
+//   // 5) Register segmentation in the SegmentationService and attach to tool groups.[web:30][web:32][web:33]
+//   await SegmentationService.createLabelmapForDisplaySet(referencedDisplaySet, {
+//     segmentationId,
+//     label: `SEG ${dicomSegSeriesUID}`,
+//     // Optionally: segments config
+//   });
+
+//   // Add representation to whatever toolGroup(s) your mode uses
+//   const { toolGroupService } = servicesManager.services;
+//   const toolGroupIds = toolGroupService.getToolGroupIds();
+//   for (const toolGroupId of toolGroupIds) {
+//     await SegmentationService.addSegmentationRepresentationToToolGroup(
+//       toolGroupId,
+//       segmentationId
+//     );
+//   }
