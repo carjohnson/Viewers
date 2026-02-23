@@ -321,13 +321,15 @@ function WebQuizSidePanelComponent() {
 
                 const { payload } = data;
                 for (const seg of payload) {
-                    if (!seg.base64) continue;
+                    if (!seg.base64Buffer) continue;
 
-                    const arrayBuffer = base64ToArrayBuffer(seg.base64);
+                    const arrayBuffer = base64ToArrayBuffer(seg.base64Buffer);
 
                     await loadDicomSegIntoOHIF({
                         dicomSegSeriesUID: seg.dicomSegSeriesUID,
                         referencedSeriesInstanceUID: seg.referencedSeriesUID,
+                        segmentationLabel: seg.segmentationLabel,
+                        segmentLabels: seg.segmentLabels,
                         arrayBuffer,
                         servicesManager,
                     });
