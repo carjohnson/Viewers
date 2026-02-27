@@ -7,7 +7,6 @@ import { annotation } from '@cornerstonejs/tools';
 import { useStudyInfoStore } from './stores/useStudyInfoStore';
 import { useStudyInfo } from './hooks/useStudyInfo';
 import { usePatientInfo } from '@ohif/extension-default';
-import { useDicomSegSeriesUIDStore } from './stores/useDicomSegSeriesUIDStore';
 import { API_BASE_URL } from './config/config';
 import { AnnotationStats } from './models/AnnotationStats';
 import { setUserInfo, getUserInfo, onUserInfoReady } from './../../../../modes/@ohif/mode-webquiz/src/userInfoService';
@@ -75,6 +74,12 @@ function WebQuizSidePanelComponent() {
 
     const [isMinimized, setIsMinimized] = useState(false);
 
+    // add a property to the segmentation service to keep track of the initial load across extensions
+    const segService = servicesManager.services.segmentationService as any;
+    if (!segService._hasLoadedInitialSegmentations) {
+    segService._hasLoadedInitialSegmentations = false;
+    }
+
 
     //~~~~~~~~~~~~~~~~~
      const [modalInfo, setModalInfo] = useState<null | { 
@@ -141,7 +146,6 @@ function WebQuizSidePanelComponent() {
     const studyUID = studyInfo?.studyUID;
 
     const userInfo = getUserInfo();
-    const { setDicomSegSeriesUIDMap } = useDicomSegSeriesUIDStore();
     //=========================================================
     // This useEffect will keep the patient and study metadata up-to-date
     //      if the user selects a different study.
@@ -305,16 +309,16 @@ function WebQuizSidePanelComponent() {
     //=========================================================
     useEffect(() => {
         async function loadSegmentations() {
-            const segmentationId = "";  // unknown segmentationId at this point
-            const username = userInfo.username;
-            console.log(' *** IN FETCH SEGMENTATIONS:', username, studyUID)
+            const username = userInfo?.username;
+            console.log(' *** IN FETCH SEGMENTATIONS ... user, study, flag:', username, studyUID, segService._hasLoadedInitialSegmentations)
             if (!studyUID || !username) return;
             try {
+                // if already loaded - skip
+                if (segService._hasLoadedInitialSegmentations) return;
+
                 const res = await fetch(
                     `${API_BASE_URL}/webquiz/list-study-segmentations?username=${username}&studyUID=${studyUID}`,
                     { credentials: 'include' }
-                // segs.forEach(seg => {
-                //     setDicomSegSeriesUIDMap(segmentationId, seg.dicomSegSeriesUID); 
                 )
                 const data = await res.json();
                 console.log('📥 Segmentations response:', data);
@@ -326,20 +330,31 @@ function WebQuizSidePanelComponent() {
                     const arrayBuffer = base64ToArrayBuffer(seg.base64Buffer);
 
                     await loadDicomSegIntoOHIF({
-                        dicomSegSeriesUID: seg.dicomSegSeriesUID,
+                        // dicomSegSeriesUID: seg.dicomSegSeriesUID,
+                        segmentationId: seg.segmentationId,
                         referencedSeriesInstanceUID: seg.referencedSeriesUID,
                         segmentationLabel: seg.segmentationLabel,
                         segmentLabels: seg.segmentLabels,
                         arrayBuffer,
                         servicesManager,
                     });
-                }
+                    
+                    // indicates at least one entry existed in DB otherwise flag remains false
+                    segService._hasLoadedInitialSegmentations = true;
 
+                }
             } catch (err) {
                 console.error('❌ Error fetching segmentations:', err);
             }
         }
         loadSegmentations();
+
+        // // for debug
+        // const allSegmentations = segmentationService.getSegmentations();
+        // Object.entries(allSegmentations).forEach(([id, seg]) => {
+        // console.log(`Seg ${id}:`, Object.keys(seg.segments || {}).length, 'segments');
+        // });        
+
     }, [userInfo?.username, studyUID]);
 
     

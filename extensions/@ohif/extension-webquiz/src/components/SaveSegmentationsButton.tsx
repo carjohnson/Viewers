@@ -3,8 +3,9 @@ import { Button } from '@ohif/ui'; // or your preferred button source
 import { postSegmentations } from '../handlers/postSegmentations';
 import {UserInfo} from '../models/UserInfo';
 import dcmjs from 'dcmjs';
-import { useDicomSegSeriesUIDStore } from './../stores/useDicomSegSeriesUIDStore';
-
+// import { useDicomSegSeriesUIDStore } from './../stores/useDicomSegSeriesUIDStore';
+import { useSegmentMetadataStore } from './../stores/useSegmentMetadataStore';
+import { SegmentationData } from './../models/SegmentationData';
 
 
 
@@ -25,6 +26,7 @@ interface SegmentWithStats {
     };
   };
 }
+
 
 type Props = {
   getUserInfo: () => UserInfo | null;
@@ -56,7 +58,7 @@ const SaveSegmentationsButton: React.FC<Props> = ({
   closeModal,
 }) => {
 
-  const {getDicomSegSeriesUIDMap, setDicomSegSeriesUIDMap} = useDicomSegSeriesUIDStore();
+  // const {getDicomSegSeriesUIDMap, setDicomSegSeriesUIDMap} = useDicomSegSeriesUIDStore();
   const handleClick = () => {
       showModal({
         title: 'Confirm Save Segmentations',
@@ -75,18 +77,50 @@ const SaveSegmentationsButton: React.FC<Props> = ({
   const confirmCompletion = async () => {
     
     const allSegmentations = segmentationService.getSegmentations();
+    const allSegs: SegmentationData = segmentationService.getSegmentations();
     console.log(' *** In SaveSegmentationsButton ... all Segmentations', allSegmentations);
+    const hasLoadedFromDB = segmentationService._hasLoadedInitialSegmentations;
 
     let segmentationObjects = [];
     let updatedSeg;
     let lastSegIdForDebug = "";
 
+    //  for (const seg of allSegmentations) {
+    for (const seg of Object.values(allSegs) as SegmentationData[]) {
 
+      let segmentLabels = useSegmentMetadataStore.getState().getMetadata(seg.segmentationId);
+      console.log(`Seg ${seg.segmentationId}:`, segmentLabels?.length || 0, 'segments from CACHE');
 
-    for (const seg of allSegmentations) {
+      if (hasLoadedFromDB) {
+        if (!segmentLabels?.length) {
+          console.log('⏭️ Skipping empty segmentation:', seg.segmentationId);
+          continue;
+        }
+      } else if (!segmentLabels?.length) {
+        console.log('🆕 New segmentation detected - caching from service');
+        
+        // Capture segments from CURRENT service state (user-created in OHIF)
+        const currentSegments = seg.segments || {};
+        const segmentLabelsFromService = Object.entries(currentSegments).map(([index, segment]) => ({
+          segmentIndex: Number(index),
+          label: segment.label || `Segment ${index}`,
+          cachedStats: segment.cachedStats,
+        }));
+      
+        // Store it for future saves
+        useSegmentMetadataStore.getState().setMetadata(seg.segmentationId, segmentLabelsFromService);
+        console.log(`✅ Cached ${segmentLabelsFromService.length} segments for new seg`);
+        segmentLabels = segmentLabelsFromService;
+      //  continue; // Still skip save for new ones until user confirms
+      }
+    
+      // Proceed with save logic for segmentations WITH metadata
+      console.log(`💾 Saving ${seg.segmentationId} with ${segmentLabels?.length} segments`);
 
+    
       let generatedSeg;
       try {
+        // generating a SEG object that can be posted to backend as DICOM SEG with metadata
 
         // because this is a custom segmentation extension, 
         //      predecessorImage prop is missing from the seg
@@ -115,10 +149,11 @@ const SaveSegmentationsButton: React.FC<Props> = ({
           continue;
         }
 
-        // Check all segments for non-zero volume
+        // Check all segments for non-zero volume - use stats from cached segment metadata
         const segmentIdsToRemove: string[] = [];
         let hasVolume = false;
-        const segments = (updatedSeg?.segments || {}) as Record<string, SegmentWithStats>;
+        // const segments = (updatedSeg?.segments || {}) as Record<string, SegmentWithStats>;
+        const segments = useSegmentMetadataStore.getState().getMetadata(seg.segmentationId);
 
         for (const [segIdxStr, segment] of Object.entries(segments)) {
           const volume = segment.cachedStats?.namedStats?.volume?.value;
@@ -154,29 +189,6 @@ const SaveSegmentationsButton: React.FC<Props> = ({
             continue;
           }
 
-          // check if modifications are being made to an existing segmentation object
-          try {
-            console.log('segmentationId:', seg.segmentationId);
-            console.log('current SEG SeriesInstanceUID:', generatedSeg.dataset.SeriesInstanceUID);
-
-            let stableUID = getDicomSegSeriesUIDMap(seg.segmentationId);
-
-            if (!stableUID) {
-              // First time this segmentationId is exported
-              stableUID = generatedSeg.dataset.SeriesInstanceUID;
-              setDicomSegSeriesUIDMap(seg.segmentationId, stableUID);
-              console.log('Stored new stableUID for segmentationId', seg.segmentationId, stableUID);
-            } else {
-              // Reuse the stable UID
-              generatedSeg.dataset.SeriesInstanceUID = stableUID;
-              console.log('Reused stableUID for segmentationId', seg.segmentationId, stableUID);
-            }
-          } catch (err) {
-            console.log(' *** In SaveSegmentationsButton ... loading dicomSegSeriesUIDMap:', getDicomSegSeriesUIDMap);
-            console.warn('Stack:', err.stack);
-          }
-
-
 
           console.log(' *** GENERATED SEG:', generatedSeg);
 
@@ -211,7 +223,8 @@ const SaveSegmentationsButton: React.FC<Props> = ({
 
           // segmentation and blob generation succeeded
           segmentationObjects.push({
-              dicomSegSeriesUID: generatedSeg.dataset.SeriesInstanceUID,
+              // dicomSegSeriesUID: generatedSeg.dataset.SeriesInstanceUID,
+              segmentationId: seg.segmentationId,
               sourceSeriesInstanceUid: seriesUid,
               label: seg.label,
               segments: buildSegmentList(seg.segments),
@@ -223,12 +236,15 @@ const SaveSegmentationsButton: React.FC<Props> = ({
         }
 
 
+
       } catch (err) {
           console.warn(`Skipping segmentation ${seg.segmentationId}: generating seg failed`, err);
           console.warn('Stack:', err.stack);
           continue;
       }
     } // end for to generate segmentation objects
+
+
 
 
     // // DEBUG - needs activeViewportImageIds as a prop
@@ -246,18 +262,23 @@ const SaveSegmentationsButton: React.FC<Props> = ({
     //     predecessorImageId: activeViewportImageIds[0],
     // });
 
-
+    let postSegmentationResult;
     if (segmentationObjects.length !== 0) {
-      const postSegmentationResult = await postSegmentations({
+      postSegmentationResult = await postSegmentations({
           segmentationObjects,
           studyUID: studyInstanceUID,
       });
+    } else {
+      postSegmentationResult = await postSegmentations({
+          segmentationObjects: [],  // signal no objects to post to keep DB in sync
+          studyUID: studyInstanceUID,
+    });
 
-      if (postSegmentationResult?.error) {
-        console.warn('⚠️ Failed to post segmentations:', postSegmentationResult.error);
-      } else {
-        console.log(`📌 Segmentations posted for ${studyInstanceUID}`);
-      }
+    if (postSegmentationResult?.error) {
+      console.warn('⚠️ Failed to post segmentations:', postSegmentationResult.error);
+    } else {
+      console.log(`📌 Segmentations posted for ${studyInstanceUID}`);
+    }
       
       console.log(`📬 Confirmed save segmentations to DB`);
     }
@@ -265,7 +286,7 @@ const SaveSegmentationsButton: React.FC<Props> = ({
     closeModal();
 
 
-  };  
+  };  // end confirm completion
 
   return (
     <div className="p-2 text-center">

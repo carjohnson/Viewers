@@ -1,21 +1,28 @@
 import { adaptersSEG } from '@cornerstonejs/adapters';
 import { imageLoader } from '@cornerstonejs/core';
 import { metaData } from '@cornerstonejs/core';
+// import { useDicomSegSeriesUIDStore } from './../stores/useDicomSegSeriesUIDStore';
+import { useSegmentMetadataStore } from '../stores/useSegmentMetadataStore';
+import { SegmentationData } from './../models/SegmentationData';
 
 
 export async function loadDicomSegIntoOHIF({
-  dicomSegSeriesUID,
+//   dicomSegSeriesUID,
+  segmentationId,
   referencedSeriesInstanceUID,
   segmentationLabel,
   segmentLabels,
   arrayBuffer,
   servicesManager,
 }) {
+
+  // ~~~~~~~~~~
   const {
-    segmentationService,
-    displaySetService,
-    viewportGridService,
+        segmentationService,
+        displaySetService,
+        viewportGridService,
   } = servicesManager.services;
+//   const { setDicomSegSeriesUIDMap } = useDicomSegSeriesUIDStore.getState();
 
   // ~~~~~~~~~~
   // get referenced display sets and image ids
@@ -24,7 +31,8 @@ export async function loadDicomSegIntoOHIF({
   const referencedDisplaySet = referencedDisplaySets?.[0];
 
   if (!referencedDisplaySet) {
-    console.warn('No referenced displaySet for SEG', dicomSegSeriesUID);
+    // console.warn('No referenced displaySet for SEG', dicomSegSeriesUID);
+    console.warn('No referenced displaySet for SEG', segmentationId);
     return;
   }
 
@@ -48,13 +56,15 @@ export async function loadDicomSegIntoOHIF({
 
     // ~~~~~~~~~~
     // create one empty labelmap segmentation
-    const segmentationId = await segmentationService.createLabelmapForDisplaySet(
+    await segmentationService.createLabelmapForDisplaySet(
         referencedDisplaySet,  // ← Pass the displaySet object directly
         {
         // label: `SEG ${dicomSegSeriesUID.slice(-8)}`,
+        segmentationId: segmentationId,
         label: segmentationLabel,
         },
     );
+
 
     segmentLabels.forEach(s => {
         // Add metadata for ALL segments found in buffer
@@ -63,6 +73,16 @@ export async function loadDicomSegIntoOHIF({
         label: s.label,
         });
     })
+
+    // cache segments metatdata so that it persists between extensions
+    useSegmentMetadataStore.getState().setMetadata(
+        segmentationId,
+        segmentLabels.map(s => ({
+            ...s,
+            cachedStats: undefined,
+        })
+    ));
+    console.log('🔥 CACHED:', segmentationId, segmentLabels.length, 'segments');
 
 
     // // for debug
@@ -74,7 +94,9 @@ export async function loadDicomSegIntoOHIF({
 
     // ~~~~~~~~~~
     // get labelmap ids and split the buffer into per Slice arrays
-    const segmentationData = segmentationService.getSegmentation(segmentationId);
+    const segmentationData = segmentationService.getSegmentation(segmentationId) as SegmentationData;
+    console.log(' *** IN LOAD DICOM SEG INTO OHIF ... segmentationData:', segmentationData);
+
     const labelmapRep = segmentationData.representationData.Labelmap;
     const labelmapImageIds = labelmapRep.imageIds; //derived images from representation data
 
@@ -97,14 +119,18 @@ export async function loadDicomSegIntoOHIF({
     });
 
 
+
+
+
     // ~~~~~~~~~~
     // Add to active viewport(s)
     const updatedSeg = segmentationService.getSegmentation(segmentationId);
-    // console.log(' *** UPDATED SEG', updatedSeg);
+    console.log(' *** UPDATED SEG', updatedSeg);
     const viewportId = viewportGridService.getActiveViewportId();
     await segmentationService.addSegmentationRepresentation(viewportId, updatedSeg);
 
-    console.log('🎉 Loaded SEG:', dicomSegSeriesUID);
+    console.log('🎉 Loaded SEG:', segmentationId);
+
 }
 
 ///////////////////////////////////////////////

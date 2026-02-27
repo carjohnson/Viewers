@@ -42,6 +42,10 @@ function modeFactory({ modeConfiguration }) {
         } = servicesManager.services;
 
       measurementService.clearMeasurements();
+      const segService = servicesManager.services.segmentationService as any;
+      if (segService._hasLoadedInitialSegmentations === undefined) {
+        segService._hasLoadedInitialSegmentations = false;
+      }
 
       // Init Default and SR ToolGroups
       initToolGroups(extensionManager, toolGroupService, commandsManager);
@@ -218,6 +222,10 @@ function modeFactory({ modeConfiguration }) {
         uiDialogService,
         uiModalService,
       } = servicesManager.services;
+
+      
+      const segService = servicesManager.services.segmentationService as any;
+      segService._hasLoadedInitialSegmentations = false;
 
       _unsubscriptions.forEach(unsubscribe => unsubscribe());
       _unsubscriptions.length = 0;
