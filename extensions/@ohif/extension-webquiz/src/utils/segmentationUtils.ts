@@ -71,6 +71,7 @@ export async function loadDicomSegIntoOHIF({
         segmentationService.addSegment(segmentationId, {
         segmentIndex: s.segmentIndex,
         label: s.label,
+        cachedStats: s.cachedStats,
         });
     })
 
@@ -79,7 +80,6 @@ export async function loadDicomSegIntoOHIF({
         segmentationId,
         segmentLabels.map(s => ({
             ...s,
-            cachedStats: undefined,
         })
     ));
     console.log('🔥 CACHED:', segmentationId, segmentLabels.length, 'segments');

@@ -5,7 +5,7 @@ import {UserInfo} from '../models/UserInfo';
 import dcmjs from 'dcmjs';
 // import { useDicomSegSeriesUIDStore } from './../stores/useDicomSegSeriesUIDStore';
 import { useSegmentMetadataStore } from './../stores/useSegmentMetadataStore';
-import { SegmentationData } from './../models/SegmentationData';
+import { SegmentationData, SegmentInfo } from './../models/SegmentationData';
 
 
 
@@ -17,15 +17,6 @@ const ImplementationVersionName = 'OHIF-3.12.0';
 const EXPLICIT_VR_LITTLE_ENDIAN = '1.2.840.10008.1.2.1';
 
 
-interface SegmentWithStats {
-  cachedStats?: {
-    namedStats?: {
-      volume?: {
-        value?: number;
-      };
-    };
-  };
-}
 
 
 type Props = {
@@ -91,29 +82,32 @@ const SaveSegmentationsButton: React.FC<Props> = ({
       let segmentLabels = useSegmentMetadataStore.getState().getMetadata(seg.segmentationId);
       console.log(`Seg ${seg.segmentationId}:`, segmentLabels?.length || 0, 'segments from CACHE');
 
-      if (hasLoadedFromDB) {
-        if (!segmentLabels?.length) {
-          console.log('⏭️ Skipping empty segmentation:', seg.segmentationId);
-          continue;
-        }
-      } else if (!segmentLabels?.length) {
-        console.log('🆕 New segmentation detected - caching from service');
-        
-        // Capture segments from CURRENT service state (user-created in OHIF)
-        const currentSegments = seg.segments || {};
-        const segmentLabelsFromService = Object.entries(currentSegments).map(([index, segment]) => ({
-          segmentIndex: Number(index),
-          label: segment.label || `Segment ${index}`,
-          cachedStats: segment.cachedStats,
-        }));
+      // Capture segments from CURRENT service state (user-created in OHIF)
+      const currentSegments = seg.segments || {};
+      const segmentLabelsFromService = Object.entries(currentSegments).map(([index, segment]) => ({
+        segmentIndex: Number(index),
+        label: segment.label || `Segment ${index}`,
+        cachedStats: segment.cachedStats,
+      }));
+
       
-        // Store it for future saves
-        useSegmentMetadataStore.getState().setMetadata(seg.segmentationId, segmentLabelsFromService);
-        console.log(`✅ Cached ${segmentLabelsFromService.length} segments for new seg`);
-        segmentLabels = segmentLabelsFromService;
-      //  continue; // Still skip save for new ones until user confirms
+      if (hasLoadedFromDB) {
+        syncSegmentsFromServiceToStore( segmentLabels, segmentLabelsFromService, seg)
+      } else {
+        if (!segmentLabels) {
+
+          console.log('🆕 New segmentation detected - caching from service');
+
+          // Add new segmentation to store
+          useSegmentMetadataStore.getState().setMetadata(seg.segmentationId, segmentLabelsFromService);
+          console.log(`✅ Cached ${segmentLabelsFromService.length} segments for new seg`);
+        } else {
+          syncSegmentsFromServiceToStore(segmentLabels, segmentLabelsFromService, seg)
+        }
+
       }
-    
+
+
       // Proceed with save logic for segmentations WITH metadata
       console.log(`💾 Saving ${seg.segmentationId} with ${segmentLabels?.length} segments`);
 
@@ -152,7 +146,6 @@ const SaveSegmentationsButton: React.FC<Props> = ({
         // Check all segments for non-zero volume - use stats from cached segment metadata
         const segmentIdsToRemove: string[] = [];
         let hasVolume = false;
-        // const segments = (updatedSeg?.segments || {}) as Record<string, SegmentWithStats>;
         const segments = useSegmentMetadataStore.getState().getMetadata(seg.segmentationId);
 
         for (const [segIdxStr, segment] of Object.entries(segments)) {
@@ -169,13 +162,28 @@ const SaveSegmentationsButton: React.FC<Props> = ({
           }
         } // end for each segment - capture unpainted segments
 
-        // Remove empty segments
+        // Remove empty segments from service 
+        //  - adjust for segment indexing '1' based (segmentation objects are '0' based indexing)
         for (const segIdxStr of segmentIdsToRemove) {
-          const segIndex = parseInt(segIdxStr);
+          const segIndex = parseInt(segIdxStr) + 1;
           segmentationService.removeSegment(seg.segmentationId, segIndex);
-          console.log(`✅ Removed empty segment ${segIdxStr}`);
+          const segAfterRemoval = segmentationService.getSegmentation(seg.segmentationId);
+          console.log(`✅ Removed empty segment ${segIdxStr}`, segAfterRemoval);
         }
 
+      // rebuild store as ARRAY (not object)
+      if (segmentIdsToRemove.length > 0) {
+        const remainingSegments = Object.values(segments || {})
+          .filter(segment => {
+            const volume = segment.cachedStats?.namedStats?.volume?.value;
+            return typeof volume === 'number' && volume > 0;
+          });
+        
+        useSegmentMetadataStore.getState().setMetadata(seg.segmentationId, remainingSegments);
+        console.log(`✅ Store updated: ${remainingSegments.length} valid segments`);
+      }
+
+        
         // if any of the segments were painted, generate a segmentation object
         if (hasVolume) {
           generatedSeg = commandsManager.runCommand('generateSegmentation', {
@@ -307,22 +315,18 @@ export default SaveSegmentationsButton;
 
 // >>>>>>>>>>>>> Helper functions <<<<<<<<<<<<<
 
-// =====================================
-type OhifSegment = {
-  segmentIndex: number;
-  label: string;
-  // add other OHIF fields if needed
-};
+
 
 // =====================================
 function buildSegmentList(segmentsObj) {
   if (!segmentsObj) return [];
 
-  const segmentArray = Object.values(segmentsObj) as OhifSegment[]; // OHIF stores segments as an object
+  const segmentArray = Object.values(segmentsObj) as SegmentInfo[]; // OHIF stores segments as an object
 
   return segmentArray.map(segment => ({
     segmentIndex: segment.segmentIndex,
     label: segment.label,
+    cachedStats: segment.cachedStats,
     lesionLocation: ["segment-1","segment-2"],
     lesionReferenceStandard: "Metastasis",
     decisionCriteria: ["Follow-up a", "Follow-up b"],
@@ -341,5 +345,53 @@ function getSeriesUid(imageId: string): string | null {
   }
 }
 
+// =====================================
+/**
+ * Function to synchronize what the user has done in the Viewer with
+ * the stored cache of metadata.
+ * 
+ * @param segmentLabelsFromStore : segments stored in the cache 
+ * @param segmentLabelsFromService : segments stored in segmentation's Labelmap property
+ * @param seg : segmentation object from segmentationService
+ */
+function syncSegmentsFromServiceToStore( 
+      segmentLabelsFromStore: SegmentInfo[],
+      segmentLabelsFromService : SegmentInfo[],
+      seg: SegmentationData,
+    ) {
 
+  console.log(' *** IN SYNC SEGMENTS - lengths ... Store / Service',segmentLabelsFromStore.length , Object.keys(segmentLabelsFromService || {}).length );
+  // map of segmentIndexes from the segmentation service
+  const serviceIndexes = new Set(
+    segmentLabelsFromService.map(s => s.segmentIndex)
+  );
+
+  // user may have deleted a segment
+  if (segmentLabelsFromStore.length > Object.keys(segmentLabelsFromService || {}).length) {
+    console.log(' *********** ... Store > Service ---> remove discarded segments');
+    const pruned = segmentLabelsFromStore.filter(s =>
+      serviceIndexes.has(s.segmentIndex)
+    );
+    useSegmentMetadataStore.getState().setMetadata(seg.segmentationId, pruned);
+  }
+
+  // user may have added a segment
+  if (segmentLabelsFromStore.length < Object.keys(segmentLabelsFromService || {}).length) {
+    console.log(' *********** ... Store < Service ---> merge in new segments');
+    const mergedLabels = segmentLabelsFromService.map(newSeg => {
+      const dbMatch = segmentLabelsFromStore?.find(dbSeg => dbSeg.segmentIndex === newSeg.segmentIndex);
+      return {
+        ...newSeg,
+        cachedStats: newSeg.cachedStats || dbMatch?.cachedStats,
+      };
+    });
+    useSegmentMetadataStore.getState().setMetadata(seg.segmentationId, mergedLabels);    
+  }
+
+  // existing segments may have been modified
+  if (segmentLabelsFromStore.length === Object.keys(segmentLabelsFromService || {}).length) {
+    console.log(' *********** ... Store = Service');
+  }
+  
+}
 
