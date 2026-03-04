@@ -1,0 +1,25 @@
+.segmentation-group {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 200px);
+  /* height: 100%; */
+  min-height: 0; /* CRITICAL for fitting into the parent container*/
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 0.5rem;
+  margin: 1rem 0;
+  /* outline: 2px solid red; */
+}
+
+.segmentation-group legend {
+  font-weight: bold;
+  padding: 0 0.5rem;
+}
+
+.segmentation-scroll {
+  flex-grow: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 0.5rem;
+  /* outline: 2px solid blue; */
+}

@@ -1,7 +1,13 @@
 // stores/useSegmentMetadataStore.ts
 import { create } from 'zustand';
-import { SegmentInfo } from './../models/SegmentationData';
+import { SegmentationStats } from './../models/SegmentationData';
 
+
+export interface SegmentInfo {
+  segmentIndex: number;
+  label: string;
+  cachedStats?: SegmentationStats;
+}
 
 export interface SegmentationMetadata {
   [segmentationId: string]: SegmentInfo[];

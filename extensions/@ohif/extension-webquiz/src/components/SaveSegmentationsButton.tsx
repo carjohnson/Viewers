@@ -4,8 +4,8 @@ import { postSegmentations } from '../handlers/postSegmentations';
 import {UserInfo} from '../models/UserInfo';
 import dcmjs from 'dcmjs';
 // import { useDicomSegSeriesUIDStore } from './../stores/useDicomSegSeriesUIDStore';
-import { useSegmentMetadataStore } from './../stores/useSegmentMetadataStore';
-import { SegmentationData, SegmentInfo } from './../models/SegmentationData';
+import { useSegmentMetadataStore, SegmentInfo } from './../stores/useSegmentMetadataStore';
+import { SegmentationData } from './../models/SegmentationData';
 
 
 

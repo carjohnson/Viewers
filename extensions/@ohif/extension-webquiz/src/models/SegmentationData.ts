@@ -15,10 +15,3 @@ export type  SegmentationStats = {
 }
 
 // =====================================
-export interface SegmentInfo {
-  segmentIndex: number;
-  label: string;
-  cachedStats?: SegmentationStats;
-}
-
-// =====================================

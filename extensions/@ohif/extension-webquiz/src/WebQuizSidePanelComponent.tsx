@@ -16,6 +16,7 @@ import { handleDropdownChange } from './handlers/dropdownHandlers';
 import { handleMeasurementClick, toggleVisibility, closeScoreModal } from './handlers/guiHandlers';
 import { useSystem } from '@ohif/core';
 import { AnnotationList } from './components/AnnotationList/AnnotationList';
+import { SegmentationList } from './components/SegmentationList/SegmentationList'
 import { ScoreModal } from './components/ScoreModal';
 import { handleMeasurementAdded, handleAnnotationChanged, handleMeasurementRemoved, handleMeasurementUpdated } from './handlers/annotationEventHandlers';
 import { ToolGroupManager } from '@cornerstonejs/tools';
@@ -734,6 +735,10 @@ function WebQuizSidePanelComponent() {
                 className="text-white w-full text-center"
                 style={{ flexGrow: 1, minHeight: 0 }}
             >
+                <SegmentationList
+                    getUserInfo={getUserInfo}
+                />
+
                 <AnnotationList
                 measurementList={measurementList}
                 dropdownSelectionMap={dropdownSelectionMap}
