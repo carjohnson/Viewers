@@ -143,105 +143,108 @@ const SaveSegmentationsButton: React.FC<Props> = ({
           continue;
         }
 
-        // Check all segments for non-zero volume - use stats from cached segment metadata
-        const segmentIdsToRemove: string[] = [];
-        let hasVolume = false;
-        const segments = useSegmentMetadataStore.getState().getMetadata(seg.segmentationId);
+      //   // Check all segments for non-zero volume - use stats from cached segment metadata
+      //   const segmentIdsToRemove: string[] = [];
+      //   let hasVolume = false;
+      //   const segments = useSegmentMetadataStore.getState().getMetadata(seg.segmentationId);
 
-        for (const [segIdxStr, segment] of Object.entries(segments)) {
-          const volume = segment.cachedStats?.namedStats?.volume?.value;
+      //   for (const [segIdxStr, segment] of Object.entries(segments)) {
+      //     const volume = segment.cachedStats?.namedStats?.volume?.value;
 
-          if (typeof volume !== 'number' || volume <=0) {
-            console.log(`Marking unpainted segment ${segIdxStr} (volume=${volume}) for removal`);
-            segmentIdsToRemove.push(segIdxStr);
-          } else {
-            // check that one of the segments has volume for generateSegmentation
-            if (typeof volume === 'number' && volume > 0) {
-              hasVolume = true;
-            }
-          }
-        } // end for each segment - capture unpainted segments
+      //     if (typeof volume !== 'number' || volume <=0) {
+      //       console.log(`Marking unpainted segment ${segIdxStr} (volume=${volume}) for removal`);
+      //       segmentIdsToRemove.push(segIdxStr);
+      //     } else {
+      //       // check that one of the segments has volume for generateSegmentation
+      //       if (typeof volume === 'number' && volume > 0) {
+      //         hasVolume = true;
+      //       }
+      //     }
+      //   } // end for each segment - capture unpainted segments
 
-        // Remove empty segments from service 
-        //  - adjust for segment indexing '1' based (segmentation objects are '0' based indexing)
-        for (const segIdxStr of segmentIdsToRemove) {
-          const segIndex = parseInt(segIdxStr) + 1;
-          segmentationService.removeSegment(seg.segmentationId, segIndex);
-          const segAfterRemoval = segmentationService.getSegmentation(seg.segmentationId);
-          console.log(`✅ Removed empty segment ${segIdxStr}`, segAfterRemoval);
+      //   // Remove empty segments from service 
+      //   //  - adjust for segment indexing '1' based (segmentation objects are '0' based indexing)
+      //   for (const segIdxStr of segmentIdsToRemove) {
+      //     const segIndex = parseInt(segIdxStr) + 1;
+      //     segmentationService.removeSegment(seg.segmentationId, segIndex);
+      //     const segAfterRemoval = segmentationService.getSegmentation(seg.segmentationId);
+      //     console.log(`✅ Removed empty segment ${segIdxStr}`, segAfterRemoval);
+      //   }
+
+      // // rebuild store as ARRAY (not object)
+      // if (segmentIdsToRemove.length > 0) {
+      //   const remainingSegments = Object.values(segments || {})
+      //     .filter(segment => {
+      //       const volume = segment.cachedStats?.namedStats?.volume?.value;
+      //       return typeof volume === 'number' && volume > 0;
+      //     });
+        
+      //   useSegmentMetadataStore.getState().setMetadata(seg.segmentationId, remainingSegments);
+      //   console.log(`✅ Store updated: ${remainingSegments.length} valid segments`);
+      // }
+
+        
+        // // if any of the segments were painted, generate a segmentation object
+        // if (hasVolume) {
+
+        generatedSeg = commandsManager.runCommand('generateSegmentation', {
+          segmentationId: seg.segmentationId,
+        });
+
+        if (!generatedSeg || !generatedSeg.dataset) {
+          console.warn(
+            `Skipping segmentation ${seg.segmentationId}: generation failed`
+          );
+          continue;
         }
 
-      // rebuild store as ARRAY (not object)
-      if (segmentIdsToRemove.length > 0) {
-        const remainingSegments = Object.values(segments || {})
-          .filter(segment => {
-            const volume = segment.cachedStats?.namedStats?.volume?.value;
-            return typeof volume === 'number' && volume > 0;
-          });
-        
-        useSegmentMetadataStore.getState().setMetadata(seg.segmentationId, remainingSegments);
-        console.log(`✅ Store updated: ${remainingSegments.length} valid segments`);
-      }
 
+        console.log(' *** GENERATED SEG:', generatedSeg);
+
+        // //////////// Create blob from generatedSeg ////////////
+        // generate the meta data 
+        let segBlob;
+        const meta = {
+              FileMetaInformationVersion: generatedSeg.dataset._meta?.FileMetaInformationVersion?.Value,
+              MediaStorageSOPClassUID: generatedSeg.dataset.SOPClassUID,
+              MediaStorageSOPInstanceUID: generatedSeg.dataset.SOPInstanceUID,
+              TransferSyntaxUID: EXPLICIT_VR_LITTLE_ENDIAN,
+              ImplementationClassUID,
+              ImplementationVersionName,
+            };
+
+        const denaturalizedMetadata = dcmjs.data.DicomMetaDictionary.denaturalizeDataset(meta);
+        const denaturalizedDataset = dcmjs.data.DicomMetaDictionary.denaturalizeDataset(generatedSeg.dataset);
+        const dicomDict = new DicomDict(denaturalizedMetadata);
+        dicomDict.dict = denaturalizedDataset;
+
+        try {
+          const arrayBuffer = dicomDict.write();
+          segBlob = new Blob([arrayBuffer], { type: 'application/dicom' });
+          console.log('Blob created successfully, size:', segBlob.size, 'type:', segBlob.type);
+          console.log('segBlob:', segBlob);
         
-        // if any of the segments were painted, generate a segmentation object
-        if (hasVolume) {
-          generatedSeg = commandsManager.runCommand('generateSegmentation', {
+        } catch (blobError) {
+          console.warn(`Skipping segmentation ${seg.segmentationId}: blob creation failed`, blobError);
+          console.warn('Stack:', blobError.stack);
+          continue;
+        }
+
+        // segmentation and blob generation succeeded
+        segmentationObjects.push({
+            // dicomSegSeriesUID: generatedSeg.dataset.SeriesInstanceUID,
             segmentationId: seg.segmentationId,
-          });
+            sourceSeriesInstanceUid: seriesUid,
+            label: seg.label,
+            segments: buildSegmentList(seg.segments),
+            segmentationDataRef: segBlob,
+        });
 
-          if (!generatedSeg || !generatedSeg.dataset) {
-            console.warn(
-              `Skipping segmentation ${seg.segmentationId}: generation failed`
-            );
-            continue;
-          }
+        lastSegIdForDebug = seg.segmentationId;
+        console.log(' *** END OF GENERATE LOOP ... segObjects to post:', segmentationObjects);
 
 
-          console.log(' *** GENERATED SEG:', generatedSeg);
-
-          // //////////// Create blob from generatedSeg ////////////
-          // generate the meta data 
-          let segBlob;
-          const meta = {
-                FileMetaInformationVersion: generatedSeg.dataset._meta?.FileMetaInformationVersion?.Value,
-                MediaStorageSOPClassUID: generatedSeg.dataset.SOPClassUID,
-                MediaStorageSOPInstanceUID: generatedSeg.dataset.SOPInstanceUID,
-                TransferSyntaxUID: EXPLICIT_VR_LITTLE_ENDIAN,
-                ImplementationClassUID,
-                ImplementationVersionName,
-              };
-
-          const denaturalizedMetadata = dcmjs.data.DicomMetaDictionary.denaturalizeDataset(meta);
-          const denaturalizedDataset = dcmjs.data.DicomMetaDictionary.denaturalizeDataset(generatedSeg.dataset);
-          const dicomDict = new DicomDict(denaturalizedMetadata);
-          dicomDict.dict = denaturalizedDataset;
-
-          try {
-            const arrayBuffer = dicomDict.write();
-            segBlob = new Blob([arrayBuffer], { type: 'application/dicom' });
-            console.log('Blob created successfully, size:', segBlob.size, 'type:', segBlob.type);
-            console.log('segBlob:', segBlob);
-          
-          } catch (blobError) {
-            console.warn(`Skipping segmentation ${seg.segmentationId}: blob creation failed`, blobError);
-            console.warn('Stack:', blobError.stack);
-            continue;
-          }
-
-          // segmentation and blob generation succeeded
-          segmentationObjects.push({
-              // dicomSegSeriesUID: generatedSeg.dataset.SeriesInstanceUID,
-              segmentationId: seg.segmentationId,
-              sourceSeriesInstanceUid: seriesUid,
-              label: seg.label,
-              segments: buildSegmentList(seg.segments),
-              segmentationDataRef: segBlob,
-          });
-
-          lastSegIdForDebug = seg.segmentationId;
-          console.log(' *** END OF GENERATE LOOP ... segObjects to post:', segmentationObjects);
-        }
+        // } // end if hasVolume
 
 
 
