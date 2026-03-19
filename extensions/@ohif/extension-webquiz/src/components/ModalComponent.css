@@ -20,16 +20,23 @@
   top: 15%;
   left: 50%;
   transform: translateX(-50%);
-  width: 30%;
-  max-width: 400px;
-  height: 300px;
+    
+  width: auto;
+  max-width: 1000;
+  min-width: 400px;
+
+  max-height: 80vh;
+  height: auto;
+
   padding: 20px;
-  overflow: auto;
+  overflow-y: auto;
+
   border-radius: 8px;
   background-color: #fff;
   z-index: 1000;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
+
 
 .modal-buttons {
   display: flex;

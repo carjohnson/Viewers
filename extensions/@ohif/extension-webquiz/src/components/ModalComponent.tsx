@@ -9,6 +9,7 @@ type ModalProps = {
   onClose: () => void;
   showCancel?: boolean;
   onCancel?: () => void;
+  confirmText?: string;
 };
 
 export const ModalComponent: React.FC<ModalProps> = ({
@@ -17,13 +18,14 @@ export const ModalComponent: React.FC<ModalProps> = ({
   onClose,
   showCancel = false,
   onCancel,
+  confirmText,
 }) => (
   <div className="modal-overlay">
     <div className="modal-content">
       <h2 className="modal-title">{title}</h2>
       <p>{message}</p>
       <div className="modal-buttons">
-        <button className="modal-button" onClick={onClose}>OK</button>
+        <button className="modal-button" onClick={onClose}> {confirmText || "OK"}</button>
         {showCancel && (
           <button className="modal-button" onClick={onCancel ?? onClose}>Cancel</button>
         )}

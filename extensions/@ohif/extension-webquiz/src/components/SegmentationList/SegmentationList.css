@@ -23,3 +23,112 @@
   padding-right: 0.5rem;
   /* outline: 2px solid blue; */
 }
+
+.segmentation-label {
+  max-height: 500px;
+}
+
+.segment-list {
+  margin-left: 0rem; /* indent under segmentation */
+  margin-top: 0.25rem;
+  padding-left: 0.5rem;
+  border-left: 1px solid #555; /* subtle visual grouping */
+}
+
+
+
+.segment-item:hover {
+  background: #2a2a2a;
+  color: white;
+}
+
+.segment-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem; /* space between label and dropdowns */
+  flex-wrap: nowrap;
+  cursor: pointer;
+  padding: 0.25rem, 0.5rem;
+}
+
+.segment-item .dd__control {
+  min-width: 90px; /* keeps them from shrinking too small */
+}
+
+
+.segmentation-item {
+  pointer-events: auto;
+}
+
+.segmentation-item .segment-list,
+.segmentation-item .segment-item {
+  pointer-events: auto;
+}
+
+
+
+/* drop down styling*/
+.dd__control {
+  background-color: #222 !important;
+  border-color: #ccc !important;
+  color: white !important;
+}
+
+/* The selected value */
+.dd__single-value {
+  color: white !important;
+}
+
+.dd__placeholder {
+  color: #bbb !important;
+}
+
+.dd__input-container {
+  color: white !important;
+}
+
+/* The dropdown menu */
+.dd__menu {
+  background-color: #222 !important;
+  color: white !important;
+}
+
+/* Each option */
+.dd__option {
+  background-color: #222 !important;
+  color: white !important;
+}
+
+.dd__option--is-focused {
+  background-color: #444 !important;
+}
+
+.hepatic-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.checkbox-title {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.checkbox-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem; /* row gap, column gap */
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.checkbox-item input[type="checkbox"] {
+  transform: scale(1.2);
+  cursor: pointer;
+}

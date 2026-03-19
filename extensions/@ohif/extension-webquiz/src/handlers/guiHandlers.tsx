@@ -1,7 +1,11 @@
-// src/handlers/guiHandlers.ts
+// src/handlers/guiHandlers.tsx
+
+import React from 'react';
+
 import * as cornerstone from '@cornerstonejs/core';
 import * as cornerstoneTools from '@cornerstonejs/tools';
 import { annotation } from '@cornerstonejs/tools';
+import { SegmentDetailsModal } from '../components/SegmentationList/SegmentDetailsModal'
 
 //=========================================================
 // Set up GUI so the user can click on an annotation in the panel list
@@ -115,3 +119,51 @@ export const closeScoreModal = ({
 
 };
 
+
+//=========================================================
+// Set up GUI so the user can click on an annotation in the panel list
+//    and have the image jump to the corresponding slice
+//    also - set up a visibility icon for each annotation
+
+export const handleSegmentationClick = ({
+  segmentationId,
+  segmentLabel,
+  showModal,
+  closeModal,
+  confirmText,
+  groundTruth,
+  referenceStandardMethod,
+  hepaticSegment,
+}: {
+  segmentationId: string;
+  segmentLabel: string;
+  showModal: (args: {
+        title: string;
+        message: React.ReactNode;
+        onClose?: () => void;
+        showCancel?: boolean;
+        onCancel?: () => void;
+        confirmText: string;
+    }) => void;
+    closeModal: () => void;
+    groundTruth: { value: number; label: string }[];
+    referenceStandardMethod: { value: number; label: string }[];
+    hepaticSegment: { value: number; label: string }[];
+  }) => {
+    showModal({
+      title: "Segment Details",
+      message: (
+        <SegmentDetailsModal
+          segmentationId={segmentationId}
+          segmentLabel={segmentLabel}
+          groundTruth={groundTruth}
+          referenceStandardMethod={referenceStandardMethod}
+          hepaticSegment={hepaticSegment}
+        />
+      ),
+      confirmText: "Save",
+      showCancel: true,
+      onCancel: closeModal,
+      onClose: closeModal,
+    });
+  };

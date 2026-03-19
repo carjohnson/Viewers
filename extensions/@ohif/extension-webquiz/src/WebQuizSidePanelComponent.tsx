@@ -13,7 +13,7 @@ import { setUserInfo, getUserInfo, onUserInfoReady } from './../../../../modes/@
 import { useAnnotationPosting } from './hooks/useAnnotationPosting';
 import { fetchAnnotationsFromDB, convertAnnotationsToMeasurements } from './handlers/fetchAnnotations';
 import { handleDropdownChange } from './handlers/dropdownHandlers';
-import { handleMeasurementClick, toggleVisibility, closeScoreModal } from './handlers/guiHandlers';
+import { handleMeasurementClick, toggleVisibility, closeScoreModal, handleSegmentationClick } from './handlers/guiHandlers';
 import { useSystem } from '@ohif/core';
 import { AnnotationList } from './components/AnnotationList/AnnotationList';
 import { SegmentationList } from './components/SegmentationList/SegmentationList'
@@ -22,6 +22,8 @@ import { handleMeasurementAdded, handleAnnotationChanged, handleMeasurementRemov
 import { ToolGroupManager } from '@cornerstonejs/tools';
 import { base64ToArrayBuffer } from './utils/dataUtils';
 import { loadDicomSegIntoOHIF } from './utils/segmentationUtils';
+import { measurementScoreOptions } from './models/ScoreOptions';
+import { groundTruth, referenceStandardMethod, hepaticSegment } from './models/ScoreOptions';
 
 
 
@@ -66,6 +68,7 @@ function WebQuizSidePanelComponent() {
     const { measurementService, viewportGridService, segmentationService } = servicesManager.services;
     const measurementList = measurementService.getMeasurements(); 
     const measurementListRef = useRef([]);    
+    const segmentationList = segmentationService.getSegmentations();
     const pendingAnnotationUIDRef = useRef<string | null>(null);
     const { cornerstoneViewportService, displaySetService } = servicesManager.services;
     const listOfUsersAnnotationsRef = useRef<any>(null);
@@ -85,39 +88,34 @@ function WebQuizSidePanelComponent() {
     //~~~~~~~~~~~~~~~~~
      const [modalInfo, setModalInfo] = useState<null | { 
         title: string;
-        message: string;
+        message: React.ReactNode;
         onClose?: () => void;
         showCancel?: boolean;
         onCancel?: () => void;
+        confirmText?: string;
     }>(null);
     const showModal = ({
         title,
         message,
         onClose,
         showCancel = false,
-        onCancel
+        onCancel,
+        confirmText = "OK",
     }: {
         title: string;
-        message: string;
+        message: React.ReactNode;
         onClose?: () => void;
         showCancel?: boolean;
         onCancel?: () => void;
+        confirmText?: string;
     }) => {
-        setModalInfo({ title, message, onClose, showCancel, onCancel });
+        setModalInfo({ title, message, onClose, showCancel, onCancel, confirmText });
     };
 
     const closeModal = () => {
         setModalInfo(null);
     };
 
-    //~~~~~~~~~~~~~~~~~
-    const scoreOptions = [
-        { value: 1, label: '1' },
-        { value: 2, label: '2' },
-        { value: 3, label: '3' },
-        { value: 4, label: '4' },
-        { value: 5, label: '5' },
-    ];
 
 
 
@@ -358,7 +356,19 @@ function WebQuizSidePanelComponent() {
 
     }, [userInfo?.username, studyUID]);
 
-    
+    //~~~~~~~~~~~~~~~~~
+    const onSegmentationClick = (id: string, label: string) => 
+        handleSegmentationClick({ 
+            segmentationId: id,
+            segmentLabel: label,
+            showModal,
+            closeModal,
+            confirmText: "Save",
+            groundTruth,
+            referenceStandardMethod,
+            hepaticSegment,
+        });
+            
     //=========================================================
     // ensure debounced definitions are stable across renders using useMemo
 
@@ -737,13 +747,15 @@ function WebQuizSidePanelComponent() {
             >
                 <SegmentationList
                     getUserInfo={getUserInfo}
+                    segmentationList={segmentationList}
+                    onSegmentationClick={onSegmentationClick}
                 />
 
                 <AnnotationList
                 measurementList={measurementList}
                 dropdownSelectionMap={dropdownSelectionMap}
                 visibilityMap={visibilityMap}
-                scoreOptions={scoreOptions}
+                scoreOptions={measurementScoreOptions}
                 onDropdownChange={onDropdownChange}
                 onMeasurementClick={onMeasurementClick}
                 onToggleVisibility={onToggleVisibility}
@@ -760,7 +772,7 @@ function WebQuizSidePanelComponent() {
     {/* --- Extension Panel siblings --- */}
     <ScoreModal
         isOpen={showScoreModal}
-        scoreOptions={scoreOptions}
+        scoreOptions={measurementScoreOptions}
         selectedScore={selectedScore}
         setSelectedScore={setSelectedScore}
         onClose={onCloseScoreModal}
@@ -776,6 +788,7 @@ function WebQuizSidePanelComponent() {
             onClose={modalInfo.onClose ?? closeModal}
             showCancel={modalInfo.showCancel}
             onCancel={modalInfo.onCancel}
+            confirmText={modalInfo.confirmText}
             />
         )}
 
