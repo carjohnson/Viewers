@@ -5,7 +5,7 @@ import './ModalComponent.css';
 
 type ModalProps = {
   title: string;
-  message: string;
+  message: React.ReactNode;
   onClose: () => void;
   showCancel?: boolean;
   onCancel?: () => void;

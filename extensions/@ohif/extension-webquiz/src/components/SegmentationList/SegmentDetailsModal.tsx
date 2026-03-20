@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Select from 'react-select';
+
 
  export const SegmentDetailsModal = ({
   segmentationId,
@@ -7,10 +8,38 @@ import Select from 'react-select';
   groundTruth,
   referenceStandardMethod,
   hepaticSegment,
+  onSaveSegmentData,
 }) => {
+
+  const [selectedGroundTruth, setSelectedGroundTruth] = useState(null);
+  const [selectedReferenceMethod, setSelectedReferenceMethod] = useState(null);
+  const [selectedHepaticSegments, setSelectedHepaticSegments] = useState([]);
+
+
+  useEffect(() => {
+    onSaveSegmentData(() => {
+      if (!selectedGroundTruth || !selectedReferenceMethod || selectedHepaticSegments.length === 0) {
+        console.warn("Missing required fields");
+        return null;
+      }
+
+      return {
+        groundTruth: selectedGroundTruth,
+        referenceMethod: selectedReferenceMethod,
+        hepaticSegments: selectedHepaticSegments,
+      };
+    });
+  }, [
+    selectedGroundTruth,
+    selectedReferenceMethod,
+    selectedHepaticSegments,
+  ]);
+
 
 
   return (
+  <div className="custom-modal-container">
+
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       
       <div style={{ fontSize: "1.1rem", fontWeight: 600 }}>
@@ -31,6 +60,8 @@ import Select from 'react-select';
             options={groundTruth}
             classNamePrefix="dd"
             placeholder="Ground Truth"
+            value={selectedGroundTruth}
+            onChange={(val) => setSelectedGroundTruth(val)}
           />
         </div>
 
@@ -39,6 +70,8 @@ import Select from 'react-select';
             options={referenceStandardMethod}
             classNamePrefix="dd"
             placeholder="Reference Standard Method"
+            value={selectedReferenceMethod}
+            onChange={(val) => setSelectedReferenceMethod(val)}
           />
         </div>
       </div>
@@ -50,15 +83,26 @@ import Select from 'react-select';
         <div className="checkbox-list">
           {hepaticSegment.map((item) => (
             <label key={item.value} className="checkbox-item">
-              <input type="checkbox" value={item.value} />
+            <input
+              type="checkbox"
+              value={item.label}   // ← use label instead of value
+              checked={selectedHepaticSegments.includes(item.label)}
+              onChange={(e) => {
+                const label = e.target.value;
+                setSelectedHepaticSegments((prev) =>
+                  prev.includes(label)
+                    ? prev.filter((v) => v !== label)
+                    : [...prev, label]
+                );
+              }}
+            />
               <span>{item.label}</span>
             </label>
           ))}
         </div>
       </div>
     </div>
+  </div>
   );
 
-
 };
-

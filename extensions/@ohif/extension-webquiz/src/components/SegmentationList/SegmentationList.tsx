@@ -6,15 +6,16 @@ import { SegmentationItem } from './SegmentationItem';
 type Props = {
     getUserInfo: () => UserInfo | null;
     segmentationList: any[];
-    onSegmentationClick: (uid: string, label: string) => void;
+    onSegmentClick: (uid: string, label: string) => void;
+    completedSegments: Record<string, boolean>;
 }
 
 export const SegmentationList = ({
     getUserInfo,
     segmentationList,
-    onSegmentationClick,
+    onSegmentClick,
+    completedSegments,
 }: Props) => {
-
 
 
     return (
@@ -32,14 +33,13 @@ export const SegmentationList = ({
                                     uid={uid}
                                     label={segmentation.label || `Segmentation ${index + 1}`}
                                     segments={segmentation.segments || []}
-                                    onClick={(segmentLabel) => onSegmentationClick(uid, segmentLabel)}
+                                    completedSegments={completedSegments}
+                                    onClick={(segmentLabel) => onSegmentClick(uid, segmentLabel)}
                                 />
                             )
                         })}
                     </ul>
                 </div>
-
-
                 </fieldset>
             )}
         </div>

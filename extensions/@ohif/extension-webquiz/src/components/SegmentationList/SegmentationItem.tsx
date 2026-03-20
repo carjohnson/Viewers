@@ -13,6 +13,7 @@ type Props = {
     segmentIndex: number;
     label: string;
   }>;
+  completedSegments: Record<string,boolean>;
   onClick?: (segmentLabel) => void;
 };
 
@@ -20,6 +21,7 @@ export const SegmentationItem = ({
   uid,
   label,
   segments,
+  completedSegments,
   onClick,
 }: Props) => {
         const segmentArray = Object.values(segments || {});
@@ -31,17 +33,26 @@ export const SegmentationItem = ({
 
             <span className="segmentation-label" > {label} </span>
             {segmentArray.length > 0 && (
-                // <div className="segment-scroll-x">
                 <ul className="segment-list">
-                    {segmentArray.map((segment) => (
-                        <li key={segment.segmentIndex} className="segment-item"  onClick={() => onClick(segment.label)}>
-                            {segment.label || `Segment ${segment.segmentIndex}`}
-                        </li>
-                    ))}
-                </ul>
-                // </div>
-            )}
+                    {segmentArray.map((segment) => {
+                        const isCompleted = completedSegments?.[segment.label];
 
+                        return (
+                        <li
+                            key={segment.segmentIndex}
+                            className="segment-item"
+                            onClick={() => onClick(segment.label)}
+                        >
+                            {segment.label || `Segment ${segment.segmentIndex}`}
+
+                            {isCompleted && (
+                            <span className="segment-complete-marker">✔</span>
+                            )}
+                        </li>
+                        );
+                    })}
+                </ul>
+            )}
         </li>
-    )
+    );
 };

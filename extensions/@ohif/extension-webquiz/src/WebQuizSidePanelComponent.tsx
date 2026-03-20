@@ -13,7 +13,8 @@ import { setUserInfo, getUserInfo, onUserInfoReady } from './../../../../modes/@
 import { useAnnotationPosting } from './hooks/useAnnotationPosting';
 import { fetchAnnotationsFromDB, convertAnnotationsToMeasurements } from './handlers/fetchAnnotations';
 import { handleDropdownChange } from './handlers/dropdownHandlers';
-import { handleMeasurementClick, toggleVisibility, closeScoreModal, handleSegmentationClick } from './handlers/guiHandlers';
+import { handleMeasurementClick, toggleVisibility, closeScoreModal } from './handlers/guiHandlers';
+import { handleSegmentClick } from './handlers/segmentationHandlers';
 import { useSystem } from '@ohif/core';
 import { AnnotationList } from './components/AnnotationList/AnnotationList';
 import { SegmentationList } from './components/SegmentationList/SegmentationList'
@@ -69,6 +70,7 @@ function WebQuizSidePanelComponent() {
     const measurementList = measurementService.getMeasurements(); 
     const measurementListRef = useRef([]);    
     const segmentationList = segmentationService.getSegmentations();
+    const [completedSegments, setCompletedSegments] = useState({});
     const pendingAnnotationUIDRef = useRef<string | null>(null);
     const { cornerstoneViewportService, displaySetService } = servicesManager.services;
     const listOfUsersAnnotationsRef = useRef<any>(null);
@@ -357,16 +359,16 @@ function WebQuizSidePanelComponent() {
     }, [userInfo?.username, studyUID]);
 
     //~~~~~~~~~~~~~~~~~
-    const onSegmentationClick = (id: string, label: string) => 
-        handleSegmentationClick({ 
+    const onSegmentClick = (id: string, label: string) => 
+        handleSegmentClick({ 
             segmentationId: id,
             segmentLabel: label,
             showModal,
             closeModal,
-            confirmText: "Save",
             groundTruth,
             referenceStandardMethod,
             hepaticSegment,
+            setCompletedSegments,
         });
             
     //=========================================================
@@ -748,7 +750,8 @@ function WebQuizSidePanelComponent() {
                 <SegmentationList
                     getUserInfo={getUserInfo}
                     segmentationList={segmentationList}
-                    onSegmentationClick={onSegmentationClick}
+                    onSegmentClick={onSegmentClick}
+                    completedSegments={completedSegments}
                 />
 
                 <AnnotationList

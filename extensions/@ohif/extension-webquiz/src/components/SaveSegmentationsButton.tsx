@@ -330,9 +330,9 @@ function buildSegmentList(segmentsObj) {
     segmentIndex: segment.segmentIndex,
     label: segment.label,
     cachedStats: segment.cachedStats,
-    lesionLocation: ["segment-1","segment-2"],
-    lesionReferenceStandard: "Metastasis",
-    decisionCriteria: ["Follow-up a", "Follow-up b"],
+    groundTruth: "Unknown",
+    referenceStandardMethod: "Biopsy",
+    hepaticSegment: ["segment-1","segment-2"],
   }));
 }
 

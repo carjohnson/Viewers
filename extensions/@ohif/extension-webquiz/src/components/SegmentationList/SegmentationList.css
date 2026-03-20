@@ -65,6 +65,11 @@
   pointer-events: auto;
 }
 
+.segment-complete-marker {
+  color: #2ecc71;
+  margin-left: 6px;
+  font-weight: bold;
+}
 
 
 /* drop down styling*/
