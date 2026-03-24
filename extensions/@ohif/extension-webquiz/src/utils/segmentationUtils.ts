@@ -1,7 +1,6 @@
 import { adaptersSEG } from '@cornerstonejs/adapters';
 import { imageLoader } from '@cornerstonejs/core';
 import { metaData } from '@cornerstonejs/core';
-// import { useDicomSegSeriesUIDStore } from './../stores/useDicomSegSeriesUIDStore';
 import { useSegmentMetadataStore } from '../stores/useSegmentMetadataStore';
 import { SegmentationData } from './../models/SegmentationData';
 
@@ -22,7 +21,6 @@ export async function loadDicomSegIntoOHIF({
         displaySetService,
         viewportGridService,
   } = servicesManager.services;
-//   const { setDicomSegSeriesUIDMap } = useDicomSegSeriesUIDStore.getState();
 
   // ~~~~~~~~~~
   // get referenced display sets and image ids
@@ -69,7 +67,7 @@ export async function loadDicomSegIntoOHIF({
     segmentLabels.forEach(s => {
         // Add metadata for ALL segments found in buffer
         segmentationService.addSegment(segmentationId, {
-        segmentIndex: s.segmentIndex,
+        segmentIndex: s.segmentMaskValue,   // matches backend schema
         label: s.label,
         cachedStats: s.cachedStats,
         });
@@ -90,7 +88,6 @@ export async function loadDicomSegIntoOHIF({
     // console.log(' *** STARTING SEG', startingSeg);
     // console.log('segToolState:', segToolState);
     // console.log('labelmapBufferArray:', segToolState.labelmapBufferArray?.length);
-    // bufferCounter_orig( segLabelmap, ' *** Creation of segToolState');
 
     // ~~~~~~~~~~
     // get labelmap ids and split the buffer into per Slice arrays
@@ -107,7 +104,7 @@ export async function loadDicomSegIntoOHIF({
     const sliceEnd = sliceStart + bytesPerSlice;
     labelmapBufferArray.push(segLabelmap.subarray(sliceStart, sliceEnd));
     }
-    // bufferCounter(labelmapBufferArray, '*** LabelmapBufferArray - AFTER load subarrays');
+    // bufferCounter(labelmapBufferArray, '*** LabelmapBufferArray - AFTER load subarrays');   // for debug
 
     // ~~~~~~~~~~
     // load each labelmap image and replace its scalar data
@@ -117,9 +114,6 @@ export async function loadDicomSegIntoOHIF({
     labelmapBufferArray.forEach((buffer, i) => {
         labelmapImages[i].getPixelData().set(buffer);
     });
-
-
-
 
 
     // ~~~~~~~~~~
@@ -136,67 +130,53 @@ export async function loadDicomSegIntoOHIF({
 ///////////////////////////////////////////////
 //////////////  DEBUG HELPERS /////////////////
 ///////////////////////////////////////////////
-function bufferCounter (buf, timePoint)  {
-
-    const uniqueValues = new Set();
-    let seg1Count = 0, seg2Count = 0;
-    let sampleCount = 0;
-    let nonZeroCount = 0;
-    let firstNonZeroIndex = 9999999;
-    let firstNonZeroIndexInSlice = 9999999;
 
 
-    for (let i = 0; i < buf.length; i++) {
-        const perSliceChunk = buf[i];
-        for (let j = 0; j< perSliceChunk.length; j++) {
-            const value = perSliceChunk[j];
-            if (value !== 0) {
-                if (firstNonZeroIndex === 9999999) {firstNonZeroIndex = i; firstNonZeroIndexInSlice = j};
-                nonZeroCount++;
-                uniqueValues.add(value);
-                if (value === 1) seg1Count++;
-                if (value === 2) seg2Count++;
-            }
+function bufferCounter(buf, timePoint) {
+  const valueStats = new Map(); 
+  // Structure:
+  // valueStats.set(value, {
+  //   count: number,
+  //   firstSlice: number,
+  //   firstIndex: number
+  // });
+
+  let nonZeroCount = 0;
+
+  for (let i = 0; i < buf.length; i++) {
+    const perSliceChunk = buf[i];
+
+    for (let j = 0; j < perSliceChunk.length; j++) {
+      const value = perSliceChunk[j];
+
+      if (value !== 0) {
+        nonZeroCount++;
+
+        if (!valueStats.has(value)) {
+          valueStats.set(value, {
+            count: 1,
+            firstSlice: i,
+            firstIndex: j
+          });
+        } else {
+          valueStats.get(value).count++;
         }
+      }
     }
+  }
 
-    console.log(' ***** DEBUG ACTUAL Buffer contents ... TIMEPOINT:', timePoint);
-    console.log('Non-zero voxels:', nonZeroCount);
-    console.log('Unique non-zero:', Array.from(uniqueValues));
-    console.log('Seg1 count:', seg1Count, 'Seg2 count:', seg2Count);
-    console.log('First non zero slice:', firstNonZeroIndex);
-    console.log('First non zero index in slice:', firstNonZeroIndexInSlice);
-    console.log('Buffer type:', buf.constructor.name, 'length:', buf.length);
+  // Debug output
+  console.log("***** DEBUG ACTUAL Buffer contents ... TIMEPOINT:", timePoint);
+  console.log("Non-zero voxels:", nonZeroCount);
+  console.log("Unique non-zero values:", [...valueStats.keys()]);
 
-    return [seg1Count, seg2Count]
-}
+  for (const [value, stats] of valueStats.entries()) {
+    console.log(
+      `Value ${value}: count=${stats.count}, firstSlice=${stats.firstSlice}, firstIndex=${stats.firstIndex}`
+    );
+  }
 
+  console.log("Buffer type:", buf.constructor.name, "length:", buf.length);
 
-function bufferCounter_orig (buf, timePoint)  {
-
-    const uniqueValues = new Set();
-    let seg1Count = 0, seg2Count = 0;
-    let sampleCount = 0;
-    let nonZeroCount = 0;
-    let firstNonZeroIndex = 9999999;
-
-    for (let i = 0; i < buf.length; i++) {
-        const value = buf[i];
-        if (value !== 0) {
-            if (firstNonZeroIndex === 9999999) firstNonZeroIndex = i;
-            nonZeroCount++;
-            uniqueValues.add(value);
-            if (value === 1) seg1Count++;
-            if (value === 2) seg2Count++;
-        }
-    }
-
-    console.log(' ***** DEBUG ACTUAL Buffer contents ... TIMEPOINT:', timePoint);
-    console.log('Non-zero voxels:', nonZeroCount);
-    console.log('Unique non-zero:', Array.from(uniqueValues));
-    console.log('Seg1 count:', seg1Count, 'Seg2 count:', seg2Count);
-    console.log('First non zero index:', firstNonZeroIndex);
-    console.log('Buffer type:', buf.constructor.name, 'length:', buf.length);
-
-    return [seg1Count, seg2Count]
+  return valueStats;
 }
