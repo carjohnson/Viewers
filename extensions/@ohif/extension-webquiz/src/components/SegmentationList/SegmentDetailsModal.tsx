@@ -15,19 +15,32 @@ import Select from 'react-select';
   const [selectedReferenceMethod, setSelectedReferenceMethod] = useState(null);
   const [selectedHepaticSegments, setSelectedHepaticSegments] = useState([]);
 
+  const [statusMessage, setStatusMessage] = useState("");
+  const [statusType, setStatusType] = useState("info"); 
+  
 
   useEffect(() => {
     onSaveSegmentData(() => {
       if (!selectedGroundTruth || !selectedReferenceMethod || selectedHepaticSegments.length === 0) {
-        console.warn("Missing required fields");
+        setStatusType("error");
+        setStatusMessage("Missing required fields");
         return null;
-      }
+      } else {
+        setStatusType("info");
+        setStatusMessage("Saving ...");
 
-      return {
-        groundTruth: selectedGroundTruth,
-        referenceMethod: selectedReferenceMethod,
-        hepaticSegments: selectedHepaticSegments,
-      };
+        // simulate async save
+           setTimeout(() => {
+             setStatusType("success");
+             setStatusMessage("Saved successfully!");
+           }, 800);
+
+        return {
+          groundTruth: selectedGroundTruth,
+          referenceMethod: selectedReferenceMethod,
+          hepaticSegments: selectedHepaticSegments,
+        };
+      }      
     });
   }, [
     selectedGroundTruth,
@@ -45,6 +58,15 @@ import Select from 'react-select';
       <div style={{ fontSize: "1.1rem", fontWeight: 600 }}>
         Segment {segmentationId}: {segmentLabel}
       </div>
+
+      {/* Status line */}
+      {statusMessage && (
+        <div
+          className={`status-line ${statusType}`}
+        >
+          {statusMessage}
+        </div>
+      )}
 
       {/* Row of dropdowns */}
       <div
@@ -101,6 +123,7 @@ import Select from 'react-select';
           ))}
         </div>
       </div>
+
     </div>
   </div>
   );

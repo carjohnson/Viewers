@@ -1,7 +1,9 @@
 
 import React, { useState } from 'react';
 
-import { SegmentDetailsModal } from '../components/SegmentationList/SegmentDetailsModal'
+import { SegmentDetailsModal } from '../components/SegmentationList/SegmentDetailsModal';
+import { saveSegmentation } from '../utils/segmentationUtils';
+import { SegmentMetadata } from './../models/SegmentationData';
 
 
 //=========================================================
@@ -12,15 +14,22 @@ import { SegmentDetailsModal } from '../components/SegmentationList/SegmentDetai
 export const handleSegmentClick = ({
   segmentationId,
   segmentLabel,
+  segmentArrayIndex,
   showModal,
   closeModal,
   groundTruth,
   referenceStandardMethod,
   hepaticSegment,
   setCompletedSegments,
+  servicesManager,
+  commandsManager,
+  segmentationService,
+  activeViewportId,
+  studyInstanceUID,
 }: {
   segmentationId: string;
   segmentLabel: string;
+  segmentArrayIndex: number;
   showModal: (args: {
         title: string;
         message: React.ReactNode;
@@ -34,6 +43,11 @@ export const handleSegmentClick = ({
     referenceStandardMethod: { value: number; label: string }[];
     hepaticSegment: { value: number; label: string }[];
     setCompletedSegments: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+    servicesManager: any;
+    commandsManager: any;
+    segmentationService: any;
+    activeViewportId: string;
+    studyInstanceUID: string;
   }) => {
 
     let saveHandlerFromModal = null;
@@ -57,14 +71,19 @@ export const handleSegmentClick = ({
       onCancel: closeModal,
       onClose: () => {
         if (saveHandlerFromModal) {
-          const data = saveHandlerFromModal(); // reads fresh state
+          const dataFromModal = saveHandlerFromModal(); // reads fresh state
+          console.log (' *** IN ONCLOSE ... segId, dataFromModal:', segmentationId, dataFromModal);
 
-          if (!data) {
+          const segmentMetadata: SegmentMetadata = {
+            groundTruth: dataFromModal.groundTruth?.label ?? "",
+            referenceStandardMethod: dataFromModal.referenceMethod?.label ?? "",
+            hepaticSegment: dataFromModal.hepaticSegments ?? [],
+          };
+
+          if (!segmentMetadata) {
             console.warn("Validation failed — keeping modal open");
             return;
           }
-
-          console.log("Saving segment data:", data);
 
           // Mark this segment as completed
           setCompletedSegments(prev => ({
@@ -72,7 +91,17 @@ export const handleSegmentClick = ({
             [segmentLabel]: true
           }));
 
-          // TODO: save to backend
+          // get segmentation - update fields
+          const segmentationToUpdate = segmentationService.getSegmentation(segmentationId);
+          saveSegmentation({
+            seg: segmentationToUpdate,
+            segmentArrayIndex,
+            segmentMetadata,
+            activeViewportId,
+            servicesManager,
+            commandsManager,
+            studyInstanceUID,
+        });
 
           closeModal();
           return;

@@ -1,3 +1,18 @@
+// =====================================
+export interface OhifSegmentInfo {
+  segmentIndex: number;
+  label: string;
+  cachedStats?: SegmentationStats;
+  quizSegmentMetadata?: SegmentMetadata;
+}
+
+// =====================================
+export interface SegmentationMetadataStore {
+  [segmentationId: string]: {
+    [segmentIndex: number]: OhifSegmentInfo;
+  };
+} 
+// =====================================
 export type SegmentationData = {
   segmentationId: string;
   label: string;
@@ -15,3 +30,9 @@ export type  SegmentationStats = {
 }
 
 // =====================================
+export type SegmentMetadata = {
+  groundTruth: string;
+  referenceStandardMethod: string;
+  hepaticSegment: string[];
+}
+

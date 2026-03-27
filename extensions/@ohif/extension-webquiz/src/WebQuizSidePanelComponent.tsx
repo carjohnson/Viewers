@@ -292,11 +292,11 @@ function WebQuizSidePanelComponent() {
         if (!studyUID || !postingApi) return;
         const userInfo = getUserInfo();
         if (userInfo?.role === 'admin') {
-            console.warn('Post suppressed for admin role');
+            console.warn('Post of annotations suppressed for admin role');
             return;
         }
         if (isStudyCompletedRef.current) {
-            console.warn('Post suppressed - study marked as complete');
+            console.warn('Post of annotations suppressed - study marked as complete');
             return;
         }
         postingApi(message);
@@ -331,11 +331,10 @@ function WebQuizSidePanelComponent() {
                     const arrayBuffer = base64ToArrayBuffer(seg.base64Buffer);
 
                     await loadDicomSegIntoOHIF({
-                        // dicomSegSeriesUID: seg.dicomSegSeriesUID,
                         segmentationId: seg.segmentationId,
                         referencedSeriesInstanceUID: seg.referencedSeriesUID,
                         segmentationLabel: seg.segmentationLabel,
-                        segmentLabels: seg.segmentLabels,
+                        segmentMetadata: seg.dbSegmentInfo,
                         arrayBuffer,
                         servicesManager,
                     });
@@ -359,16 +358,22 @@ function WebQuizSidePanelComponent() {
     }, [userInfo?.username, studyUID]);
 
     //~~~~~~~~~~~~~~~~~
-    const onSegmentClick = (id: string, label: string) => 
+    const onSegmentClick = (id: string, label: string, index: number) => 
         handleSegmentClick({ 
             segmentationId: id,
             segmentLabel: label,
+            segmentArrayIndex: index,
             showModal,
             closeModal,
             groundTruth,
             referenceStandardMethod,
             hepaticSegment,
             setCompletedSegments,
+            servicesManager,
+            commandsManager,
+            segmentationService,
+            activeViewportId,
+            studyInstanceUID:studyInfoFromHook?.studyUID
         });
             
     //=========================================================

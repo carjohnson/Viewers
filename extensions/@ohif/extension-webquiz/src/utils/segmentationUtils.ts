@@ -2,15 +2,29 @@ import { adaptersSEG } from '@cornerstonejs/adapters';
 import { imageLoader } from '@cornerstonejs/core';
 import { metaData } from '@cornerstonejs/core';
 import { useSegmentMetadataStore } from '../stores/useSegmentMetadataStore';
-import { SegmentationData } from './../models/SegmentationData';
+import { OhifSegmentInfo, SegmentationData, SegmentMetadata } from './../models/SegmentationData';
+import {
+  ImplementationClassUID,
+  ImplementationVersionName,
+  EXPLICIT_VR_LITTLE_ENDIAN,
+} from '../init';
+import dcmjs from 'dcmjs';
+import { postSegmentations } from '../handlers/postSegmentations';
+import { groundTruth, hepaticSegment, referenceStandardMethod } from '../models/ScoreOptions';
 
 
+// for creating the blob when saving a segment
+const { DicomMetaDictionary, DicomDict } = dcmjs.data;
+
+
+
+// =====================================
 export async function loadDicomSegIntoOHIF({
 //   dicomSegSeriesUID,
   segmentationId,
   referencedSeriesInstanceUID,
   segmentationLabel,
-  segmentLabels,
+  segmentMetadata,
   arrayBuffer,
   servicesManager,
 }) {
@@ -63,24 +77,30 @@ export async function loadDicomSegIntoOHIF({
         },
     );
 
-
-    segmentLabels.forEach(s => {
-        // Add metadata for ALL segments found in buffer
-        segmentationService.addSegment(segmentationId, {
+    segmentMetadata.forEach(s => {
+      const ohifInfo: OhifSegmentInfo = {
         segmentIndex: s.segmentMaskValue,   // matches backend schema
         label: s.label,
         cachedStats: s.cachedStats,
-        });
-    })
+        quizSegmentMetadata: {
+          groundTruth: s.groundTruth,
+          referenceStandardMethod: s.referenceStandardMethod,
+          hepaticSegment: s.hepaticSegment,
+        }
+      };
 
-    // cache segments metatdata so that it persists between extensions
-    useSegmentMetadataStore.getState().setMetadata(
-        segmentationId,
-        segmentLabels.map(s => ({
-            ...s,
-        })
-    ));
-    console.log('🔥 CACHED:', segmentationId, segmentLabels.length, 'segments');
+      segmentationService.addSegment(segmentationId, ohifInfo);
+
+      useSegmentMetadataStore
+        .getState()
+        .setSegmentInfo(
+          segmentationId,
+          s.segmentMaskValue, //1-based
+          ohifInfo,
+        );
+    })
+    const cachedStore = useSegmentMetadataStore.getState().getAllSegments(segmentationId);
+    console.log('🔥 CACHED:', segmentationId, cachedStore);
 
 
     // // for debug
@@ -104,6 +124,7 @@ export async function loadDicomSegIntoOHIF({
     const sliceEnd = sliceStart + bytesPerSlice;
     labelmapBufferArray.push(segLabelmap.subarray(sliceStart, sliceEnd));
     }
+
     // bufferCounter(labelmapBufferArray, '*** LabelmapBufferArray - AFTER load subarrays');   // for debug
 
     // ~~~~~~~~~~
@@ -126,6 +147,277 @@ export async function loadDicomSegIntoOHIF({
     console.log('🎉 Loaded SEG:', segmentationId);
 
 }
+
+// =====================================
+// export async function saveSegmentation (seg: SegmentationData, segmentMetadata: SegmentMetadata, activeViewportId: string ) {
+export async function saveSegmentation({
+  seg,
+  segmentMetadata,
+  segmentArrayIndex,
+  activeViewportId,
+  servicesManager,
+  commandsManager,
+  studyInstanceUID,
+}: {
+  seg: SegmentationData;
+  segmentMetadata: SegmentMetadata;
+  segmentArrayIndex: number;
+  activeViewportId: string;
+  servicesManager: any;
+  commandsManager: any;
+  studyInstanceUID: string;
+}) {
+  const {
+    displaySetService,
+    viewportGridService,
+    segmentationService,
+  } = servicesManager.services;
+
+
+    let segmentationObjects = [];
+
+
+    // Capture segments from CURRENT service state (user-created in OHIF)
+    const currentSegments = seg.segments || {};
+
+    // synchronize the stored segment info with the current segments displayed in OHIF  (in case one has been deleted)
+    const segmentInfoFromService = Object.entries(currentSegments).map(([arrayIndexStr, segment]) => {
+      const arrayIndex = Number(arrayIndexStr); // 0-based
+      const segmentIndex = arrayIndex + 1;     // 1-based
+
+      return {
+        segmentIndex: segmentIndex,
+        label: segment.label || `Segment ${segmentIndex}`,
+        cachedStats: segment.cachedStats,
+        quizSegmentMetadata: segment.quizSegmentMetadata,
+      };
+    });
+    refreshStoredSegmentMetadata(seg.segmentationId, segmentInfoFromService);
+
+
+    // update the store with the clicked segment metadata
+    const segmentArray = Object.values(currentSegments);
+    // const clickedSegmentInfoFromService = segmentArray[segmentArrayIndex];
+
+    // useSegmentMetadataStore.getState().setSegmentInfo(seg.segmentationId, segmentArrayIndex + 1, clickedSegmentInfoFromService);
+
+    const segmentIndexToUpdate = segmentArrayIndex + 1;
+
+    const clickedSegmentInfoFromService = {
+      ...segmentArray[segmentArrayIndex],
+      segmentIndex: segmentIndexToUpdate,
+    };
+
+    useSegmentMetadataStore
+      .getState()
+      .setSegmentInfo(seg.segmentationId, segmentIndexToUpdate, clickedSegmentInfoFromService);
+
+  
+    let generatedSeg;
+    try {
+        // generating a SEG object that can be posted to backend as DICOM SEG with metadata
+
+        // because this is a custom segmentation extension, 
+        //      predecessorImage prop is missing from the seg
+        segmentationService.addOrUpdateSegmentation({
+            segmentationId: seg.segmentationId,
+            type: seg.type,
+            predecessorImageId: seg.representationData.Labelmap.referencedImageIds[0]
+        });
+        // const updatedSeg = segmentationService.getSegmentation(seg.segmentationId);
+        // console.log('updatedSeg after update', updatedSeg);    // for debug
+
+        const seriesUid = getSeriesUid(seg.representationData.Labelmap.referencedImageIds[0]);
+        const displaySets = displaySetService.getDisplaySetsForSeries(seriesUid);
+        const displaySetInstanceUID = displaySets[0]?.displaySetInstanceUID;
+
+        await viewportGridService.setDisplaySetsForViewport({
+            viewportId: activeViewportId,
+            displaySetInstanceUIDs: [displaySetInstanceUID],
+          });
+
+          // Give OHIF a moment to render the new stack
+          await new Promise(resolve => setTimeout(resolve, 50));
+
+        if (!displaySetInstanceUID) {
+          console.warn('No displaySet found for series', seriesUid);
+          // continue;
+        }
+
+        // Check all segments for non-zero volume - use stats from cached segment metadata
+        //    At least one segment must have a volume in order to call function to generate a Seg
+        let hasVolume = false;
+        const segments = useSegmentMetadataStore.getState().getAllSegments(seg.segmentationId);
+
+        for (const [segIdxStr, segment] of Object.entries(segments)) {
+          const volume = segment.cachedStats?.namedStats?.volume?.value;
+
+          // check that one of the segments has volume for generateSegmentation
+          if (typeof volume === 'number' && volume > 0) {
+            hasVolume = true;
+          }
+        } // end for each segment
+
+       
+        // if any of the segments were painted, generate a segmentation object
+        if (hasVolume) {
+
+          generatedSeg = commandsManager.runCommand('generateSegmentation', {
+            segmentationId: seg.segmentationId,
+          });
+
+          if (!generatedSeg || !generatedSeg.dataset) {
+            console.warn(
+              `Skipping segmentation ${seg.segmentationId}: generation failed`
+            );
+            // continue;
+          }
+
+
+          console.log(' *** GENERATED SEG:', generatedSeg);
+
+          // //////////// Create blob from generatedSeg ////////////
+          // generate the meta data 
+          let segBlob;
+          const meta = {
+                FileMetaInformationVersion: generatedSeg.dataset._meta?.FileMetaInformationVersion?.Value,
+                MediaStorageSOPClassUID: generatedSeg.dataset.SOPClassUID,
+                MediaStorageSOPInstanceUID: generatedSeg.dataset.SOPInstanceUID,
+                TransferSyntaxUID: EXPLICIT_VR_LITTLE_ENDIAN,
+                ImplementationClassUID,
+                ImplementationVersionName,
+              };
+
+          const denaturalizedMetadata = dcmjs.data.DicomMetaDictionary.denaturalizeDataset(meta);
+          const denaturalizedDataset = dcmjs.data.DicomMetaDictionary.denaturalizeDataset(generatedSeg.dataset);
+          const dicomDict = new DicomDict(denaturalizedMetadata);
+          dicomDict.dict = denaturalizedDataset;
+
+          try {
+            const arrayBuffer = dicomDict.write();
+            segBlob = new Blob([arrayBuffer], { type: 'application/dicom' });
+            console.log('Blob created successfully, size:', segBlob.size, 'type:', segBlob.type);
+            console.log('segBlob:', segBlob);
+          
+          } catch (blobError) {
+            console.warn(`Skipping segmentation ${seg.segmentationId}: blob creation failed`, blobError);
+            console.warn('Stack:', blobError.stack);
+            // continue;
+          }
+
+          // segmentation and blob generation succeeded
+          segmentationObjects.push({
+              segmentationId: seg.segmentationId,
+              sourceSeriesInstanceUid: seriesUid,
+              label: seg.label,
+              segments: buildSegmentList(seg.segmentationId, segmentMetadata, segmentArrayIndex),
+              segmentationDataRef: segBlob,
+          });
+
+          console.log(' *** END OF GENERATE SEG ... segObjects to post:', segmentationObjects);
+        } // end if hasVolume
+
+
+
+      } catch (err) {
+          console.warn(`Skipping segmentation ${seg.segmentationId}: generating seg failed`, err);
+          console.warn('Stack:', err.stack);
+          // continue;
+      }
+
+
+    // post to backend
+    let postSegmentationResult;
+    if (segmentationObjects.length !== 0) {
+      postSegmentationResult = await postSegmentations({
+          segmentationObjects,
+          studyUID: studyInstanceUID,
+      });
+    } else {
+      postSegmentationResult = await postSegmentations({
+          segmentationObjects: [],  // signal no objects to post to keep DB in sync
+          studyUID: studyInstanceUID,
+    });
+
+    if (postSegmentationResult?.error) {
+      console.warn('⚠️ Failed to post segmentations:', postSegmentationResult.error);
+    } else {
+      console.log(`📌 Segmentations posted for ${studyInstanceUID}`);
+    }
+      
+      console.log(`📬 Confirmed save segmentations to DB`);
+    }
+
+}
+
+
+
+
+// =====================================
+function buildSegmentList(
+  segmentationId: string,
+  updatedMetadata: SegmentMetadata,
+  arrayIndexToUpdate: number
+) {
+  const allSegments = useSegmentMetadataStore
+    .getState()
+    .getAllSegments(segmentationId);
+
+  return Object.entries(allSegments).map(([segmentIndexStr, stored]) => {
+    const segmentIndex = Number(segmentIndexStr); // 1-based
+    const arrayIndex = segmentIndex - 1;           // convert to 0-based
+
+    const base = {
+      segmentIndex,
+      label: stored.label,
+      cachedStats: stored.cachedStats,
+    };
+
+    const quizSegmentMetadata =
+      arrayIndex === arrayIndexToUpdate
+        ? updatedMetadata
+        : stored.quizSegmentMetadata;
+
+    return {
+      ...base,
+      ...quizSegmentMetadata, // flatten for backend
+    };
+  });
+}
+
+// =====================================
+export function getSeriesUid(imageId: string): string | null {
+  try {
+    const url = new URL(imageId);
+    const parts = url.pathname.split('/').filter(Boolean);
+    const seriesIndex = parts.indexOf('series');
+    return seriesIndex !== -1 && seriesIndex + 1 < parts.length ? parts[seriesIndex + 1] : null;
+  } catch {
+    return null;
+  }
+}
+
+
+// =====================================
+export function refreshStoredSegmentMetadata(segmentationId: string, currentSegments: any[]) {
+  const store = useSegmentMetadataStore.getState();
+
+  store.clearMetadata(segmentationId);
+
+  currentSegments.forEach((segment, arrayIndex) => {
+    const segmentIndex = arrayIndex + 1;
+
+    const ohifInfo: OhifSegmentInfo = {
+      segmentIndex,
+      label: segment.label,
+      cachedStats: segment.cachedStats,
+      quizSegmentMetadata: segment.quizSegmentMetadata,
+    };
+
+    store.setSegmentInfo(segmentationId, segmentIndex, ohifInfo);
+  });
+}
+
 
 ///////////////////////////////////////////////
 //////////////  DEBUG HELPERS /////////////////
@@ -180,3 +472,4 @@ function bufferCounter(buf, timePoint) {
 
   return valueStats;
 }
+

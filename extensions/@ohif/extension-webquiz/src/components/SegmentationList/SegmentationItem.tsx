@@ -14,7 +14,7 @@ type Props = {
     label: string;
   }>;
   completedSegments: Record<string,boolean>;
-  onClick?: (segmentLabel) => void;
+  onClick?: (segmentLabel, index) => void;
 };
 
 export const SegmentationItem = ({
@@ -34,14 +34,14 @@ export const SegmentationItem = ({
             <span className="segmentation-label" > {label} </span>
             {segmentArray.length > 0 && (
                 <ul className="segment-list">
-                    {segmentArray.map((segment) => {
+                    {segmentArray.map((segment, index) => {
                         const isCompleted = completedSegments?.[segment.label];
 
                         return (
                         <li
                             key={segment.segmentIndex}
                             className="segment-item"
-                            onClick={() => onClick(segment.label)}
+                            onClick={() => onClick(segment.label, index)}
                         >
                             {segment.label || `Segment ${segment.segmentIndex}`}
 

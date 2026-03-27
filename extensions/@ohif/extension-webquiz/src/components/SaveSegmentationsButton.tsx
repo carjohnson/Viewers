@@ -8,8 +8,9 @@ import { Button } from '@ohif/ui'; // or your preferred button source
 import { postSegmentations } from '../handlers/postSegmentations';
 import {UserInfo} from '../models/UserInfo';
 import dcmjs from 'dcmjs';
-import { useSegmentMetadataStore, OhifSegmentInfo } from './../stores/useSegmentMetadataStore';
-import { SegmentationData } from './../models/SegmentationData';
+import { useSegmentMetadataStore } from './../stores/useSegmentMetadataStore';
+import { SegmentationData, OhifSegmentInfo } from './../models/SegmentationData';
+import { getSeriesUid, refreshStoredSegmentMetadata } from './../utils/segmentationUtils';
 
 
 
@@ -75,8 +76,7 @@ const SaveSegmentationsButton: React.FC<Props> = ({
 
     for (const seg of Object.values(allSegs) as SegmentationData[]) {
 
-      let segmentLabels = useSegmentMetadataStore.getState().getMetadata(seg.segmentationId);
-      console.log(`Seg ${seg.segmentationId}:`, segmentLabels?.length || 0, 'segments from CACHE', seg);
+      let segmentLabels = useSegmentMetadataStore.getState().getAllSegments(seg.segmentationId);
 
       // Capture segments from CURRENT service state (user-created in OHIF)
       const currentSegments = seg.segments || {};
@@ -86,12 +86,10 @@ const SaveSegmentationsButton: React.FC<Props> = ({
         cachedStats: segment.cachedStats,
       }));
 
-
-      useSegmentMetadataStore.getState().clearMetadata(seg.segmentationId);
-      useSegmentMetadataStore.getState().setMetadata(seg.segmentationId, segmentLabelsFromService);
+      refreshStoredSegmentMetadata(seg.segmentationId, segmentLabelsFromService);
 
       // Proceed with save logic for segmentations WITH metadata
-      console.log(`💾 Saving ${seg.segmentationId} with ${segmentLabels?.length} segments`);
+      // console.log(`💾 Saving ${seg.segmentationId} with ${segmentLabels?.length} segments`);
 
     
       let generatedSeg;
@@ -127,22 +125,22 @@ const SaveSegmentationsButton: React.FC<Props> = ({
 
         // Check all segments for non-zero volume - use stats from cached segment metadata
         //    At least one segment must have a volume in order to call function to generate a Seg
-        const segmentIdsToRemove: string[] = [];
+        // const segmentIdsToRemove: string[] = [];
         let hasVolume = false;
-        const segments = useSegmentMetadataStore.getState().getMetadata(seg.segmentationId);
+        const segments = useSegmentMetadataStore.getState().getAllSegments(seg.segmentationId);
 
         for (const [segIdxStr, segment] of Object.entries(segments)) {
           const volume = segment.cachedStats?.namedStats?.volume?.value;
 
-          if (typeof volume !== 'number' || volume <=0) {
-            console.log(`Marking unpainted segment ${segIdxStr} (volume=${volume}) for removal`);
-            segmentIdsToRemove.push(segIdxStr);
-          } else {
+          // if (typeof volume !== 'number' || volume <=0) {
+          //   console.log(`Marking unpainted segment ${segIdxStr} (volume=${volume}) for removal`);
+          //   segmentIdsToRemove.push(segIdxStr);
+          // } else {
             // check that one of the segments has volume for generateSegmentation
             if (typeof volume === 'number' && volume > 0) {
               hasVolume = true;
             }
-          }
+          // }
         } // end for each segment
 
        
@@ -298,16 +296,16 @@ function buildSegmentList(segmentsObj) {
 }
 
 // =====================================
-function getSeriesUid(imageId: string): string | null {
-  try {
-    const url = new URL(imageId);
-    const parts = url.pathname.split('/').filter(Boolean);
-    const seriesIndex = parts.indexOf('series');
-    return seriesIndex !== -1 && seriesIndex + 1 < parts.length ? parts[seriesIndex + 1] : null;
-  } catch {
-    return null;
-  }
-}
+// function getSeriesUid(imageId: string): string | null {
+//   try {
+//     const url = new URL(imageId);
+//     const parts = url.pathname.split('/').filter(Boolean);
+//     const seriesIndex = parts.indexOf('series');
+//     return seriesIndex !== -1 && seriesIndex + 1 < parts.length ? parts[seriesIndex + 1] : null;
+//   } catch {
+//     return null;
+//   }
+// }
 
 // =====================================
 

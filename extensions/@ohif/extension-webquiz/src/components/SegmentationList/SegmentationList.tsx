@@ -6,7 +6,7 @@ import { SegmentationItem } from './SegmentationItem';
 type Props = {
     getUserInfo: () => UserInfo | null;
     segmentationList: any[];
-    onSegmentClick: (uid: string, label: string) => void;
+    onSegmentClick: (uid: string, label: string, index: number) => void;
     completedSegments: Record<string, boolean>;
 }
 
@@ -26,7 +26,7 @@ export const SegmentationList = ({
                 <div className="segmentation-scroll">
                     <ul>
                         {segmentationList.map((segmentation, index) => {
-                            const uid = segmentation.uid;
+                            const uid = segmentation.segmentationId;
                             return (
                                 <SegmentationItem
                                     key={uid || index}
@@ -34,7 +34,7 @@ export const SegmentationList = ({
                                     label={segmentation.label || `Segmentation ${index + 1}`}
                                     segments={segmentation.segments || []}
                                     completedSegments={completedSegments}
-                                    onClick={(segmentLabel) => onSegmentClick(uid, segmentLabel)}
+                                    onClick={(segmentLabel, segmentIndex) => onSegmentClick(uid, segmentLabel, segmentIndex)}
                                 />
                             )
                         })}
