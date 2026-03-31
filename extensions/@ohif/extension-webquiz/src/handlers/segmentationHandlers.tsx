@@ -2,25 +2,24 @@
 import React, { useState } from 'react';
 
 import { SegmentDetailsModal } from '../components/SegmentationList/SegmentDetailsModal';
-import { saveSegmentation } from '../utils/segmentationUtils';
+import { computeSegmentDataIsComplete, saveSegmentation } from '../utils/segmentationUtils';
 import { SegmentMetadata } from './../models/SegmentationData';
+import { useSegmentMetadataStore } from '../stores/useSegmentMetadataStore';
 
 
 //=========================================================
-// Set up GUI so the user can click on an annotation in the panel list
-//    and have the image jump to the corresponding slice
-//    also - set up a visibility icon for each annotation
+// Set up GUI so the user can click on a segment in the segmentation list
 
 export const handleSegmentClick = ({
   segmentationId,
   segmentLabel,
   segmentArrayIndex,
+  segmentIndex,
   showModal,
   closeModal,
   groundTruth,
   referenceStandardMethod,
   hepaticSegment,
-  setCompletedSegments,
   servicesManager,
   commandsManager,
   segmentationService,
@@ -30,6 +29,7 @@ export const handleSegmentClick = ({
   segmentationId: string;
   segmentLabel: string;
   segmentArrayIndex: number;
+  segmentIndex: number
   showModal: (args: {
         title: string;
         message: React.ReactNode;
@@ -42,7 +42,6 @@ export const handleSegmentClick = ({
     groundTruth: { value: number; label: string }[];
     referenceStandardMethod: { value: number; label: string }[];
     hepaticSegment: { value: number; label: string }[];
-    setCompletedSegments: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
     servicesManager: any;
     commandsManager: any;
     segmentationService: any;
@@ -78,6 +77,7 @@ export const handleSegmentClick = ({
             groundTruth: dataFromModal.groundTruth?.label ?? "",
             referenceStandardMethod: dataFromModal.referenceMethod?.label ?? "",
             hepaticSegment: dataFromModal.hepaticSegments ?? [],
+            isComplete: false,
           };
 
           if (!segmentMetadata) {
@@ -85,17 +85,20 @@ export const handleSegmentClick = ({
             return;
           }
 
-          // Mark this segment as completed
-          setCompletedSegments(prev => ({
-            ...prev,
-            [segmentLabel]: true
-          }));
+
+          segmentMetadata.isComplete = computeSegmentDataIsComplete(segmentMetadata);
+          useSegmentMetadataStore.getState().setMetadata( segmentationId, segmentIndex, segmentMetadata);
+
+          const storeForDebug = useSegmentMetadataStore.getState();
+          console.log(' *** IN LOAD HANDLER ... segment metadata store:', storeForDebug);
+
 
           // get segmentation - update fields
           const segmentationToUpdate = segmentationService.getSegmentation(segmentationId);
           saveSegmentation({
             seg: segmentationToUpdate,
             segmentArrayIndex,
+            segmentIndex,
             segmentMetadata,
             activeViewportId,
             servicesManager,

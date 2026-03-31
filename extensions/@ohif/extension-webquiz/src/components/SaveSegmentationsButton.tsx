@@ -289,9 +289,9 @@ function buildSegmentList(segmentsObj) {
     segmentIndex: i + 1,    // matches mask value
     label: segment.label,
     cachedStats: segment.cachedStats,
-    groundTruth: "Unknown",
-    referenceStandardMethod: "Biopsy",
-    hepaticSegment: ["segment-1","segment-2"],
+    groundTruth: "",
+    referenceStandardMethod: "",
+    hepaticSegment: [],
   }));
 }
 

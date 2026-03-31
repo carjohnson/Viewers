@@ -10,7 +10,6 @@ import {
 } from '../init';
 import dcmjs from 'dcmjs';
 import { postSegmentations } from '../handlers/postSegmentations';
-import { groundTruth, hepaticSegment, referenceStandardMethod } from '../models/ScoreOptions';
 
 
 // for creating the blob when saving a segment
@@ -78,26 +77,39 @@ export async function loadDicomSegIntoOHIF({
     );
 
     segmentMetadata.forEach(s => {
-      const ohifInfo: OhifSegmentInfo = {
-        segmentIndex: s.segmentMaskValue,   // matches backend schema
-        label: s.label,
-        cachedStats: s.cachedStats,
-        quizSegmentMetadata: {
+      const isComplete = computeSegmentDataIsComplete(s)
+      useSegmentMetadataStore.getState().setMetadata(
+        segmentationId,
+        s.segmentMaskValue,
+        {
           groundTruth: s.groundTruth,
           referenceStandardMethod: s.referenceStandardMethod,
           hepaticSegment: s.hepaticSegment,
+          isComplete: isComplete,
         }
-      };
+      );      
 
-      segmentationService.addSegment(segmentationId, ohifInfo);
+      const ohifInfo: OhifSegmentInfo = {
+      segmentIndex: s.segmentMaskValue,   // matches backend schema
+      label: s.label,
+      cachedStats: s.cachedStats,
+      quizSegmentMetadata: {
+        groundTruth: s.groundTruth,
+        referenceStandardMethod: s.referenceStandardMethod,
+        hepaticSegment: s.hepaticSegment,
+        isComplete: isComplete,
+      }
+    };
 
-      useSegmentMetadataStore
-        .getState()
-        .setSegmentInfo(
-          segmentationId,
-          s.segmentMaskValue, //1-based
-          ohifInfo,
-        );
+    segmentationService.addSegment(segmentationId, ohifInfo);
+
+    useSegmentMetadataStore
+      .getState()
+      .setSegmentInfo(
+        segmentationId,
+        s.segmentMaskValue, //1-based
+        ohifInfo,
+      );
     })
     const cachedStore = useSegmentMetadataStore.getState().getAllSegments(segmentationId);
     console.log('🔥 CACHED:', segmentationId, cachedStore);
@@ -153,7 +165,8 @@ export async function loadDicomSegIntoOHIF({
 export async function saveSegmentation({
   seg,
   segmentMetadata,
-  segmentArrayIndex,
+  segmentArrayIndex,  //0-based
+  segmentIndex,       //1-based
   activeViewportId,
   servicesManager,
   commandsManager,
@@ -162,6 +175,7 @@ export async function saveSegmentation({
   seg: SegmentationData;
   segmentMetadata: SegmentMetadata;
   segmentArrayIndex: number;
+  segmentIndex: number;
   activeViewportId: string;
   servicesManager: any;
   commandsManager: any;
@@ -182,8 +196,6 @@ export async function saveSegmentation({
 
     // synchronize the stored segment info with the current segments displayed in OHIF  (in case one has been deleted)
     const segmentInfoFromService = Object.entries(currentSegments).map(([arrayIndexStr, segment]) => {
-      const arrayIndex = Number(arrayIndexStr); // 0-based
-      const segmentIndex = arrayIndex + 1;     // 1-based
 
       return {
         segmentIndex: segmentIndex,
@@ -197,11 +209,7 @@ export async function saveSegmentation({
 
     // update the store with the clicked segment metadata
     const segmentArray = Object.values(currentSegments);
-    // const clickedSegmentInfoFromService = segmentArray[segmentArrayIndex];
-
-    // useSegmentMetadataStore.getState().setSegmentInfo(seg.segmentationId, segmentArrayIndex + 1, clickedSegmentInfoFromService);
-
-    const segmentIndexToUpdate = segmentArrayIndex + 1;
+    const segmentIndexToUpdate = segmentIndex;
 
     const clickedSegmentInfoFromService = {
       ...segmentArray[segmentArrayIndex],
@@ -418,6 +426,14 @@ export function refreshStoredSegmentMetadata(segmentationId: string, currentSegm
   });
 }
 
+// =====================================
+export function computeSegmentDataIsComplete(m: SegmentMetadata) {
+  return (
+    m.groundTruth.trim() !== "" &&
+    m.referenceStandardMethod.trim() !== "" &&
+    m.hepaticSegment.length > 0
+  );
+};
 
 ///////////////////////////////////////////////
 //////////////  DEBUG HELPERS /////////////////

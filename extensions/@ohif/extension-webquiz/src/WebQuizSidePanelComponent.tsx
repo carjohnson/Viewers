@@ -70,7 +70,6 @@ function WebQuizSidePanelComponent() {
     const measurementList = measurementService.getMeasurements(); 
     const measurementListRef = useRef([]);    
     const segmentationList = segmentationService.getSegmentations();
-    const [completedSegments, setCompletedSegments] = useState({});
     const pendingAnnotationUIDRef = useRef<string | null>(null);
     const { cornerstoneViewportService, displaySetService } = servicesManager.services;
     const listOfUsersAnnotationsRef = useRef<any>(null);
@@ -358,17 +357,17 @@ function WebQuizSidePanelComponent() {
     }, [userInfo?.username, studyUID]);
 
     //~~~~~~~~~~~~~~~~~
-    const onSegmentClick = (id: string, label: string, index: number) => 
+    const onSegmentClick = (id: string, segmentLabel: string, segmentArrayIndex: number, segmentIndex) => 
         handleSegmentClick({ 
             segmentationId: id,
-            segmentLabel: label,
-            segmentArrayIndex: index,
+            segmentLabel,
+            segmentArrayIndex,
+            segmentIndex,
             showModal,
             closeModal,
             groundTruth,
             referenceStandardMethod,
             hepaticSegment,
-            setCompletedSegments,
             servicesManager,
             commandsManager,
             segmentationService,
@@ -756,7 +755,6 @@ function WebQuizSidePanelComponent() {
                     getUserInfo={getUserInfo}
                     segmentationList={segmentationList}
                     onSegmentClick={onSegmentClick}
-                    completedSegments={completedSegments}
                 />
 
                 <AnnotationList

@@ -7,12 +7,6 @@ export interface OhifSegmentInfo {
 }
 
 // =====================================
-export interface SegmentationMetadataStore {
-  [segmentationId: string]: {
-    [segmentIndex: number]: OhifSegmentInfo;
-  };
-} 
-// =====================================
 export type SegmentationData = {
   segmentationId: string;
   label: string;
@@ -34,5 +28,6 @@ export type SegmentMetadata = {
   groundTruth: string;
   referenceStandardMethod: string;
   hepaticSegment: string[];
+  isComplete: boolean;
 }
 
