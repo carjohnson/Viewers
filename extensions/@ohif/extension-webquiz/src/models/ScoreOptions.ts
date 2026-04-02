@@ -1,12 +1,12 @@
 //~~~~~~~~~~~~~~~~~
-export const groundTruth = [
+export const groundTruthOptions = [
     { value: 1, label: 'Metastasis'},
     { value: 2, label: 'Not metastasis'},
     { value: 3, label: 'Unknown'},
 ];
 
 //~~~~~~~~~~~~~~~~~
-export const referenceStandardMethod = [
+export const referenceStandardMethodOptions = [
     { value: 1, label: 'Surgical pathology'},
     { value: 2, label: 'Biopsy' },
     { value: 3, label: 'Focal therapy on spec' },
@@ -20,7 +20,7 @@ export const referenceStandardMethod = [
 ];
 
 //~~~~~~~~~~~~~~~~~
-export const hepaticSegment = [
+export const hepaticSegmentOptions = [
     { value: 1, label: '1'},
     { value: 2, label: '2' },
     { value: 3, label: '3' },

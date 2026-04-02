@@ -204,23 +204,24 @@ export async function saveSegmentation({
         quizSegmentMetadata: segment.quizSegmentMetadata,
       };
     });
-    refreshStoredSegmentMetadata(seg.segmentationId, segmentInfoFromService);
+              // refreshStoredSegmentMetadata(seg.segmentationId, segmentInfoFromService);
 
 
-    // update the store with the clicked segment metadata
-    const segmentArray = Object.values(currentSegments);
-    const segmentIndexToUpdate = segmentIndex;
+              // // update the store with the clicked segment metadata
+              // const segmentArray = Object.values(currentSegments);
+              // const segmentIndexToUpdate = segmentIndex;
 
-    const clickedSegmentInfoFromService = {
-      ...segmentArray[segmentArrayIndex],
-      segmentIndex: segmentIndexToUpdate,
-    };
+              // const clickedSegmentInfoFromService = {
+              //   ...segmentArray[segmentArrayIndex],
+              //   segmentIndex: segmentIndexToUpdate,
+              // };
 
-    useSegmentMetadataStore
-      .getState()
-      .setSegmentInfo(seg.segmentationId, segmentIndexToUpdate, clickedSegmentInfoFromService);
-
-  
+              // useSegmentMetadataStore
+              //   .getState()
+              //   .setSegmentInfo(seg.segmentationId, segmentIndexToUpdate, clickedSegmentInfoFromService);
+              // useSegmentMetadataStore.getState().setMetadata(seg.segmentationId, segmentIndexToUpdate, segmentMetadata);
+    console.log(' *** IN Utils SAVESEGMENTATION ... store', useSegmentMetadataStore.getState())
+    
     let generatedSeg;
     try {
         // generating a SEG object that can be posted to backend as DICOM SEG with metadata
@@ -232,8 +233,8 @@ export async function saveSegmentation({
             type: seg.type,
             predecessorImageId: seg.representationData.Labelmap.referencedImageIds[0]
         });
-        // const updatedSeg = segmentationService.getSegmentation(seg.segmentationId);
-        // console.log('updatedSeg after update', updatedSeg);    // for debug
+        const updatedSeg = segmentationService.getSegmentation(seg.segmentationId);
+        console.log('updatedSeg after update', updatedSeg);    // for debug
 
         const seriesUid = getSeriesUid(seg.representationData.Labelmap.referencedImageIds[0]);
         const displaySets = displaySetService.getDisplaySetsForSeries(seriesUid);

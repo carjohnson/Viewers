@@ -24,7 +24,7 @@ import { ToolGroupManager } from '@cornerstonejs/tools';
 import { base64ToArrayBuffer } from './utils/dataUtils';
 import { loadDicomSegIntoOHIF } from './utils/segmentationUtils';
 import { measurementScoreOptions } from './models/ScoreOptions';
-import { groundTruth, referenceStandardMethod, hepaticSegment } from './models/ScoreOptions';
+import { groundTruthOptions, referenceStandardMethodOptions, hepaticSegmentOptions } from './models/ScoreOptions';
 
 
 
@@ -365,9 +365,9 @@ function WebQuizSidePanelComponent() {
             segmentIndex,
             showModal,
             closeModal,
-            groundTruth,
-            referenceStandardMethod,
-            hepaticSegment,
+            groundTruthOptions,
+            referenceStandardMethodOptions,
+            hepaticSegmentOptions,
             servicesManager,
             commandsManager,
             segmentationService,

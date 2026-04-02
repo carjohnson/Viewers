@@ -1,31 +1,71 @@
 import React, { useEffect, useState } from 'react';
 import Select from 'react-select';
+import { SegmentMetadata } from '../../models/SegmentationData';
 
 
- export const SegmentDetailsModal = ({
+//  export const SegmentDetailsModal = ({
+//   segmentationId,
+//   segmentLabel,
+//   groundTruth,
+//   referenceStandardMethod,
+//   hepaticSegment,
+//   onSaveSegmentData,
+// }) => {
+
+  // const [selectedGroundTruth, setSelectedGroundTruth] = useState(null);
+  // const [selectedReferenceMethod, setSelectedReferenceMethod] = useState(null);
+  // const [selectedHepaticSegments, setSelectedHepaticSegments] = useState([]);
+
+  export const SegmentDetailsModal = ({
   segmentationId,
   segmentLabel,
-  groundTruth,
-  referenceStandardMethod,
-  hepaticSegment,
+
+  groundTruthOptions,
+  referenceMethodOptions,
+  hepaticSegmentOptions,
+
+  selectedGroundTruth,
+  selectedReferenceMethod,
+  selectedHepaticSegments,
+
   onSaveSegmentData,
 }) => {
 
-  const [selectedGroundTruth, setSelectedGroundTruth] = useState(null);
-  const [selectedReferenceMethod, setSelectedReferenceMethod] = useState(null);
-  const [selectedHepaticSegments, setSelectedHepaticSegments] = useState([]);
+  const [groundTruthValue, setGroundTruthValue] = useState(null);
+  const [referenceMethodValue, setReferenceMethodValue] = useState(null);
+  const [hepaticValues, setHepaticValues] = useState([]);
 
   const [statusMessage, setStatusMessage] = useState("");
   const [statusType, setStatusType] = useState("info"); 
   
 
+
+  // Hydrate from props
+  useEffect(() => {
+    if (selectedGroundTruth) {
+      const match = groundTruthOptions.find(o => o.label === selectedGroundTruth);
+      setGroundTruthValue(match || null);
+    }
+
+    if (selectedReferenceMethod) {
+      const match = referenceMethodOptions.find(o => o.label === selectedReferenceMethod);
+      setReferenceMethodValue(match || null);
+    }
+
+    if (selectedHepaticSegments?.length > 0) {
+      setHepaticValues(selectedHepaticSegments);
+    }
+  }, []);
+
+
   useEffect(() => {
     onSaveSegmentData(() => {
-      if (!selectedGroundTruth || !selectedReferenceMethod || selectedHepaticSegments.length === 0) {
+      if (!groundTruthValue || !referenceMethodValue || hepaticValues.length === 0)  {
         setStatusType("error");
         setStatusMessage("Missing required fields");
-        return null;
+        return false;
       } else {
+
         setStatusType("info");
         setStatusMessage("Saving ...");
 
@@ -36,17 +76,13 @@ import Select from 'react-select';
            }, 800);
 
         return {
-          groundTruth: selectedGroundTruth,
-          referenceMethod: selectedReferenceMethod,
-          hepaticSegments: selectedHepaticSegments,
+          groundTruth: groundTruthValue,
+          referenceMethod: referenceMethodValue,
+          hepaticSegments: hepaticValues,
         };
       }      
     });
-  }, [
-    selectedGroundTruth,
-    selectedReferenceMethod,
-    selectedHepaticSegments,
-  ]);
+  }, [groundTruthValue, referenceMethodValue, hepaticValues]);
 
 
 
@@ -79,21 +115,21 @@ import Select from 'react-select';
       >
         <div style={{ flex: "0 1 auto" }}>
           <Select
-            options={groundTruth}
+            options={groundTruthOptions}
             classNamePrefix="dd"
             placeholder="Ground Truth"
-            value={selectedGroundTruth}
-            onChange={(val) => setSelectedGroundTruth(val)}
+            value={groundTruthValue}
+            onChange={(val) => setGroundTruthValue(val)}
           />
         </div>
 
         <div style={{ flex: "0 1 auto" }}>
           <Select
-            options={referenceStandardMethod}
+            options={referenceMethodOptions}
             classNamePrefix="dd"
             placeholder="Reference Standard Method"
-            value={selectedReferenceMethod}
-            onChange={(val) => setSelectedReferenceMethod(val)}
+            value={referenceMethodValue}
+            onChange={(val) => setReferenceMethodValue(val)}
           />
         </div>
       </div>
@@ -103,15 +139,15 @@ import Select from 'react-select';
         <div className="checkbox-title">Hepatic Segments</div>
 
         <div className="checkbox-list">
-          {hepaticSegment.map((item) => (
+          {hepaticSegmentOptions.map((item) => (
             <label key={item.value} className="checkbox-item">
             <input
               type="checkbox"
               value={item.label}   // ← use label instead of value
-              checked={selectedHepaticSegments.includes(item.label)}
+              checked={hepaticValues.includes(item.label)}
               onChange={(e) => {
                 const label = e.target.value;
-                setSelectedHepaticSegments((prev) =>
+                setHepaticValues((prev) =>
                   prev.includes(label)
                     ? prev.filter((v) => v !== label)
                     : [...prev, label]
