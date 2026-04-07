@@ -15,8 +15,11 @@ export const SegmentationList = ({
     segmentationList,
     onSegmentClick,
 }: Props) => {
-    
-    const metadata = useSegmentMetadataStore(state => state.metadata);
+
+    // arrayIndex   ... 0-based (to access object)
+    // segmentIndex ... 1-based (reflects SEG file mask value)
+
+    const ohifInfo = useSegmentMetadataStore(state => state.ohifInfo);
 
     return (
         <div>
@@ -36,8 +39,8 @@ export const SegmentationList = ({
                             const completionMap: Record<number, boolean> = {};
 
                             segmentArray.forEach(seg => {
-                                const segMeta = metadata[uid]?.[seg.segmentIndex];
-                                completionMap[seg.segmentIndex] = segMeta?.isComplete ?? false;
+                                const segMeta = ohifInfo[uid]?.[seg.segmentIndex];
+                                completionMap[seg.segmentIndex] = segMeta?.quizSegmentMetadata?.isComplete ?? false;
                             });
 
                             return (

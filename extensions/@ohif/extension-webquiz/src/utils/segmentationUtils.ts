@@ -78,16 +78,16 @@ export async function loadDicomSegIntoOHIF({
 
     segmentMetadata.forEach(s => {
       const isComplete = computeSegmentDataIsComplete(s)
-      useSegmentMetadataStore.getState().setMetadata(
-        segmentationId,
-        s.segmentMaskValue,
-        {
-          groundTruth: s.groundTruth,
-          referenceStandardMethod: s.referenceStandardMethod,
-          hepaticSegment: s.hepaticSegment,
-          isComplete: isComplete,
-        }
-      );      
+      // useSegmentMetadataStore.getState().setMetadata(
+      //   segmentationId,
+      //   s.segmentMaskValue,
+      //   {
+      //     groundTruth: s.groundTruth,
+      //     referenceStandardMethod: s.referenceStandardMethod,
+      //     hepaticSegment: s.hepaticSegment,
+      //     isComplete: isComplete,
+      //   }
+      // );      
 
       const ohifInfo: OhifSegmentInfo = {
       segmentIndex: s.segmentMaskValue,   // matches backend schema
@@ -204,7 +204,8 @@ export async function saveSegmentation({
         quizSegmentMetadata: segment.quizSegmentMetadata,
       };
     });
-              // refreshStoredSegmentMetadata(seg.segmentationId, segmentInfoFromService);
+    
+    // refreshStoredSegmentMetadata(seg.segmentationId, segmentInfoFromService);
 
 
               // // update the store with the clicked segment metadata
@@ -220,7 +221,6 @@ export async function saveSegmentation({
               //   .getState()
               //   .setSegmentInfo(seg.segmentationId, segmentIndexToUpdate, clickedSegmentInfoFromService);
               // useSegmentMetadataStore.getState().setMetadata(seg.segmentationId, segmentIndexToUpdate, segmentMetadata);
-    console.log(' *** IN Utils SAVESEGMENTATION ... store', useSegmentMetadataStore.getState())
     
     let generatedSeg;
     try {
@@ -411,7 +411,7 @@ export function getSeriesUid(imageId: string): string | null {
 export function refreshStoredSegmentMetadata(segmentationId: string, currentSegments: any[]) {
   const store = useSegmentMetadataStore.getState();
 
-  store.clearMetadata(segmentationId);
+  // store.clearMetadata(segmentationId);
 
   currentSegments.forEach((segment, arrayIndex) => {
     const segmentIndex = arrayIndex + 1;

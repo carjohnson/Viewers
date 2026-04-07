@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 
 import { SegmentDetailsModal } from '../components/SegmentationList/SegmentDetailsModal';
 import { computeSegmentDataIsComplete, saveSegmentation } from '../utils/segmentationUtils';
-import { SegmentMetadata } from './../models/SegmentationData';
+import { SegmentMetadata, OhifSegmentInfo } from './../models/SegmentationData';
 import { useSegmentMetadataStore } from '../stores/useSegmentMetadataStore';
 import { segmentation as csSegmentation, Enums as csToolsEnums,  } from '@cornerstonejs/tools';
 
@@ -50,7 +50,8 @@ export const handleSegmentClick = ({
   }) => {
 
     let saveHandlerFromModal = null;
-    const metadata = useSegmentMetadataStore.getState().getMetadata(segmentationId, segmentIndex);
+    // const metadata = useSegmentMetadataStore.getState().getMetadata(segmentationId, segmentIndex);
+    const metadata = useSegmentMetadataStore.getState().getSegmentInfo(segmentationId, segmentIndex).quizSegmentMetadata;
 
     showModal({
       title: "Segment Details",
@@ -222,6 +223,23 @@ export const handleSegmentClick = ({
               commandsManager,
               studyInstanceUID,
             });
+
+            // Update metadata store as modal closes
+            const segmentToUpdate = segmentationToUpdate.segments[segmentArrayIndex]
+
+            const ohifInfo: OhifSegmentInfo = {
+              segmentIndex,   // matches backend schema - mask value
+              label: segmentLabel,
+              cachedStats: segmentToUpdate.cachedStats,
+              quizSegmentMetadata: {
+                groundTruth: segmentMetadata.groundTruth,
+                referenceStandardMethod: segmentMetadata.referenceStandardMethod,
+                hepaticSegment: segmentMetadata.hepaticSegment,
+                isComplete: segmentMetadata.isComplete,
+              }
+            };
+
+            useSegmentMetadataStore.getState().setSegmentInfo( segmentationId, segmentIndex, ohifInfo );
 
 
             const storeForDebugAfterSave = useSegmentMetadataStore.getState();
