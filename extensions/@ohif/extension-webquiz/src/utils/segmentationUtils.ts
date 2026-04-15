@@ -2,7 +2,7 @@ import { adaptersSEG } from '@cornerstonejs/adapters';
 import { imageLoader } from '@cornerstonejs/core';
 import { metaData } from '@cornerstonejs/core';
 import { useSegmentMetadataStore } from '../stores/useSegmentMetadataStore';
-import { OhifSegmentInfo, SegmentationData, SegmentMetadata } from './../models/SegmentationData';
+import { OhifSegmentInfo, SegmentationData, SegmentMetadata, DEFAULT_SEGMENT_METADATA } from './../models/SegmentationData';
 import {
   ImplementationClassUID,
   ImplementationVersionName,
@@ -78,19 +78,10 @@ export async function loadDicomSegIntoOHIF({
 
     segmentMetadata.forEach(s => {
       const isComplete = computeSegmentDataIsComplete(s)
-      // useSegmentMetadataStore.getState().setMetadata(
-      //   segmentationId,
-      //   s.segmentMaskValue,
-      //   {
-      //     groundTruth: s.groundTruth,
-      //     referenceStandardMethod: s.referenceStandardMethod,
-      //     hepaticSegment: s.hepaticSegment,
-      //     isComplete: isComplete,
-      //   }
-      // );      
+   
 
       const ohifInfo: OhifSegmentInfo = {
-      segmentIndex: s.segmentMaskValue,   // matches backend schema
+      segmentIndex: s.segmentMaskValue,   // matches backend schema on load
       label: s.label,
       cachedStats: s.cachedStats,
       quizSegmentMetadata: {
@@ -98,6 +89,7 @@ export async function loadDicomSegIntoOHIF({
         referenceStandardMethod: s.referenceStandardMethod,
         hepaticSegment: s.hepaticSegment,
         isComplete: isComplete,
+        dicomSegMaskValue: s.segmentMaskValue,
       }
     };
 
@@ -107,7 +99,7 @@ export async function loadDicomSegIntoOHIF({
       .getState()
       .setSegmentInfo(
         segmentationId,
-        s.segmentMaskValue, //1-based
+        s.segmentMaskValue, //1-based - match to backend on load
         ohifInfo,
       );
     })
@@ -191,36 +183,52 @@ export async function saveSegmentation({
     let segmentationObjects = [];
 
 
-    // Capture segments from CURRENT service state (user-created in OHIF)
-    const currentSegments = seg.segments || {};
+    // // Capture segments from CURRENT service state (user-created in OHIF)
+    // const currentSegments = seg.segments || {};
 
-    // synchronize the stored segment info with the current segments displayed in OHIF  (in case one has been deleted)
-    const segmentInfoFromService = Object.entries(currentSegments).map(([arrayIndexStr, segment]) => {
+    // // synchronize the stored segment info with the current segments displayed in OHIF  (in case one has been deleted)
+    // const segmentInfoFromService = Object.entries(currentSegments).map(([arrayIndexStr, segment]) => {
 
-      return {
-        segmentIndex: segmentIndex,
-        label: segment.label || `Segment ${segmentIndex}`,
-        cachedStats: segment.cachedStats,
-        quizSegmentMetadata: segment.quizSegmentMetadata,
-      };
-    });
+    //   return {
+    //     segmentIndex: segmentIndex,
+    //     label: segment.label || `Segment ${segmentIndex}`,
+    //     cachedStats: segment.cachedStats,
+    //     quizSegmentMetadata: segment.quizSegmentMetadata,
+    //   };
+    // });
+
+    // console.log(' *** IN SAVESEGMENTATION after segment clicked', segmentInfoFromService);
     
-    // refreshStoredSegmentMetadata(seg.segmentationId, segmentInfoFromService);
+//     refreshStoredSegmentMetadata(seg.segmentationId, segmentInfoFromService);
 
 
-              // // update the store with the clicked segment metadata
-              // const segmentArray = Object.values(currentSegments);
-              // const segmentIndexToUpdate = segmentIndex;
+//               // update the store with the clicked segment metadata
+//               const segmentArray = Object.values(currentSegments);
+//               const segmentIndexToUpdate = segmentIndex;
 
-              // const clickedSegmentInfoFromService = {
-              //   ...segmentArray[segmentArrayIndex],
-              //   segmentIndex: segmentIndexToUpdate,
-              // };
+//               const clickedSegmentInfoFromService = {
+//                 ...segmentArray[segmentArrayIndex],
+//                 segmentIndex: segmentIndexToUpdate,
+//               };
 
-              // useSegmentMetadataStore
-              //   .getState()
-              //   .setSegmentInfo(seg.segmentationId, segmentIndexToUpdate, clickedSegmentInfoFromService);
-              // useSegmentMetadataStore.getState().setMetadata(seg.segmentationId, segmentIndexToUpdate, segmentMetadata);
+//                     const ohifInfo: OhifSegmentInfo = {
+//         segmentIndex,
+//         label: segmentArray[segmentArrayIndex].label,
+//         cachedStats: segmentArray[segmentArrayIndex].cachedStats,
+//         quizSegmentMetadata: segmentMetadata,
+//       };
+ 
+//     // ///// FOR DEBUG
+// console.log('segmentArrayIndex', segmentArrayIndex);
+// console.log('segmentArray', segmentArray);
+// console.log('segmentArray[segmentArrayIndex]', segmentArray[segmentArrayIndex]);
+// console.log('currentSegments', currentSegments);
+ 
+//               useSegmentMetadataStore
+//                 .getState()
+//                 .setSegmentInfo(seg.segmentationId, segmentIndexToUpdate, ohifInfo);
+//               // useSegmentMetadataStore.getState().setMetadata(seg.segmentationId, segmentIndexToUpdate, segmentMetadata);
+    
     
     let generatedSeg;
     try {
@@ -361,7 +369,35 @@ export async function saveSegmentation({
 
 
 
+// =====================================
+function buildAllSegmentsList( segmentationId: string) {
 
+  const allSegments = useSegmentMetadataStore
+    .getState()
+    .getAllSegments(segmentationId);
+
+  if (!allSegments) return [];
+
+  return Object.entries(allSegments).map(([segmentIndexStr, stored]) => {
+    // const segmentIndex = Number(segmentIndexStr); 
+    const segMaskValue = stored.quizSegmentMetadata.dicomSegMaskValue;
+
+    const base = {
+      segmentIndex: segMaskValue,
+      label: stored.label,
+      cachedStats: stored.cachedStats,
+    };
+
+    const {groundTruth, referenceStandardMethod, hepaticSegment,} = stored.quizSegmentMetadata || DEFAULT_SEGMENT_METADATA;
+
+    return {
+      ...base,
+      groundTruth,
+      referenceStandardMethod,
+      hepaticSegment,
+    };
+  });    
+}
 // =====================================
 function buildSegmentList(
   segmentationId: string,
@@ -374,7 +410,8 @@ function buildSegmentList(
 
   return Object.entries(allSegments).map(([segmentIndexStr, stored]) => {
     const segmentIndex = Number(segmentIndexStr); // 1-based
-    const arrayIndex = segmentIndex - 1;           // convert to 0-based
+    // const arrayIndex = segmentIndex - 1;           // convert to 0-based
+    const arrayIndex = stored.quizSegmentMetadata.dicomSegMaskValue;
 
     const base = {
       segmentIndex,
@@ -408,24 +445,179 @@ export function getSeriesUid(imageId: string): string | null {
 
 
 // =====================================
+export function refreshSegmentMetadataStore (segmentationService: any) {
+
+  // get all segmentations from the service and from the store
+  // compare each array 
+  //    - collect id's that match, unmatched from service, and unmatched from store
+  //    - if unmatched arrays lengths > 0 
+  //           - remove unmatched store id's from store
+  //           - add unmatched service ids into store
+  //           - signal that a save to db is required
+  //    - if matched array > 0 
+  //           - check for mismatched segments service to store
+  //           - replace all segments in store with those in the service
+  //             This ensures that any changes to the segments (add or delete) is captured
+
+  let bDatabaseUpdateRequired = false;
+
+  const lSegmentationsFromService = segmentationService.getSegmentations();
+  let lIdsFromService = [];
+  lSegmentationsFromService.forEach(s => {
+    lIdsFromService.push(s.segmentationId);
+  })
+  const lIdsFromStore = useSegmentMetadataStore.getState().getAllSegmentationsIds();
+  
+  let lUnmatchedIdsFromService = [];
+  let lUnmatchedIdsFromStore = [];
+  let lMatchedIds = [];
+
+  // look for segmentations missing in each list
+  lUnmatchedIdsFromService = lIdsFromService.filter(s => !lIdsFromStore.includes(s));
+  lUnmatchedIdsFromStore = lIdsFromStore.filter(s => !lIdsFromService.includes(s));
+  lMatchedIds = lIdsFromService.filter(s => lIdsFromStore.includes(s));
+
+  const store = useSegmentMetadataStore.getState();
+
+  // remove segmentation items from store if there is no match in the service
+  lUnmatchedIdsFromStore.forEach( segmentationId => {
+    store.clearSegmentation(segmentationId);
+    bDatabaseUpdateRequired = true;
+  });
+
+  // add segmentations and segments from service to store
+  lUnmatchedIdsFromService.forEach( segmentationId => {
+    const segmentation = lSegmentationsFromService.find(s => s.segmentationId === segmentationId);
+    if (!segmentation) return;
+
+    const oSegments = segmentation?.segments || {};
+
+    Object.values(oSegments as Record<number, OhifSegmentInfo>).forEach((segment, arrayIndex) => {
+      // const segmentIndex = arrayIndex + 1;
+      const segmentIndex = segment.segmentIndex;
+
+      const ohifInfo: OhifSegmentInfo = {
+        segmentIndex,
+        label: segment.label,
+        cachedStats: segment.cachedStats,
+        quizSegmentMetadata: normalizeSegmentMetadata(segment, arrayIndex),
+      };
+
+      store.setSegmentInfo(segmentationId, segmentIndex, ohifInfo);
+      bDatabaseUpdateRequired = true;
+    });
+
+  });
+
+  
+  // for segmentations that are in both service and store - make sure the segments match
+  //    clear segment metadata from store and replace it with that from the service 
+
+  lMatchedIds.forEach(segmentationId => {
+    const segmentation = lSegmentationsFromService.find(
+      s => s.segmentationId === segmentationId
+    );
+
+    const serviceSegments = Object.values(
+      (segmentation?.segments || {}) as Record<number, OhifSegmentInfo>
+    );
+
+    const storeState = useSegmentMetadataStore.getState();
+    const storeSegments = storeState.getAllSegments(segmentationId) || {};
+
+    const serviceCount = serviceSegments.length;
+    const storeCount = Object.keys(storeSegments).length;
+
+    let needsRefresh = serviceCount !== storeCount;
+
+    if (!needsRefresh) {
+      for (const [arrayIndex, segmentFromService] of serviceSegments.entries()) {
+        const expectedStoreIndex = arrayIndex + 1;
+        const segmentFromStore = storeState.getSegmentInfo(
+          segmentationId,
+          expectedStoreIndex
+        );
+
+        if (!segmentFromStore) {
+          needsRefresh = true;
+          break;
+        }
+
+        const serviceLabel = segmentFromService.label;
+        const storeLabel = segmentFromStore.label;
+
+        if (serviceLabel !== storeLabel) {
+          needsRefresh = true;
+          break;
+        }
+      }
+    }
+
+    if (needsRefresh) {
+      bDatabaseUpdateRequired = rebuildSegmentsFromService(segmentationId, serviceSegments);
+    }
+  });
+
+  return bDatabaseUpdateRequired;
+
+}
+
+// =====================================
+
+const rebuildSegmentsFromService = (
+  segmentationId: string,
+  serviceSegments: OhifSegmentInfo[]
+) => {
+  useSegmentMetadataStore.getState().clearAllSegmentInfo(segmentationId);
+
+  for (const [arrayIndex, segment] of serviceSegments.entries()) {
+    const ohifInfo: OhifSegmentInfo = {
+      segmentIndex: segment.segmentIndex,
+      label: segment.label,
+      cachedStats: segment.cachedStats,
+      quizSegmentMetadata: normalizeSegmentMetadata(segment, arrayIndex),
+    };
+
+    const maskValue = ohifInfo.quizSegmentMetadata?.dicomSegMaskValue;
+    if (maskValue == null) {
+      continue;
+    }
+
+    useSegmentMetadataStore
+      .getState()
+      .setSegmentInfo(segmentationId, maskValue, ohifInfo);
+  }
+
+  return true;
+};
+
+// =====================================
 export function refreshStoredSegmentMetadata(segmentationId: string, currentSegments: any[]) {
   const store = useSegmentMetadataStore.getState();
 
-  // store.clearMetadata(segmentationId);
+  store.clearAllSegmentInfo(segmentationId);
 
   currentSegments.forEach((segment, arrayIndex) => {
-    const segmentIndex = arrayIndex + 1;
+    // const segmentIndex = arrayIndex + 1;
 
-    const ohifInfo: OhifSegmentInfo = {
-      segmentIndex,
-      label: segment.label,
-      cachedStats: segment.cachedStats,
-      quizSegmentMetadata: segment.quizSegmentMetadata,
+    const updatedQuizSegmentMetadata: SegmentMetadata = {
+      ...segment.quizSegmentMetadata,
+      dicomSegMaskValue: arrayIndex + 1,
     };
 
-    store.setSegmentInfo(segmentationId, segmentIndex, ohifInfo);
+    const ohifInfo: OhifSegmentInfo = {
+      segmentIndex: segment.segmentIndex,
+      label: segment.label,
+      cachedStats: segment.cachedStats,
+      quizSegmentMetadata: updatedQuizSegmentMetadata,
+    };
+
+    const indexToUpdate = updatedQuizSegmentMetadata.dicomSegMaskValue;
+    // store.setSegmentInfo(segmentationId, segmentIndex, ohifInfo);
+    store.setSegmentInfo(segmentationId, indexToUpdate, ohifInfo);
   });
 }
+
 
 // =====================================
 export function computeSegmentDataIsComplete(m: SegmentMetadata) {
@@ -435,6 +627,225 @@ export function computeSegmentDataIsComplete(m: SegmentMetadata) {
     m.hepaticSegment.length > 0
   );
 };
+
+// =====================================
+export async function saveAllSegmentations ( {  
+  segmentationService,
+  viewportGridService,
+  displaySetService,
+  activeViewportId,
+  commandsManager,
+  studyInstanceUID,
+}: {
+  segmentationService: any;
+  viewportGridService: any;
+  displaySetService: any;
+  activeViewportId: string;
+  commandsManager: any;
+  studyInstanceUID: string;
+}) {
+    const allSegmentations: SegmentationData = segmentationService.getSegmentations();
+    console.log(' *** In saveAllSegmentations ... all Segmentations', allSegmentations);
+    let updatedSeg;
+    let segmentationObjects = [];
+
+    for (const seg of Object.values(allSegmentations) as SegmentationData[]) {
+
+      let generatedSeg;
+      try {
+
+                // generating a SEG object that can be posted to backend as DICOM SEG with metadata
+
+        // because this is a custom segmentation extension, 
+        //      predecessorImage prop is missing from the seg
+        segmentationService.addOrUpdateSegmentation({
+            segmentationId: seg.segmentationId,
+            type: seg.type,
+            predecessorImageId: seg.representationData.Labelmap.referencedImageIds[0]
+        });
+        updatedSeg = segmentationService.getSegmentation(seg.segmentationId);
+
+        const seriesUid = getSeriesUid(seg.representationData.Labelmap.referencedImageIds[0]);
+        const displaySets = displaySetService.getDisplaySetsForSeries(seriesUid);
+        const displaySetInstanceUID = displaySets[0]?.displaySetInstanceUID;
+
+        await viewportGridService.setDisplaySetsForViewport({
+            viewportId: activeViewportId,
+            displaySetInstanceUIDs: [displaySetInstanceUID],
+          });
+
+        // Give OHIF a moment to render the new stack
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        if (!displaySetInstanceUID) {
+          console.warn('No displaySet found for series', seriesUid);
+          continue;
+        }
+
+        // Check all segments for non-zero volume - use stats from cached segment metadata
+        //    At least one segment must have a volume in order to call function to generate a Seg
+        // const segmentIdsToRemove: string[] = [];
+        let hasVolume = false;
+        const segments = useSegmentMetadataStore.getState().getAllSegments(seg.segmentationId);
+        
+
+        for (const [segIdxStr, segment] of Object.entries(segments)) {
+          const volume = segment.cachedStats?.namedStats?.volume?.value;
+          if (typeof volume === 'number' && volume > 0) {
+            hasVolume = true;
+            break;
+          }
+        } // end for each segment
+
+        // if any of the segments were painted, generate a segmentation object
+        if (hasVolume) {
+
+          generatedSeg = commandsManager.runCommand('generateSegmentation', {
+            segmentationId: seg.segmentationId,
+          });
+
+          if (!generatedSeg || !generatedSeg.dataset) {
+            console.warn(
+              `Skipping segmentation ${seg.segmentationId}: generation failed`
+            );
+            continue;
+          }
+
+
+          console.log(' *** GENERATED SEG:', generatedSeg);
+
+          // //////////// Create blob from generatedSeg ////////////
+          // generate the meta data 
+          let segBlob;
+          const meta = {
+                FileMetaInformationVersion: generatedSeg.dataset._meta?.FileMetaInformationVersion?.Value,
+                MediaStorageSOPClassUID: generatedSeg.dataset.SOPClassUID,
+                MediaStorageSOPInstanceUID: generatedSeg.dataset.SOPInstanceUID,
+                TransferSyntaxUID: EXPLICIT_VR_LITTLE_ENDIAN,
+                ImplementationClassUID,
+                ImplementationVersionName,
+              };
+
+          const denaturalizedMetadata = dcmjs.data.DicomMetaDictionary.denaturalizeDataset(meta);
+          const denaturalizedDataset = dcmjs.data.DicomMetaDictionary.denaturalizeDataset(generatedSeg.dataset);
+          const dicomDict = new DicomDict(denaturalizedMetadata);
+          dicomDict.dict = denaturalizedDataset;
+
+          try {
+            const arrayBuffer = dicomDict.write();
+            segBlob = new Blob([arrayBuffer], { type: 'application/dicom' });
+            console.log('Blob created successfully, size:', segBlob.size, 'type:', segBlob.type);
+            console.log('segBlob:', segBlob);
+          
+          } catch (blobError) {
+            console.warn(`Skipping segmentation ${seg.segmentationId}: blob creation failed`, blobError);
+            console.warn('Stack:', blobError.stack);
+            continue;
+          }
+
+
+          // segmentation and blob generation succeeded
+          segmentationObjects.push({
+              segmentationId: seg.segmentationId,
+              sourceSeriesInstanceUid: seriesUid,
+              label: seg.label,
+              segments: buildAllSegmentsList(seg.segmentationId),
+              segmentationDataRef: segBlob,
+          });
+
+          console.log(' *** END OF GENERATE LOOP ... segObjects to post:', segmentationObjects);
+
+
+        } // end if hasVolume
+
+
+      } catch (err) {
+        console.warn(`Skipping segmentation ${seg.segmentationId}: generating seg failed`, err);
+        console.warn('Stack:', err.stack);
+        continue;
+      }
+
+    let postSegmentationResult;
+    if (segmentationObjects.length !== 0) {
+      postSegmentationResult = await postSegmentations({
+          segmentationObjects,
+          studyUID: studyInstanceUID,
+      });
+    } else {
+      postSegmentationResult = await postSegmentations({
+          segmentationObjects: [],  // signal no objects to post to keep DB in sync
+          studyUID: studyInstanceUID,
+    });
+
+    if (postSegmentationResult?.error) {
+      console.warn('⚠️ Failed to post segmentations:', postSegmentationResult.error);
+    } else {
+      console.log(`📌 Segmentations posted for ${studyInstanceUID}`);
+    }
+      
+      console.log(`📬 Confirmed save segmentations to DB`);
+    }
+    
+  }  // end for - to generate segmentation objects
+
+}
+
+
+
+// function normalizeSegmentMetadata(segment: OhifSegmentInfo, arrayIndex: number): SegmentMetadata {
+//   const meta = segment.quizSegmentMetadata;
+
+//   if (
+//     !meta ||
+//     typeof meta !== 'object' ||
+//     meta.groundTruth === undefined ||
+//     meta.referenceStandardMethod === undefined ||
+//     meta.hepaticSegment === undefined ||
+//     meta.isComplete === undefined
+//   ) {
+//     return { ...DEFAULT_SEGMENT_METADATA,
+//       dicomSegMaskValue: arrayIndex,
+//      };
+//   } else {
+//       segment.quizSegmentMetadata.isComplete = computeSegmentDataIsComplete(segment.quizSegmentMetadata);
+//   }
+
+//   return meta;
+// }
+
+
+function normalizeSegmentMetadata(
+  segment: OhifSegmentInfo,
+  arrayIndex: number
+): SegmentMetadata {
+  const meta = segment.quizSegmentMetadata;
+
+  const baseMeta: SegmentMetadata =
+    meta &&
+    typeof meta === 'object' &&
+    meta.groundTruth !== undefined &&
+    meta.referenceStandardMethod !== undefined &&
+    meta.hepaticSegment !== undefined &&
+    meta.isComplete !== undefined
+      ? {
+          ...DEFAULT_SEGMENT_METADATA,
+          ...meta,
+        }
+      : {
+          ...DEFAULT_SEGMENT_METADATA,
+        };
+
+  const normalizedMeta: SegmentMetadata = {
+    ...baseMeta,
+    dicomSegMaskValue: arrayIndex + 1,
+  };
+
+  return {
+    ...normalizedMeta,
+    isComplete: computeSegmentDataIsComplete(normalizedMeta),
+  };
+}
+
 
 ///////////////////////////////////////////////
 //////////////  DEBUG HELPERS /////////////////
@@ -490,3 +901,136 @@ function bufferCounter(buf, timePoint) {
   return valueStats;
 }
 
+// >>>>>>>>>>>>>>>>>>  From Perplexity <<<<<<<<<<
+// export async function saveAllSegmentations({
+//   segmentationService,
+//   viewportGridService,
+//   displaySetService,
+//   activeViewportId,
+//   commandsManager,
+//   studyInstanceUID,
+// }: {
+//   segmentationService: any;
+//   viewportGridService: any;
+//   displaySetService: any;
+//   activeViewportId: string;
+//   commandsManager: any;
+//   studyInstanceUID: string;
+// }) {
+//   const allSegmentations = segmentationService.getSegmentations();
+//   const segmentationObjects = [];
+
+//   for (const segmentation of Object.values(allSegmentations) as SegmentationData[]) {
+//     const segmentationId = segmentation.segmentationId;
+
+//     try {
+//       const sourceImageId = segmentation.representationData?.Labelmap?.referencedImageIds?.[0];
+//       if (!sourceImageId) {
+//         console.warn(`Skipping segmentation ${segmentationId}: no referenced image id`);
+//         continue;
+//       }
+
+//       segmentationService.addOrUpdateSegmentation({
+//         segmentationId,
+//         type: segmentation.type,
+//         predecessorImageId: sourceImageId,
+//       });
+
+//       const updatedSeg = segmentationService.getSegmentation(segmentationId);
+//       if (!updatedSeg) {
+//         console.warn(`Skipping segmentation ${segmentationId}: update failed`);
+//         continue;
+//       }
+
+//       const seriesUid = getSeriesUid(sourceImageId);
+//       const displaySets = displaySetService.getDisplaySetsForSeries(seriesUid);
+//       const displaySetInstanceUID = displaySets?.[0]?.displaySetInstanceUID;
+
+//       if (!displaySetInstanceUID) {
+//         console.warn(`Skipping segmentation ${segmentationId}: no display set for series ${seriesUid}`);
+//         continue;
+//       }
+
+//       await viewportGridService.setDisplaySetsForViewport({
+//         viewportId: activeViewportId,
+//         displaySetInstanceUIDs: [displaySetInstanceUID],
+//       });
+
+//       await new Promise(resolve => setTimeout(resolve, 50));
+
+//       const storeState = useSegmentMetadataStore.getState();
+//       const storeSegments = storeState.getAllSegments(segmentationId) || {};
+
+//       const hasVolume = Object.values(storeSegments).some(segment => {
+//         const volume = segment.cachedStats?.namedStats?.volume?.value;
+//         return typeof volume === 'number' && volume > 0;
+//       });
+
+//       if (!hasVolume) {
+//         continue;
+//       }
+
+//       const generatedSeg = commandsManager.runCommand('generateSegmentation', {
+//         segmentationId,
+//       });
+
+//       if (!generatedSeg?.dataset) {
+//         console.warn(`Skipping segmentation ${segmentationId}: generation failed`);
+//         continue;
+//       }
+
+//       const meta = {
+//         FileMetaInformationVersion: generatedSeg.dataset._meta?.FileMetaInformationVersion?.Value,
+//         MediaStorageSOPClassUID: generatedSeg.dataset.SOPClassUID,
+//         MediaStorageSOPInstanceUID: generatedSeg.dataset.SOPInstanceUID,
+//         TransferSyntaxUID: EXPLICIT_VR_LITTLE_ENDIAN,
+//         ImplementationClassUID,
+//         ImplementationVersionName,
+//       };
+
+//       const denaturalizedMetadata = dcmjs.data.DicomMetaDictionary.denaturalizeDataset(meta);
+//       const denaturalizedDataset = dcmjs.data.DicomMetaDictionary.denaturalizeDataset(generatedSeg.dataset);
+//       const dicomDict = new DicomDict(denaturalizedMetadata);
+//       dicomDict.dict = denaturalizedDataset;
+
+//       let segBlob;
+//       try {
+//         const arrayBuffer = dicomDict.write();
+//         segBlob = new Blob([arrayBuffer], { type: 'application/dicom' });
+//       } catch (blobError) {
+//         console.warn(`Skipping segmentation ${segmentationId}: blob creation failed`, blobError);
+//         continue;
+//       }
+
+//       const persistedSegments = Object.entries(storeSegments)
+//         .sort(([a], [b]) => Number(a) - Number(b))
+//         .map(([segmentIndex, segment]) => ({
+//           segmentIndex: Number(segmentIndex),
+//           label: segment.label,
+//           cachedStats: segment.cachedStats,
+//           quizSegmentMetadata: segment.quizSegmentMetadata,
+//         }));
+
+//       segmentationObjects.push({
+//         segmentationId,
+//         sourceSeriesInstanceUid: seriesUid,
+//         label: segmentation.label,
+//         segments: persistedSegments,
+//         segmentationDataRef: segBlob,
+//       });
+//     } catch (err) {
+//       console.warn(`Skipping segmentation ${segmentation.segmentationId}: generating seg failed`, err);
+//     }
+//   }
+
+//   const postSegmentationResult = await postSegmentations({
+//     segmentationObjects,
+//     studyUID: studyInstanceUID,
+//   });
+
+//   if (postSegmentationResult?.error) {
+//     console.warn('⚠️ Failed to post segmentations:', postSegmentationResult.error);
+//   } else {
+//     console.log(`📌 Segmentations posted for ${studyInstanceUID}`);
+//   }
+// }

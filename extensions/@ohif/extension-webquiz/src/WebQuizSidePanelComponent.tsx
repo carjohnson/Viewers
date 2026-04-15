@@ -22,7 +22,7 @@ import { ScoreModal } from './components/ScoreModal';
 import { handleMeasurementAdded, handleAnnotationChanged, handleMeasurementRemoved, handleMeasurementUpdated } from './handlers/annotationEventHandlers';
 import { ToolGroupManager } from '@cornerstonejs/tools';
 import { base64ToArrayBuffer } from './utils/dataUtils';
-import { loadDicomSegIntoOHIF } from './utils/segmentationUtils';
+import { loadDicomSegIntoOHIF, refreshSegmentMetadataStore, saveAllSegmentations } from './utils/segmentationUtils';
 import { measurementScoreOptions } from './models/ScoreOptions';
 import { groundTruthOptions, referenceStandardMethodOptions, hepaticSegmentOptions } from './models/ScoreOptions';
 
@@ -37,7 +37,7 @@ import { createDebouncedStatsUpdater,
 
 import MarkSeriesCompletedButton from './components/MarkSeriesCompletedButton';
 import MarkStudyCompletedButton from './components/MarkStudyCompletedButton';
-import SaveSegmentationsButton from './components/SaveSegmentationsButton';
+// import SaveSegmentationsButton from './components/SaveSegmentationsButton';
 import { useSeriesValidation } from './hooks/useSeriesValidation';
 import { useViewportAndSeriesSync } from './hooks/useViewportAndSeriesSync';
 import  useCustomizeAnnotationMenu  from './hooks/useCustomizeAnnotationMenu'
@@ -84,6 +84,8 @@ function WebQuizSidePanelComponent() {
     if (!segService._hasLoadedInitialSegmentations) {
     segService._hasLoadedInitialSegmentations = false;
     }
+    // const hasSavedSegmentationsRef = useRef(false);
+
 
 
     //~~~~~~~~~~~~~~~~~
@@ -357,6 +359,44 @@ function WebQuizSidePanelComponent() {
     }, [userInfo?.username, studyUID]);
 
     //~~~~~~~~~~~~~~~~~
+    useEffect(() => {
+        // save all segmentations when extension is mounted
+        if (!activeViewportId) return; 
+        if (!studyInfoFromHook?.studyUID) return;
+
+        // Prevent double-run in dev or re-renders
+        // if (hasSavedSegmentationsRef.current) return;
+
+
+        // refresh the metadata store - save segmentations if required
+        const bSaveRequired = refreshSegmentMetadataStore(segmentationService);
+
+       if (bSaveRequired) {
+            // hasSavedSegmentationsRef.current = true;
+
+            saveAllSegmentations({
+            segmentationService,
+            viewportGridService,
+            displaySetService,
+            activeViewportId,
+            commandsManager,
+            studyInstanceUID: studyInfoFromHook?.studyUID,
+            });
+            console.log(' *** IN USEEFFECT FOR SAVE SEGS');
+
+            }
+
+    }, [activeViewportId, studyInfoFromHook?.studyUID]);
+
+    //~~~~~~~~~~~~~~~~~
+    // useEffect(() => {
+    //     // reset flag when unmounting
+    //     return () => {
+    //         hasSavedSegmentationsRef.current = false;
+    //     };
+    // }, []);
+
+    //~~~~~~~~~~~~~~~~~
     const onSegmentClick = (id: string, segmentLabel: string, segmentArrayIndex: number, segmentIndex) => 
         handleSegmentClick({ 
             segmentationId: id,
@@ -372,7 +412,9 @@ function WebQuizSidePanelComponent() {
             commandsManager,
             segmentationService,
             activeViewportId,
-            studyInstanceUID:studyInfoFromHook?.studyUID
+            studyInstanceUID:studyInfoFromHook?.studyUID,
+            viewportGridService,
+            displaySetService,
         });
             
     //=========================================================
@@ -719,7 +761,7 @@ function WebQuizSidePanelComponent() {
                 padding: '0 0.5rem',
             }}
             >
-            <SaveSegmentationsButton
+            {/* <SaveSegmentationsButton
                 getUserInfo={getUserInfo}
                 studyInstanceUID={studyInfoFromHook?.studyUID}
                 segmentationService={segmentationService}
@@ -729,7 +771,7 @@ function WebQuizSidePanelComponent() {
                 commandsManager={commandsManager}
                 showModal={showModal}
                 closeModal={closeModal}
-            />
+            /> */}
 
 
             <MarkStudyCompletedButton

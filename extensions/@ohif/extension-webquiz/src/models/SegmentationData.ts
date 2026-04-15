@@ -29,5 +29,13 @@ export type SegmentMetadata = {
   referenceStandardMethod: string;
   hepaticSegment: string[];
   isComplete: boolean;
+  dicomSegMaskValue?: number;
 }
 
+// =====================================
+export const DEFAULT_SEGMENT_METADATA: SegmentMetadata = {
+  groundTruth: "",
+  referenceStandardMethod: "",
+  hepaticSegment: [],
+  isComplete: false,
+};
