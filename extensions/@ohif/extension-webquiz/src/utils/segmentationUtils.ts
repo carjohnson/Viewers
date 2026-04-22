@@ -177,6 +177,23 @@ export async function saveSegmentation({
 
   const editedSegmentation = seg.segmentationId;
 
+  // update the service with the metatdata for the edited segment
+  const isComplete = computeSegmentDataIsComplete(segmentMetadata);
+  const ohifInfo: OhifSegmentInfo = {
+    segmentIndex: segmentIndex, // 1‑based
+    label: seg.label,
+    cachedStats: seg.segments?.[segmentArrayIndex]?.cachedStats ?? {},
+    quizSegmentMetadata: {
+      groundTruth: segmentMetadata.groundTruth,
+      referenceStandardMethod: segmentMetadata.referenceStandardMethod,
+      hepaticSegment: segmentMetadata.hepaticSegment,
+      isComplete,
+      dicomSegMaskValue: segmentIndex,
+    },
+  };
+  segmentationService.addSegment(editedSegmentation, ohifInfo);
+
+
   const allSegmentations = segmentationService.getSegmentations();
   const segmentationObjects = [];
 
@@ -206,25 +223,7 @@ export async function saveSegmentation({
     }
   }
 
-//   console.log('segObjects to post in SaveSegmentation:', segmentationObjects);
-
-//   const postSegmentationResult = await postSegmentations({
-//     segmentationObjects,
-//     studyUID: studyInstanceUID,
-//   });
-
-//   if (!postSegmentationResult.success) {
-//     console.warn('⚠️ Failed to post segmentations:', postSegmentationResult.error);
-//   } else {
-//     console.log(`📌 Segmentations posted for ${studyInstanceUID}`);
-//   }
-
-//   console.log(`📬 Confirmed save segmentations to DB`);
-// }
-
-
-
-// Add failure reporting
+  // Add failure reporting
   const failures = allResults.filter(r => !r.success);
   const validCount = segmentationObjects.length;
   console.log(`✅ ${validCount}/${allResults.length} succeeded`);
@@ -565,15 +564,21 @@ export function refreshSegmentMetadataStore (segmentationService: any) {
     Object.values(oSegments as Record<number, OhifSegmentInfo>).forEach((segment, arrayIndex) => {
       // const segmentIndex = arrayIndex + 1;
       const segmentIndex = segment.segmentIndex;
+      const quizSegmentMetadata = normalizeSegmentMetadata(segment, arrayIndex);
 
       const ohifInfo: OhifSegmentInfo = {
         segmentIndex,
         label: segment.label,
         cachedStats: segment.cachedStats,
-        quizSegmentMetadata: normalizeSegmentMetadata(segment, arrayIndex),
+        quizSegmentMetadata
       };
 
       store.setSegmentInfo(segmentationId, segmentIndex, ohifInfo);
+
+      // update the service with the segment metadata structure
+      segmentationService.addSegment(segmentationId, ohifInfo);
+
+
       bDatabaseUpdateRequired = true;
     });
 
@@ -1113,43 +1118,3 @@ function bufferCounter(buf: any, timePoint: any) {
 // =====================================
 // =====================================
 // =====================================
-
-// lUnmatchedIdsFromService.forEach(segmentationId => {
-//   const segmentation = lSegmentationsFromService.find(
-//     s => s.segmentationId === segmentationId
-//   );
-//   if (!segmentation) return;
-
-//   const oSegments = segmentation.segments || {};
-
-//   Object.values(oSegments as Record<number, OhifSegmentInfo>).forEach((segment, arrayIndex) => {
-//     const segmentIndex = segment.segmentIndex ?? (arrayIndex + 1);
-
-//     const isComplete = computeSegmentDataIsComplete(segment); // same as in loadDicomSegIntoOHIF
-
-//     const quizSegmentMetadata = {
-//       groundTruth: segment.groundTruth,
-//       referenceStandardMethod: segment.referenceStandardMethod,
-//       hepaticSegment: segment.hepaticSegment,
-//       isComplete,
-//       dicomSegMaskValue: segmentIndex, // or whatever stable ID you want
-//     };
-
-//     const ohifInfo: OhifSegmentInfo = {
-//       segmentIndex,
-//       label: segment.label,
-//       cachedStats: segment.cachedStats,
-//       quizSegmentMetadata,
-//     };
-
-//     // Add or update in the service (same shape as in loadDicomSegIntoOHIF)
-//     segmentationService.addSegment(segmentationId, ohifInfo);
-
-//     // Add or update in the store
-//     useSegmentMetadataStore
-//       .getState()
-//       .setSegmentInfo(segmentationId, segmentIndex, ohifInfo);
-
-//     bDatabaseUpdateRequired = true;
-//   });
-// });
