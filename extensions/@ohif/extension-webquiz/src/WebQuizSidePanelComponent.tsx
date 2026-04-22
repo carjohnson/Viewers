@@ -6,6 +6,7 @@ import * as cornerstoneTools from '@cornerstonejs/tools';
 import { annotation } from '@cornerstonejs/tools';
 import { useStudyInfoStore } from './stores/useStudyInfoStore';
 import { useStudyInfo } from './hooks/useStudyInfo';
+import { useSegmentationLoadStore } from './stores/useSegmentationLoadStore';
 import { usePatientInfo } from '@ohif/extension-default';
 import { API_BASE_URL } from './config/config';
 import { AnnotationStats } from './models/AnnotationStats';
@@ -74,18 +75,9 @@ function WebQuizSidePanelComponent() {
     const { cornerstoneViewportService, displaySetService } = servicesManager.services;
     const listOfUsersAnnotationsRef = useRef<any>(null);
     const [dropdownMapVersion, setDropdownMapVersion] = useState(0);
-    // const [isOpen, setIsOpen] = React.useState(false);
-    // const isOpenRef = useRef<boolean | null>(null);
+
 
     const [isMinimized, setIsMinimized] = useState(false);
-
-    // add a property to the segmentation service to keep track of the initial load across extensions
-    const segService = servicesManager.services.segmentationService as any;
-    if (!segService._hasLoadedInitialSegmentations) {
-    segService._hasLoadedInitialSegmentations = false;
-    }
-    // const hasSavedSegmentationsRef = useRef(false);
-
 
 
     //~~~~~~~~~~~~~~~~~
@@ -148,6 +140,12 @@ function WebQuizSidePanelComponent() {
     const studyUID = studyInfo?.studyUID;
 
     const userInfo = getUserInfo();
+
+
+    const loadStudyUID = studyUID ?? '';
+    const hasLoaded = useSegmentationLoadStore((state: any) =>
+        loadStudyUID ? state.hasLoadedInitialSegmentations[loadStudyUID] : false);
+    
     //=========================================================
     // This useEffect will keep the patient and study metadata up-to-date
     //      if the user selects a different study.
@@ -170,6 +168,16 @@ function WebQuizSidePanelComponent() {
         setStudyInfo(fullInfo);
 
     }, [studyInfoFromHook, patientInfo]);
+
+
+
+useEffect(() => {
+  if (!studyUID) return;
+  
+  console.log('📊 Reset check: studyUID=', studyUID);
+  useSegmentationLoadStore.getState().resetForNewStudy(studyUID);
+}, [studyUID]);
+
 
     // //>>>>> for debug <<<<<
     // console.log('🧠 useStudyInfo() returned:', studyInfoFromHook);
@@ -312,11 +320,14 @@ function WebQuizSidePanelComponent() {
     useEffect(() => {
         async function loadSegmentations() {
             const username = userInfo?.username;
-            console.log(' *** IN FETCH SEGMENTATIONS ... user, study, flag:', username, studyUID, segService._hasLoadedInitialSegmentations)
-            if (!studyUID || !username) return;
+
+            const currentLoaded = useSegmentationLoadStore.getState().getLoadedForStudy(studyUID);
+            console.log('*** IN FETCH ... user:', username, 'study:', studyUID, 'loaded:', currentLoaded);
+            
+            if (!username || !studyUID || currentLoaded) return;
+
+
             try {
-                // if already loaded - skip
-                if (segService._hasLoadedInitialSegmentations) return;
 
                 const res = await fetch(
                     `${API_BASE_URL}/webquiz/list-study-segmentations?username=${username}&studyUID=${studyUID}`,
@@ -339,11 +350,11 @@ function WebQuizSidePanelComponent() {
                         arrayBuffer,
                         servicesManager,
                     });
-                    
-                    // indicates at least one entry existed in DB otherwise flag remains false
-                    segService._hasLoadedInitialSegmentations = true;
-
                 }
+                // flag set to true after load
+                // - even if there were no entries in the database (starting fresh)
+                useSegmentationLoadStore.getState().setLoaded(loadStudyUID!, true);
+
             } catch (err) {
                 console.error('❌ Error fetching segmentations:', err);
             }
@@ -364,16 +375,13 @@ function WebQuizSidePanelComponent() {
         if (!activeViewportId) return; 
         if (!studyInfoFromHook?.studyUID) return;
 
-        // Prevent double-run in dev or re-renders
-        // if (hasSavedSegmentationsRef.current) return;
-
+        // Give the segmentationservice a moment to finish add/remove
+        const timerId = setTimeout(() => {
 
         // refresh the metadata store - save segmentations if required
         const bSaveRequired = refreshSegmentMetadataStore(segmentationService);
 
        if (bSaveRequired) {
-            // hasSavedSegmentationsRef.current = true;
-
             saveAllSegmentations({
             segmentationService,
             viewportGridService,
@@ -384,17 +392,12 @@ function WebQuizSidePanelComponent() {
             });
             console.log(' *** IN USEEFFECT FOR SAVE SEGS');
 
-            }
+        }
+
+        }, 500); // small delay, adjust as needed - temporary - change to event listeners? or remove?
 
     }, [activeViewportId, studyInfoFromHook?.studyUID]);
 
-    //~~~~~~~~~~~~~~~~~
-    // useEffect(() => {
-    //     // reset flag when unmounting
-    //     return () => {
-    //         hasSavedSegmentationsRef.current = false;
-    //     };
-    // }, []);
 
     //~~~~~~~~~~~~~~~~~
     const onSegmentClick = (id: string, segmentLabel: string, segmentArrayIndex: number, segmentIndex) => 
@@ -413,8 +416,6 @@ function WebQuizSidePanelComponent() {
             segmentationService,
             activeViewportId,
             studyInstanceUID:studyInfoFromHook?.studyUID,
-            viewportGridService,
-            displaySetService,
         });
             
     //=========================================================

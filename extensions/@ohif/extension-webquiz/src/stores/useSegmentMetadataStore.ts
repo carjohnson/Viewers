@@ -3,8 +3,7 @@
 //
 
 import { create } from 'zustand';
-import { OhifSegmentInfo, SegmentMetadata } from './../models/SegmentationData';
-import { computeSegmentDataIsComplete } from '../utils/segmentationUtils';
+import { OhifSegmentInfo } from './../models/SegmentationData';
 
 interface Store {
 

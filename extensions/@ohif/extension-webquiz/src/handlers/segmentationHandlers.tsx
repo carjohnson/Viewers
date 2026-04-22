@@ -5,7 +5,6 @@ import { SegmentDetailsModal } from '../components/SegmentationList/SegmentDetai
 import { computeSegmentDataIsComplete, saveSegmentation } from '../utils/segmentationUtils';
 import { SegmentMetadata, OhifSegmentInfo } from './../models/SegmentationData';
 import { useSegmentMetadataStore } from '../stores/useSegmentMetadataStore';
-import { segmentation as csSegmentation, Enums as csToolsEnums,  } from '@cornerstonejs/tools';
 
 //=========================================================
 // Set up GUI so the user can click on a segment in the segmentation list
@@ -50,7 +49,6 @@ export const handleSegmentClick = ({
   }) => {
 
     let saveHandlerFromModal = null;
-    // const metadata = useSegmentMetadataStore.getState().getMetadata(segmentationId, segmentIndex);
     const metadata = useSegmentMetadataStore.getState().getSegmentInfo(segmentationId, segmentIndex).quizSegmentMetadata;
 
     showModal({
@@ -73,62 +71,11 @@ export const handleSegmentClick = ({
       confirmText: "Save",
       showCancel: true,
       onCancel: closeModal,
-      // onClose: () => {
-      //   if (saveHandlerFromModal) {
-      //     const dataFromModal = saveHandlerFromModal(); // reads fresh state
-      //     console.log (' *** IN ONCLOSE ... segId, dataFromModal:', segmentationId, dataFromModal);
-
-      //     const segmentMetadata: SegmentMetadata = {
-      //       groundTruth: dataFromModal.groundTruth?.label ?? "",
-      //       referenceStandardMethod: dataFromModal.referenceMethod?.label ?? "",
-      //       hepaticSegment: dataFromModal.hepaticSegments ?? [],
-      //       isComplete: false,
-      //     };
-
-      //     if (segmentMetadata.groundTruth === "" || segmentMetadata.referenceStandardMethod === "" || segmentMetadata.hepaticSegment.length === 0) {
-      //       console.warn("Validation failed — keeping modal open");
-      //       return;
-      //     }
-
-
-      //     segmentMetadata.isComplete = computeSegmentDataIsComplete(segmentMetadata);
-      //     useSegmentMetadataStore.getState().setMetadata( segmentationId, segmentIndex, segmentMetadata);
-      //       segmentationService.triggerSegmentationEvents.triggerSegmentationRepresentationModified(
-      //         activeViewportId,
-      //         segmentationId,
-      //         'LABELMAP'
-      //       );
-
-      //     const storeForDebug = useSegmentMetadataStore.getState();
-      //     console.log(' *** IN LOAD HANDLER ... segment metadata store:', storeForDebug);
-
-
-      //     // get segmentation - update fields
-      //     const segmentationToUpdate = segmentationService.getSegmentation(segmentationId);
-      //     saveSegmentation({
-      //       seg: segmentationToUpdate,
-      //       segmentArrayIndex,
-      //       segmentIndex,
-      //       segmentMetadata,
-      //       activeViewportId,
-      //       servicesManager,
-      //       commandsManager,
-      //       studyInstanceUID,
-      //   });
-
-      //     closeModal();
-      //     return;
-      //   }
-
-      //   // If no save handler, just close normally
-      //   closeModal();
-      // }
-
       onClose: () => {
         try {
           if (saveHandlerFromModal) {
             const dataFromModal = saveHandlerFromModal(); // reads fresh state
-            console.log('*** IN ONCLOSE ... segId, dataFromModal:', segmentationId, dataFromModal);
+            // console.log('*** IN ONCLOSE ... segId, dataFromModal:', segmentationId, dataFromModal);
 
             if (!dataFromModal) {
               console.warn("Modal returned null — validation failed or Save was blocked.");
@@ -153,31 +100,7 @@ export const handleSegmentClick = ({
 
             segmentMetadata.isComplete = computeSegmentDataIsComplete(segmentMetadata);
 
-            // Update your metadata store
-            useSegmentMetadataStore
-              .getState()
-              .setMetadata(segmentationId, segmentIndex, segmentMetadata);
-
-
-                      // // 🔥 Force OHIF segmentation panel to refresh
-                      //   const seg = segmentationService.getSegmentation(segmentationId);
-                      // segmentationService.addOrUpdateSegmentation({segmentationId, seg});
-
-                      //   console.group("🔎 Cornerstone Segmentation Debug");
-                      //   console.log("csSegmentation:", csSegmentation);
-                      //   console.log("csSegmentation keys:", Object.keys(csSegmentation));
-
-                      //   console.log("triggerSegmentationEvents:", csSegmentation.triggerSegmentationEvents);
-                      //   if (csSegmentation.triggerSegmentationEvents) {
-                      //     console.log(
-                      //       "triggerSegmentationEvents keys:",
-                      //       Object.keys(csSegmentation.triggerSegmentationEvents)
-                      //     );
-                      //   }
-
-                      //   // console.log("EVENTS:", csSegmentation.EVENTS);
-                      //   console.groupEnd();
-
+                  // FOR DEBUG
                         // console.group("🔎 OHIF SegmentationService Debug");
                         // console.log("segmentationService:", segmentationService);
                         // console.log("segmentationService keys:", Object.keys(segmentationService));
@@ -191,41 +114,28 @@ export const handleSegmentClick = ({
                         //   (...args) => console.log("🔥 SEGMENTATION_MODIFIED fired!", args)
                         // );
                         // console.log("Subscription object:", sub);
-
                         // console.groupEnd();
-
-                      //   // 🔥 NEW: Force OHIF to refresh segmentation UI
-                      //   // segmentationService._broadcastEvent(
-                      //   //   segmentationService.EVENTS.SEGMENTATION_MODIFIED,
-                      //   //   { segmentationId }
-                      //   // );
-                      //   csSegmentation.triggerSegmentationEvents.triggerSegmentationModified(segmentationId);
-                      //   //// OR ////
-                      //   csSegmentation.triggerSegmentationEvents.triggerSegmentationRepresentationModified(
-                      //     activeViewportId,
-                      //     segmentationId,
-                      //     csToolsEnums.SegmentationRepresentations.Labelmap
-                      //   );
+                        // const storeForDebug = useSegmentMetadataStore.getState();
+                        // console.log('*** IN LOAD HANDLER ... segment metadata store:', storeForDebug);
 
 
-            const storeForDebug = useSegmentMetadataStore.getState();
-            console.log('*** IN LOAD HANDLER ... segment metadata store:', storeForDebug);
 
             // Update segmentation in cornerstone + backend
-            const segmentationToUpdate = segmentationService.getSegmentation(segmentationId);
-            saveSegmentation({
-              seg: segmentationToUpdate,
-              segmentArrayIndex,
-              segmentIndex,
-              segmentMetadata,
-              activeViewportId,
-              servicesManager,
-              commandsManager,
-              studyInstanceUID,
-            });
+             const segmentationToUpdate = segmentationService.getSegmentation(segmentationId);
+
+
+
 
             // Update metadata store as modal closes
-            const segmentToUpdate = segmentationToUpdate.segments[segmentArrayIndex]
+            const segmentToUpdate = segmentationToUpdate?.segments?.[segmentArrayIndex + 1];
+
+            if (!segmentToUpdate) {
+              console.warn(
+                `No segment found for segmentationId=${segmentationId}, segmentIndex=${segmentIndex}, segmentArrayIndex=${segmentArrayIndex}`
+              );
+              closeModal();
+              return;
+            }
 
             const ohifInfo: OhifSegmentInfo = {
               segmentIndex,   // matches backend schema - mask value
@@ -242,8 +152,20 @@ export const handleSegmentClick = ({
             useSegmentMetadataStore.getState().setSegmentInfo( segmentationId, segmentIndex, ohifInfo );
 
 
-            const storeForDebugAfterSave = useSegmentMetadataStore.getState();
-            console.log('*** IN LOAD HANDLER After Save... segment metadata store:', storeForDebugAfterSave);
+             saveSegmentation({
+              seg: segmentationToUpdate,
+              segmentArrayIndex,
+              segmentIndex,
+              segmentMetadata,
+              activeViewportId,
+              servicesManager,
+              commandsManager,
+              studyInstanceUID,
+            });
+
+
+            // const storeForDebugAfterSave = useSegmentMetadataStore.getState();
+            // console.log('*** IN LOAD HANDLER After Save... segment metadata store:', storeForDebugAfterSave);
 
             closeModal();
             return;
@@ -256,8 +178,6 @@ export const handleSegmentClick = ({
           console.error("Stack trace:", err?.stack);
         }
       }
-
-
 
     });
   };

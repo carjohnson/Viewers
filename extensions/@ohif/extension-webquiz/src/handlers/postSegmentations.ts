@@ -11,7 +11,18 @@ export const postSegmentations = ({
 
 }) => {
   try {
-        console.log(`📬 Posting segmentations to Backend`);
+      if (!Array.isArray(segmentationObjects) || segmentationObjects.length === 0) {
+        console.warn(
+          'postSegmentations :: Refusing to post empty segmentationObjects array',
+          { studyUID, segmentationObjects }
+        );
+      return {
+        success: false,
+        error: new Error('Refusing to post empty segmentationObjects array'),
+      };
+    }
+
+    console.log(`📬 Posting segmentations to Backend`,  segmentationObjects);
 
     window.parent.postMessage(
       {
@@ -21,9 +32,10 @@ export const postSegmentations = ({
       },
       '*'
     );
+    return { success: true}
   } catch (err) {
       console.error('postSegmentations :: Error posting segmentations:', err);
-      return { error: err };
+      return { success: false, error: err };
 
   }
 

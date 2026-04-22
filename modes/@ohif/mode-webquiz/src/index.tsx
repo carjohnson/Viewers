@@ -6,6 +6,7 @@ import toolbarButtons from './toolbarButtons';
 import setUpAutoTabSwitchHandler from './../../../segmentation/src/utils/setUpAutoTabSwitchHandler';
 import { hotkeys } from '@ohif/core';
 import { setUserInfo, getUserInfo, onUserInfoReady } from './userInfoService';
+import { useSegmentationLoadStore } from './../../../../extensions/@ohif/extension-webquiz/src/stores/useSegmentationLoadStore';
 import cornerstoneExtension from '@ohif/extension-cornerstone';
 import { ohif, cornerstone, extensionDependencies, dicomRT, segmentation } from '@ohif/mode-basic';
 export * from './toolbarButtons';
@@ -42,10 +43,6 @@ function modeFactory({ modeConfiguration }) {
         } = servicesManager.services;
 
       measurementService.clearMeasurements();
-      const segService = servicesManager.services.segmentationService as any;
-      if (segService._hasLoadedInitialSegmentations === undefined) {
-        segService._hasLoadedInitialSegmentations = false;
-      }
 
       // Init Default and SR ToolGroups
       initToolGroups(extensionManager, toolGroupService, commandsManager);
@@ -223,10 +220,8 @@ function modeFactory({ modeConfiguration }) {
         uiModalService,
       } = servicesManager.services;
 
+      useSegmentationLoadStore.getState().clearAllLoaded();
       
-      const segService = servicesManager.services.segmentationService as any;
-      segService._hasLoadedInitialSegmentations = false;
-
       _unsubscriptions.forEach(unsubscribe => unsubscribe());
       _unsubscriptions.length = 0;
 
