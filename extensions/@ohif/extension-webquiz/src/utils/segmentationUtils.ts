@@ -181,7 +181,7 @@ export async function saveSegmentation({
   const isComplete = computeSegmentDataIsComplete(segmentMetadata);
   const ohifInfo: OhifSegmentInfo = {
     segmentIndex: segmentIndex, // 1‑based
-    label: seg.label,
+    label: seg.segments?.[segmentArrayIndex]?.label,
     cachedStats: seg.segments?.[segmentArrayIndex]?.cachedStats ?? {},
     quizSegmentMetadata: {
       groundTruth: segmentMetadata.groundTruth,
@@ -929,7 +929,9 @@ export async function generateSegmentationActivity(
     segResult.success = true;
     return segResult ;
   } catch (err) {
-    console.warn( `Skipping segmentation ${seg.segmentationId}: generation failed`, err );
+    console.warn( `Skipping segmentation ${seg.segmentationId}: generation failed. Check existing segmentation collection in database.`, err );
+    alert('⚠️ Segmentation ${seg.segmentationId} : generation failed; Press F12 to display details.');
+
     return segResult;
   }
 }

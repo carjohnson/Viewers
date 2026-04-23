@@ -220,7 +220,9 @@ function modeFactory({ modeConfiguration }) {
         uiModalService,
       } = servicesManager.services;
 
+      // reset the hasLoaded flags when leaving (eg. to return to study browser)
       useSegmentationLoadStore.getState().clearAllLoaded();
+
       
       _unsubscriptions.forEach(unsubscribe => unsubscribe());
       _unsubscriptions.length = 0;
@@ -282,7 +284,7 @@ function modeFactory({ modeConfiguration }) {
                 // rightPanels = [ '@ohif/extension-webquiz.panelModule.webquiz', cornerstone.segLabelMap, cornerstone.segContour];
             rightPanels = [ '@ohif/extension-webquiz.panelModule.webquiz',
               cornerstone.labelMapSegmentationPanel,
-              cornerstone.contourSegmentationPanel,
+              // cornerstone.contourSegmentationPanel,
             ]
           }
           return {

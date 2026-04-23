@@ -67,7 +67,7 @@ function WebQuizSidePanelComponent() {
     const [validatedSeriesUID, setValidatedSeriesUID] = useState(null);
 
     const { servicesManager, commandsManager } = useSystem();
-    const { measurementService, viewportGridService, segmentationService } = servicesManager.services;
+    const { measurementService, viewportGridService, segmentationService, toolGroupService } = servicesManager.services;
     const measurementList = measurementService.getMeasurements(); 
     const measurementListRef = useRef([]);    
     const segmentationList = segmentationService.getSegmentations();
@@ -111,7 +111,43 @@ function WebQuizSidePanelComponent() {
         setModalInfo(null);
     };
 
+    // ************************************************************
+    // *********************  Initializing  ***********************
+    // ************************************************************
+    /**
+     * use Effect to return the mouse to the default window/level tool
+     * when re-entering the extension. 
+     *      (This disables the segmentation tool that may be left on 
+     *      when returning to this extension.)
+     */
+    useEffect(() => {
+        const userInfo = getUserInfo();
+            if (userInfo?.role === 'admin') {
 
+                const toolGroup = toolGroupService?.getToolGroup();
+
+                const segTools = [
+                    // 'Brush',
+                    // 'Eraser',
+                    // 'Threshold',
+                    'SphereBrush',
+                    'SphereEraser',
+                    'ThresholdSphereBrush',
+                    'CircularBrush',
+                    'SphereBrush',
+                    'ThresholdSphereBrushDynamic',
+                    ];
+
+                segTools.forEach(toolName => {
+                    toolGroup?.setToolPassive(toolName);
+                });
+
+                toolGroup?.setToolActive('WindowLevel', {
+                    bindings: [{ mouseButton: 1 }],
+                });
+
+            }
+        }, [toolGroupService]);
 
 
     // ************************************************************
@@ -752,30 +788,18 @@ useEffect(() => {
 
         {/* --- COLLAPSIBLE CONTENT --- */}
         {!isMinimized && (
-        <div className="panel-content">
+
+            <div className="panel-content">
             <div
-            style={{
+                style={{
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
                 overflowX: 'hidden',
                 padding: '0 0.5rem',
-            }}
+                }}
             >
-            {/* <SaveSegmentationsButton
-                getUserInfo={getUserInfo}
-                studyInstanceUID={studyInfoFromHook?.studyUID}
-                segmentationService={segmentationService}
-                viewportGridService={viewportGridService}
-                displaySetService={displaySetService}
-                activeViewportId={activeViewportId}
-                commandsManager={commandsManager}
-                showModal={showModal}
-                closeModal={closeModal}
-            /> */}
-
-
-            <MarkStudyCompletedButton
+                <MarkStudyCompletedButton
                 baseUrl={API_BASE_URL}
                 getUserInfo={getUserInfo}
                 studyInstanceUID={studyInfoFromHook?.studyUID}
@@ -784,37 +808,44 @@ useEffect(() => {
                 isStudyCompletedRef={isStudyCompletedRef}
                 onMarkCompleted={(studyInstanceUID) => {
                     lockAllAnnotations({ annotation, userInfo, isStudyCompletedRef });
-                    setDropdownMapVersion(v => v + 1); // triggers effect after render
+                    setDropdownMapVersion((v) => v + 1);
                 }}
                 showModal={showModal}
                 closeModal={closeModal}
-            />
+                />
 
-            <div
+                <div
                 className="text-white w-full text-center"
-                style={{ flexGrow: 1, minHeight: 0 }}
-            >
-                <SegmentationList
+                style={{ flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+                >
+                {/* <div style={{ flex: '1 1 50%', overflowY: 'auto', minHeight: 0 }}> */}
+                <div style={{ flex: '0 1 auto', maxHeight: '40%',overflowY: 'auto', minHeight: 0 }}>
+                    <SegmentationList
                     getUserInfo={getUserInfo}
                     segmentationList={segmentationList}
                     onSegmentClick={onSegmentClick}
-                />
+                    />
+                </div>
 
-                <AnnotationList
-                measurementList={measurementList}
-                dropdownSelectionMap={dropdownSelectionMap}
-                visibilityMap={visibilityMap}
-                scoreOptions={measurementScoreOptions}
-                onDropdownChange={onDropdownChange}
-                onMeasurementClick={onMeasurementClick}
-                onToggleVisibility={onToggleVisibility}
-                triggerPost={triggerPost}
-                annotation={annotation}
-                />
+                {/* <div style={{ flex: '1 1 50%', overflowY: 'auto', minHeight: 0 }}> */}
+                <div style={{ flex: '1 1 auto', overflowY: 'auto', minHeight: 0 }}>
+                    <AnnotationList
+                    measurementList={measurementList}
+                    dropdownSelectionMap={dropdownSelectionMap}
+                    visibilityMap={visibilityMap}
+                    scoreOptions={measurementScoreOptions}
+                    onDropdownChange={onDropdownChange}
+                    onMeasurementClick={onMeasurementClick}
+                    onToggleVisibility={onToggleVisibility}
+                    triggerPost={triggerPost}
+                    annotation={annotation}
+                    />
+                </div>
+                </div>
             </div>
+            </div>  // panel content
 
-            </div>  // measurement list
-        </div>  // panel-content
+
         )}
     </div>  // extension panel
 

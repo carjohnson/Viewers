@@ -92,7 +92,7 @@ import { SegmentMetadata } from '../../models/SegmentationData';
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       
       <div style={{ fontSize: "1.1rem", fontWeight: 600 }}>
-        Segment {segmentationId}: {segmentLabel}
+        Segment: {segmentLabel}
       </div>
 
       {/* Status line */}
