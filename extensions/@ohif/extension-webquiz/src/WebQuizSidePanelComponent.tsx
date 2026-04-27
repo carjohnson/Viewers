@@ -436,9 +436,10 @@ useEffect(() => {
 
 
     //~~~~~~~~~~~~~~~~~
-    const onSegmentClick = (id: string, segmentLabel: string, segmentArrayIndex: number, segmentIndex) => 
+    const onSegmentClick = (id: string, segmentationLabel: string, segmentLabel: string, segmentArrayIndex: number, segmentIndex: number) => 
         handleSegmentClick({ 
             segmentationId: id,
+            segmentationLabel,
             segmentLabel,
             segmentArrayIndex,
             segmentIndex,

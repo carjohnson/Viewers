@@ -18,6 +18,7 @@ import { SegmentMetadata } from '../../models/SegmentationData';
 
   export const SegmentDetailsModal = ({
   segmentationId,
+  segmentationLabel,
   segmentLabel,
 
   groundTruthOptions,
@@ -92,7 +93,7 @@ import { SegmentMetadata } from '../../models/SegmentationData';
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       
       <div style={{ fontSize: "1.1rem", fontWeight: 600 }}>
-        Segment: {segmentLabel}
+        {segmentationLabel}: {segmentLabel}
       </div>
 
       {/* Status line */}

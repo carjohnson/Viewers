@@ -11,6 +11,7 @@ import { useSegmentMetadataStore } from '../stores/useSegmentMetadataStore';
 
 export const handleSegmentClick = ({
   segmentationId,
+  segmentationLabel,
   segmentLabel,
   segmentArrayIndex,
   segmentIndex,
@@ -26,6 +27,7 @@ export const handleSegmentClick = ({
   studyInstanceUID,
 }: {
   segmentationId: string;
+  segmentationLabel: string;
   segmentLabel: string;
   segmentArrayIndex: number;
   segmentIndex: number
@@ -56,6 +58,7 @@ export const handleSegmentClick = ({
       message: (
         <SegmentDetailsModal
           segmentationId={segmentationId}
+          segmentationLabel={segmentationLabel}
           segmentLabel={segmentLabel}
           groundTruthOptions={groundTruthOptions}
           referenceMethodOptions={referenceStandardMethodOptions}
@@ -125,9 +128,8 @@ export const handleSegmentClick = ({
 
 
 
-
             // Update metadata store as modal closes
-            const segmentToUpdate = segmentationToUpdate?.segments?.[segmentArrayIndex + 1];
+            const segmentToUpdate = segmentationToUpdate?.segments?.[segmentIndex];
 
             if (!segmentToUpdate) {
               console.warn(
@@ -146,10 +148,29 @@ export const handleSegmentClick = ({
                 referenceStandardMethod: segmentMetadata.referenceStandardMethod,
                 hepaticSegment: segmentMetadata.hepaticSegment,
                 isComplete: segmentMetadata.isComplete,
+                dicomSegMaskValue: segmentToUpdate.quizSegmentMetadata.dicomSegMaskValue,
               }
             };
 
             useSegmentMetadataStore.getState().setSegmentInfo( segmentationId, segmentIndex, ohifInfo );
+
+  // //////////////////////////////
+  // //////////////////////////////
+  // // for debug
+  // const allSegmentations = segmentationService.getSegmentations();
+  // Object.values(allSegmentations).forEach(segmentation => {
+  //   const segId = segmentation.segmentationId;
+  //   const serviceKeys = Object.keys(segmentation?.segments || {});
+
+  //   const storeState = useSegmentMetadataStore.getState();
+  //   const storeSegments = storeState.getAllSegments(segId) || {};
+
+  //   console.log('📊 in HandleClick store keys:', Object.keys(storeSegments), `segmentation ${segId}`);
+  //   console.log('📊 in HandleClick service keys:', serviceKeys, `segmentation ${segId}`);
+
+  // });
+  // //////////////////////////////
+  // //////////////////////////////
 
 
              saveSegmentation({

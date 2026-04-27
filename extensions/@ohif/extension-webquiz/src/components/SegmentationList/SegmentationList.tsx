@@ -7,7 +7,7 @@ import { useSegmentMetadataStore } from '../../stores/useSegmentMetadataStore';
 type Props = {
     getUserInfo: () => UserInfo | null;
     segmentationList: any[];
-    onSegmentClick: (uid: string, segmentLabel: string, arrayIndex: number, segmentIndex: number) => void;
+    onSegmentClick: (uid: string, segmentationLabel: string, segmentLabel: string, arrayIndex: number, segmentIndex: number) => void;
 }
 
 export const SegmentationList = ({
@@ -30,6 +30,7 @@ export const SegmentationList = ({
                     <ul>
                         {segmentationList.map((segmentation, index) => {
                             const uid = segmentation.segmentationId;
+                            const segmentationLabel= segmentation.label;
                             const segments = segmentation.segments || [];
                             const segmentArray = Object.values(segments || {}) as Array<{
                                 segmentIndex: number;
@@ -50,7 +51,7 @@ export const SegmentationList = ({
                                     label={segmentation.label || `Segmentation ${index + 1}`}
                                     segments={segmentation.segments || []}
                                     completedSegments={ completionMap }
-                                    onClick={({segmentLabel, arrayIndex, segmentIndex}) => onSegmentClick(uid, segmentLabel, arrayIndex, segmentIndex)}
+                                    onClick={({label, segmentLabel, arrayIndex, segmentIndex}) => onSegmentClick(uid, label, segmentLabel, arrayIndex, segmentIndex)}
                                 />
                             )
                         })}
