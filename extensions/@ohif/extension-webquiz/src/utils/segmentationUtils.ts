@@ -25,6 +25,7 @@ export async function loadDicomSegIntoOHIF({
   segmentMetadata,
   arrayBuffer,
   servicesManager,
+  activeViewportId,
 }) {
 
   // ~~~~~~~~~~
@@ -63,6 +64,22 @@ export async function loadDicomSegIntoOHIF({
     // console.log('segToolState:', segToolState);
     // console.log('labelmapBufferArray:', segToolState.labelmapBufferArray?.length);
     const segLabelmap = new Uint8Array(segToolState.labelmapBufferArray[0]);
+
+    // ~~~~~~~~~~
+    // ensure the referenced displayset is being displayed in the viewport
+    const currentDisplaySets = viewportGridService.getDisplaySetsUIDsForViewport(activeViewportId);
+    const isReferencedSeriesActive = currentDisplaySets.includes(referencedDisplaySet.displaySetInstanceUID);
+
+    if (!isReferencedSeriesActive) {
+        // Switch the viewport to the correct series
+        await viewportGridService.setDisplaySetsForViewport({
+            viewportId: activeViewportId,
+            displaySetInstanceUIDs: [referencedDisplaySet.displaySetInstanceUID],
+        });
+        
+        // Give the viewer a moment to switch display sets
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
 
     // ~~~~~~~~~~
     // create one empty labelmap segmentation - this automatically creates one segment
@@ -301,19 +318,52 @@ export async function saveAllSegmentations({
   // //////////////////////////////
 
 
-  const segmentationObjectsPromises = Object.values(allSegmentations).map(seg =>
-    generateSegmentationActivity(seg, {
-      segmentationService,
-      displaySetService,
-      viewportGridService,
-      commandsManager,
-      activeViewportId,
-      buildSegmentFn: (segmentationId: string) =>
-        buildAllSegmentsListForPosting(segmentationId),
-    })
-  );
+//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+// -  highjacking the UI here to display each series before generating segmentation
+// -  causes flickering
+//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  
+const allResults = [];
 
-  const allResults = await Promise.all(segmentationObjectsPromises);
+for (const seg of Object.values(allSegmentations)) {
+    // Identify the series
+    const referencedDisplaySets = displaySetService.getDisplaySetsForSeries(seg.referencedSeriesInstanceUID);
+    const referencedDisplaySet = referencedDisplaySets?.[0];
+
+    if (!referencedDisplaySet) {
+        console.warn(`Could not find display set for series ${seg.referencedSeriesInstanceUID}`);
+        allResults.push({ success: false, error: 'missing_display_set', segmentationId: seg.segmentationId });
+        continue;
+    }
+
+    // Check current viewport
+    const currentDisplaySets = viewportGridService.getDisplaySetsUIDsForViewport(activeViewportId);
+    const isReferencedSeriesActive = currentDisplaySets.includes(referencedDisplaySet.displaySetInstanceUID);
+
+    if (!isReferencedSeriesActive) {
+        // Switch the viewport
+        await viewportGridService.setDisplaySetsForViewport({
+            viewportId: activeViewportId,
+            displaySetInstanceUIDs: [referencedDisplaySet.displaySetInstanceUID],
+        });
+
+        // Give the UI time to re-render the volume
+        await new Promise(resolve => setTimeout(resolve, 500)); 
+    }
+
+    // Now it is safe to generate
+    const result = await generateSegmentationActivity(seg, {
+        segmentationService,
+        displaySetService,
+        viewportGridService,
+        commandsManager,
+        activeViewportId,
+        buildSegmentFn: (segmentationId: string) => buildAllSegmentsListForPosting(segmentationId),
+    });
+
+    allResults.push(result);
+}
+//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  
+//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  
 
   const validObjects = allResults.filter(r => r.success)
 
@@ -348,35 +398,6 @@ export async function saveAllSegmentations({
 
   console.log(`📬 Confirmed save segmentations to DB`);
 }
-
-//////// ??????????
-//////// ?????????? WHAT HAPPENS IF A SEGMENT WAS CREATED WITH NO VOLUME ????????? //////////
-//   let postSegmentationResult;
-//   if (validObjects.length > 0) {
-//     postSegmentationResult = await postSegmentations({
-//       segmentationObjects: validObjects,
-//       studyUID: studyInstanceUID,
-//     });
-//   } else {
-//     // still sync DB even if no blobs
-//     postSegmentationResult = await postSegmentations({
-//       segmentationObjects: [],
-//       studyUID: studyInstanceUID,
-//     });
-//   }
-
-//   if (!postSegmentationResult.success) {
-//     console.warn('⚠️ Failed to post segmentations:', postSegmentationResult.error);
-//   } else {
-//     console.log(`📌 Segmentations posted for ${studyInstanceUID}`);
-//   }
-
-//   console.log(`📬 Confirmed save segmentations to DB`);
-// }
-//////// ??????????
-
-
-
 
 // =====================================
 /**

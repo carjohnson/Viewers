@@ -373,6 +373,12 @@ useEffect(() => {
                 console.log('📥 Segmentations response:', data);
 
                 const { payload } = data;
+
+                // make sure all display sets are available for loading
+                if (!activeViewportId || !seriesInstanceUID) {
+                    return;
+                }
+
                 for (const seg of payload) {
                     if (!seg.base64Buffer) continue;
 
@@ -385,6 +391,7 @@ useEffect(() => {
                         segmentMetadata: seg.dbSegmentInfo,
                         arrayBuffer,
                         servicesManager,
+                        activeViewportId,
                     });
                 }
                 // flag set to true after load
@@ -402,8 +409,8 @@ useEffect(() => {
         // Object.entries(allSegmentations).forEach(([id, seg]) => {
         // console.log(`Seg ${id}:`, Object.keys(seg.segments || {}).length, 'segments');
         // });        
-
-    }, [userInfo?.username, studyUID]);
+        
+    }, [userInfo?.username, studyUID, activeViewportId, seriesInstanceUID]);
 
     //~~~~~~~~~~~~~~~~~
     useEffect(() => {
