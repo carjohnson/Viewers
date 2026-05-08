@@ -13,17 +13,19 @@ services:
     image: webapp:latest
     container_name: ohif_orthanc
     volumes:
-      # Nginx config
-      - ./config/nginx.conf:/etc/nginx/nginx.conf
+
       # ### cj July 2025 ### added
       # ### Mount built OHIF files directly into container
 
       # ### 20260121 - 
-      # ###   for development - a new build with yarn build:nocache will
+      # ###   while developing - a new build with yarn build:nocache will
       # ###       immediately load the changes from the /dist directory
       # ###       into the docker container without doing a docker-compose build --no-cache
-      # ###   (Possibly - to be removed on deployment to Render/AWS)
       - ../../dist:/usr/share/nginx/html/ohif
+
+      # ### 20260508 - 
+      # ###   See docker-compose.prod.yml and docker-compose.dev.yml
+      # ###   These hold production and development overrides for the volume and environment  
 
       # Logs
       - ./logs/nginx:/var/logs/nginx
@@ -40,8 +42,7 @@ services:
       #   - keycloak
       - orthanc
     restart: unless-stopped
-    environment:
-      - NODE_ENV=production
+
 
   # LINK: https://hub.docker.com/r/jodogne/orthanc-plugins/
   # TODO: Update to use Postgres

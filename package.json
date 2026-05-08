@@ -26,6 +26,13 @@
   },
   "scripts": {
     "cm": "npx git-cz",
+    "prebuild:dev": "copy /Y .\\platform\\app\\.env.development .\\platform\\app\\.env",
+    "prebuild:prod": "copy /Y .\\platform\\app\\.env.production .\\platform\\app\\.env",
+    "build:nocache:dev": "yarn prebuild:dev && lerna run build:viewer --stream --skip-nx-cache && yarn postbuild:dev",
+    "build:nocache:prod": "yarn prebuild:prod && lerna run build:viewer --stream --skip-nx-cache && yarn postbuild:prod",
+    "postbuild:dev": "rimraf ..\\..\\WebQuizProject\\public\\ohif && rimraf ..\\..\\WebQuizProject\\public\\ohif-dev && xcopy .\\platform\\app\\dist ..\\..\\WebQuizProject\\public\\ohif /E /I /Y && xcopy .\\platform\\app\\dist ..\\..\\WebQuizProject\\public\\ohif-dev /E /I /Y",
+    "postbuild:prod": "rimraf ..\\..\\WebQuizProject\\public\\ohif && rimraf ..\\..\\WebQuizProject\\public\\ohif-prod && xcopy .\\platform\\app\\dist ..\\..\\WebQuizProject\\public\\ohif /E /I /Y && xcopy .\\platform\\app\\dist ..\\..\\WebQuizProject\\public\\ohif-prod /E /I /Y",
+
     "build": "lerna run build:viewer --stream",
     "build:dev": "lerna run build:dev --stream",
     "build:ci": "lerna run build:viewer:ci --stream",
@@ -120,6 +127,7 @@
     "postcss-loader": "6.2.1",
     "prettier": "3.6.2",
     "prettier-plugin-tailwindcss": "0.6.9",
+    "rimraf": "^6.1.3",
     "shader-loader": "1.3.1",
     "source-map-support": "0.5.21",
     "style-loader": "1.3.0",

@@ -1,0 +1,11 @@
+# overrides for production environment
+services:
+  # Exposed server that's handling incoming web requests
+  ohif_viewer:
+    volumes:
+      # Nginx config
+      - ./config/nginx.prod.conf:/etc/nginx/nginx.conf
+    env_file:
+      - .\..\..\.env
+    environment:
+      - NODE_ENV=production

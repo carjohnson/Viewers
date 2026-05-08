@@ -1,0 +1,12 @@
+
+# overrides for development environment
+services:
+  # Exposed server that's handling incoming web requests
+  ohif_viewer:
+    volumes:
+      # Nginx config
+      - ./config/nginx.conf:/etc/nginx/nginx.conf
+    env_file:
+      - .\..\..\.env
+    environment:
+      - NODE_ENV=development

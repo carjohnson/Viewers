@@ -127,7 +127,6 @@ window.config = {
         omitQuotationForMultipartRequest: true,
       },
     },
-
     {
       namespace: '@ohif/extension-default.dataSourcesModule.dicomweb',
       sourceName: 'ohif2',
@@ -209,40 +208,40 @@ window.config = {
         },
       },
     },
-    {
-      namespace: '@ohif/extension-default.dataSourcesModule.dicomweb',
-      sourceName: 'orthanc',
-      configuration: {
-        friendlyName: 'local Orthanc DICOMWeb Server',
-        name: 'DCM4CHEE',
-        wadoUriRoot: 'https://localhost/pacs/dicom-web',
-        qidoRoot: 'https://localhost/pacs/dicom-web',
-        wadoRoot: 'https://localhost/pacs/dicom-web',
-        qidoSupportsIncludeField: true,
-        supportsReject: true,
-        dicomUploadEnabled: true,
-        imageRendering: 'wadors',
-        thumbnailRendering: 'wadors',
-        enableStudyLazyLoad: true,
-        supportsFuzzyMatching: true,
-        supportsWildcard: true,
-        omitQuotationForMultipartRequest: true,
-        bulkDataURI: {
-          enabled: true,
-          // This is an example config that can be used to fix the retrieve URL
-          // where it has the wrong prefix (eg a canned prefix).  It is better to
-          // just use the correct prefix out of the box, but that is sometimes hard
-          // when URLs go through several systems.
-          // Example URLS are:
-          // "BulkDataURI" : "http://localhost/dicom-web/studies/1.2.276.0.7230010.3.1.2.2344313775.14992.1458058363.6979/series/1.2.276.0.7230010.3.1.3.1901948703.36080.1484835349.617/instances/1.2.276.0.7230010.3.1.4.1901948703.36080.1484835349.618/bulk/00420011",
-          // when running on http://localhost:3003 with no server running on localhost.  This can be corrected to:
-          // /orthanc/dicom-web/studies/1.2.276.0.7230010.3.1.2.2344313775.14992.1458058363.6979/series/1.2.276.0.7230010.3.1.3.1901948703.36080.1484835349.617/instances/1.2.276.0.7230010.3.1.4.1901948703.36080.1484835349.618/bulk/00420011
-          // which is a valid relative URL, and will result in using the http://localhost:3003/orthanc/.... path
-          // startsWith: 'http://localhost/',
-          // prefixWith: '/orthanc/',
-        },
-      },
-    },
+    // {
+    //   namespace: '@ohif/extension-default.dataSourcesModule.dicomweb',
+    //   sourceName: 'orthanc',
+    //   configuration: {
+    //     friendlyName: 'local Orthanc DICOMWeb Server',
+    //     name: 'DCM4CHEE',
+    //     wadoUriRoot: 'https://localhost/pacs/dicom-web',
+    //     qidoRoot: 'https://localhost/pacs/dicom-web',
+    //     wadoRoot: 'https://localhost/pacs/dicom-web',
+    //     qidoSupportsIncludeField: true,
+    //     supportsReject: true,
+    //     dicomUploadEnabled: true,
+    //     imageRendering: 'wadors',
+    //     thumbnailRendering: 'wadors',
+    //     enableStudyLazyLoad: true,
+    //     supportsFuzzyMatching: true,
+    //     supportsWildcard: true,
+    //     omitQuotationForMultipartRequest: true,
+    //     bulkDataURI: {
+    //       enabled: true,
+    //       // This is an example config that can be used to fix the retrieve URL
+    //       // where it has the wrong prefix (eg a canned prefix).  It is better to
+    //       // just use the correct prefix out of the box, but that is sometimes hard
+    //       // when URLs go through several systems.
+    //       // Example URLS are:
+    //       // "BulkDataURI" : "http://localhost/dicom-web/studies/1.2.276.0.7230010.3.1.2.2344313775.14992.1458058363.6979/series/1.2.276.0.7230010.3.1.3.1901948703.36080.1484835349.617/instances/1.2.276.0.7230010.3.1.4.1901948703.36080.1484835349.618/bulk/00420011",
+    //       // when running on http://localhost:3003 with no server running on localhost.  This can be corrected to:
+    //       // /orthanc/dicom-web/studies/1.2.276.0.7230010.3.1.2.2344313775.14992.1458058363.6979/series/1.2.276.0.7230010.3.1.3.1901948703.36080.1484835349.617/instances/1.2.276.0.7230010.3.1.4.1901948703.36080.1484835349.618/bulk/00420011
+    //       // which is a valid relative URL, and will result in using the http://localhost:3003/orthanc/.... path
+    //       // startsWith: 'http://localhost/',
+    //       // prefixWith: '/orthanc/',
+    //     },
+    //   },
+    // },
 
     {
       namespace: '@ohif/extension-default.dataSourcesModule.dicomwebproxy',
@@ -265,6 +264,39 @@ window.config = {
       sourceName: 'dicomlocal',
       configuration: {
         friendlyName: 'dicom local',
+      },
+    },
+    // added for deployment to Render (April 2026)
+    {
+      namespace: '@ohif/extension-default.dataSourcesModule.dicomweb',
+      sourceName: 'orthanc',
+      configuration: {
+        friendlyName: 'Orthanc PACS',
+        name: 'orthanc',
+        // These paths must match your Nginx location block
+        wadoUriRoot: '/pacs/dicom-web',
+        qidoRoot: '/pacs/dicom-web',
+        wadoRoot: '/pacs/dicom-web',
+        
+        // Orthanc-friendly defaults
+        qidoSupportsIncludeField: true,
+        supportsReject: false,
+        imageRendering: 'wadors',
+        thumbnailRendering: 'wadors',
+        enableStudyLazyLoad: true,
+        supportsFuzzyMatching: true,
+        supportsWildcard: true,
+        omitQuotationForMultipartRequest: true,
+        
+        // IMPORTANT: If you have issues loading bulk data (like PDFs or large images),
+        // Orthanc often returns absolute URLs (e.g., http://localhost:8042/...).
+        // You must use these to "fix" those URLs to match your proxy path:
+        bulkDataURI: {
+          enabled: true,
+          relativeResolution: 'studies',
+          startsWith: 'http://orthanc:8042/', // Your internal Orthanc URL
+          prefixWith: '/pacs/',               // Your Nginx proxy path
+        },
       },
     },
   ],
