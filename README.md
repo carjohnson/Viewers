@@ -1,3 +1,10 @@
+NOTES: For frontend development of the WebQuiz project; 
+- Fork into branch master from OHIF website.
+- Customization for webquiz extensions to run in branch customized-webquiz-dev
+- Merged the customized-webquiz-dev branch into various study and development branches.
+
+
+ 
 <!-- prettier-ignore-start -->
 <div align="center">
   <h1>OHIF Medical Imaging Viewer</h1>
