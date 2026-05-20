@@ -10,6 +10,7 @@ import {
 } from '../init';
 import dcmjs from 'dcmjs';
 import { postSegmentations } from '../handlers/postSegmentations';
+import { cornerstone } from 'modes/basic/src';
 
 // for creating the blob when saving a segment
 const { DicomMetaDictionary, DicomDict } = dcmjs.data;
@@ -862,6 +863,47 @@ export async function generateSegmentationActivity(
       return segResult;
     }
 
+    // get pixel measures info for SEG metadata
+    // Load the reference image
+// let image = null;
+
+// try {
+//   image = await imageLoader.loadAndCacheImage(refImageId);
+// } catch (err) {
+//   console.warn('Failed to load image for pixel measures:', refImageId, err);
+// }
+
+// if (!image) {
+//   console.warn('No cornerstone image for pixel measures');
+// } else {
+//   const {
+//     rowPixelSpacing,
+//     columnPixelSpacing,
+//   } = image;
+
+
+const referencedDisplaySets = displaySetService.getDisplaySetsForSeries(seriesUid);
+const referencedDisplaySet = referencedDisplaySets?.[0];
+const image0 = referencedDisplaySet.images[0];
+
+const pixelSpacing = image0.PixelSpacing; // [row, col]
+const sliceThickness = image0.SliceThickness;
+const spacingBetweenSlices = image0.SpacingBetweenSlices ?? image0.SliceThickness ?? 1;
+const iop = image0.ImageOrientationPatient;
+const ipp = image0.ImagePositionPatient;
+
+console.log(
+    " *** PIXEL MEASURES:",
+    "row:", pixelSpacing[0],
+    "col:", pixelSpacing[1],
+    "thickness:", sliceThickness,
+    "spacing:", pixelSpacing,
+    "spacingBetweenSlices:", spacingBetweenSlices,
+    "IOP:", iop,
+    "IPP:", ipp,
+  );
+// }
+
     const displaySets = displaySetService.getDisplaySetsForSeries(seriesUid);
     const displaySetInstanceUID = displaySets[0]?.displaySetInstanceUID;
 
@@ -927,6 +969,44 @@ export async function generateSegmentationActivity(
 
     const denaturalizedMetadata = dcmjs.data.DicomMetaDictionary.denaturalizeDataset(meta);
     const denaturalizedDataset = dcmjs.data.DicomMetaDictionary.denaturalizeDataset(generatedSeg.dataset);
+
+    if (image0 && denaturalizedDataset["52009229"]?.Value?.[0]) {
+      const sharedFG = denaturalizedDataset["52009229"].Value[0];
+
+      // Ensure PixelMeasuresSequence and its first item exist
+      if (!sharedFG["00289110"]) {
+        sharedFG["00289110"] = { vr: "SQ", Value: [{}] };
+      }
+      if (!sharedFG["00289110"].Value[0]) {
+        sharedFG["00289110"].Value[0] = {};
+      }
+
+      const pixelMeasuresItem = sharedFG["00289110"].Value[0];;
+
+      // SliceThickness (0018,0050)
+      pixelMeasuresItem["00180050"] = {
+        vr: "DS",
+        Value: [String(image0.SliceThickness || 1)],
+      };
+
+      // SpacingBetweenSlices (0018,0088)
+      pixelMeasuresItem["00180088"] = {
+        vr: "DS",
+        Value: [
+          String(image0.SpacingBetweenSlices ?? image0.SliceThickness ?? 1),
+        ],
+      };
+
+      // PixelSpacing (0028,0030)
+      pixelMeasuresItem["00280030"] = {
+        vr: "DS",
+        Value: [
+          String(image0.PixelSpacing[0]),
+          String(image0.PixelSpacing[1]),
+        ],
+      };
+    }
+
     const dicomDict = new DicomDict(denaturalizedMetadata);
     dicomDict.dict = denaturalizedDataset;
 
