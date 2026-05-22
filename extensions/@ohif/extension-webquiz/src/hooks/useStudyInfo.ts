@@ -26,9 +26,14 @@ import { useEffect, useState } from 'react';
 import { useSystem } from '@ohif/core';
 import { metaData } from '@cornerstonejs/core';
 
+// function to determine if displaySet has images using 'Array' for typescript rules
+function hasImages(ds: any): ds is { images: { imageId: string }[] } {
+  return Array.isArray(ds?.images) && ds.images.length > 0;
+}
+
 export function useStudyInfo() {
   const { servicesManager } = useSystem();
-  const displaySetService = servicesManager.services.displaySetService;
+  const displaySetService = servicesManager.services.displaySetService!;
 
   const [studyInfo, setStudyInfo] = useState(null);
 
@@ -39,19 +44,25 @@ export function useStudyInfo() {
     const poll = setInterval(() => {
       attempts++;
       const activeDisplaySets = displaySetService.getActiveDisplaySets();
-      const firstDisplaySet = activeDisplaySets?.[0];
 
-      if (!firstDisplaySet || !firstDisplaySet.images?.length) {
+      // find the display set with modality = CT or MR that has images
+      //    ignore other series types (SEG, SR RTStruct)
+      const ctDisplaySet = activeDisplaySets?.find(
+        ds => ds.Modality === 'CT' || ds.Modality === 'MR'
+      );
+
+      // if (!ctDisplaySet || !ctDisplaySet.images?.length) {
+      if (!ctDisplaySet || !hasImages(ctDisplaySet)) {
         console.log(`⏳ Waiting for display sets... attempt ${attempts}`);
         if (attempts >= maxAttempts) {
-          console.warn('❌ Giving up on study info after max attempts');
+          console.warn('❌ Giving up on study info after max attempts (no CT or MR images?)');
           clearInterval(poll);
         }
         return;
       }
 
-      const studyUID = firstDisplaySet.StudyInstanceUID ?? null;
-      const imageId = firstDisplaySet.images[0].imageId;
+      const studyUID = ctDisplaySet.StudyInstanceUID ?? null;
+      const imageId = ctDisplaySet.images[0].imageId;
       const imagePlaneModule = metaData.get('imagePlaneModule', imageId);
       const frameUID = imagePlaneModule?.frameOfReferenceUID ?? null;
 
