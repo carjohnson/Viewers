@@ -10,7 +10,6 @@ import {
 } from '../init';
 import dcmjs from 'dcmjs';
 import { postSegmentations } from '../handlers/postSegmentations';
-import { cornerstone } from 'modes/basic/src';
 
 // for creating the blob when saving a segment
 const { DicomMetaDictionary, DicomDict } = dcmjs.data;
@@ -82,6 +81,8 @@ export async function loadDicomSegIntoOHIF({
         await new Promise(resolve => setTimeout(resolve, 100));
     }
 
+    //////////////////////// ORIGINAL ///////////////////////////////
+    //////////////////////// ORIGINAL ///////////////////////////////
     // ~~~~~~~~~~
     // create one empty labelmap segmentation - this automatically creates one segment
     await segmentationService.createLabelmapForDisplaySet(
@@ -121,8 +122,92 @@ export async function loadDicomSegIntoOHIF({
         ohifInfo,
       );
     })
-    const cachedStore = useSegmentMetadataStore.getState().getAllSegments(segmentationId);
-    console.log('🔥 CACHED:', segmentationId, cachedStore);
+    // ////////////////////////       END         ///////////////////////////////
+    // //////////////////////////////////////////////////////////////////////////
+
+
+    // //////////////////////// WITH NO QUIZMETADATA ///////////////////////////////
+    // ////////////////////////     TWO PASSES       ///////////////////////////////
+    // const segments = Object.fromEntries(
+    //   segmentMetadata.map(s => [
+    //     s.segmentMaskValue,
+    //     {
+    //       label: s.label,
+    //       active: s.segmentMaskValue === 1,
+    //       visibility: true,
+    //     },
+    //   ])
+    // );
+
+    // await segmentationService.createLabelmapForDisplaySet(referencedDisplaySet, {
+    //   segmentationId,
+    //   label: segmentationLabel,
+    //   segments,
+    // });
+
+    // segmentMetadata.forEach(s => {
+    //   const isComplete = computeSegmentDataIsComplete(s);
+
+    //   const ohifInfo: OhifSegmentInfo = {
+    //     segmentIndex: s.segmentMaskValue,
+    //     label: s.label,
+    //     cachedStats: s.cachedStats,
+    //     quizSegmentMetadata: {
+    //       groundTruth: s.groundTruth,
+    //       referenceStandardMethod: s.referenceStandardMethod,
+    //       hepaticSegment: s.hepaticSegment,
+    //       isComplete,
+    //       dicomSegMaskValue: s.segmentMaskValue,
+    //     },
+    //   };
+
+    //   useSegmentMetadataStore
+    //     .getState()
+    //     .setSegmentInfo(segmentationId, s.segmentMaskValue, ohifInfo);
+    // });
+    // ////////////////////////       END         ///////////////////////////////
+    // //////////////////////////////////////////////////////////////////////////
+
+
+    // //////////////////////// WITH QUIZMETADATA ///////////////////////////////
+    // ////////////////////////    ONE PASS       ///////////////////////////////
+    // const segments: Record<number, Partial<Segment>> = {};
+
+    // segmentMetadata.forEach(s => {
+    //   const isComplete = computeSegmentDataIsComplete(s);
+
+    //   segments[s.segmentMaskValue] = {
+    //     label: s.label,
+    //     active: s.segmentMaskValue === 1,
+    //     visibility: true,
+    //     cachedStats: s.cachedStats,
+    //   };
+
+    //   const ohifInfo: OhifSegmentInfo = {
+    //     segmentIndex: s.segmentMaskValue,
+    //     label: s.label,
+    //     cachedStats: s.cachedStats,
+    //     quizSegmentMetadata: {
+    //       groundTruth: s.groundTruth,
+    //       referenceStandardMethod: s.referenceStandardMethod,
+    //       hepaticSegment: s.hepaticSegment,
+    //       isComplete,
+    //       dicomSegMaskValue: s.segmentMaskValue,
+    //     },
+    //   };
+
+    //   useSegmentMetadataStore
+    //     .getState()
+    //     .setSegmentInfo(segmentationId, s.segmentMaskValue, ohifInfo);
+    // });
+
+    // await segmentationService.createLabelmapForDisplaySet(referencedDisplaySet, {
+    //   segmentationId,
+    //   label: segmentationLabel,
+    //   segments,
+    // });
+    // ////////////////////////       END         ///////////////////////////////
+    // //////////////////////////////////////////////////////////////////////////
 
 
     // // for debug
@@ -130,6 +215,9 @@ export async function loadDicomSegIntoOHIF({
     // console.log(' *** STARTING SEG', startingSeg);
     // console.log('segToolState:', segToolState);
     // console.log('labelmapBufferArray:', segToolState.labelmapBufferArray?.length);
+
+    const cachedStore = useSegmentMetadataStore.getState().getAllSegments(segmentationId);
+    console.log('🔥 CACHED:', segmentationId, cachedStore);
 
     // ~~~~~~~~~~
     // get labelmap ids and split the buffer into per Slice arrays
@@ -865,44 +953,29 @@ export async function generateSegmentationActivity(
 
     // get pixel measures info for SEG metadata
     // Load the reference image
-// let image = null;
 
-// try {
-//   image = await imageLoader.loadAndCacheImage(refImageId);
-// } catch (err) {
-//   console.warn('Failed to load image for pixel measures:', refImageId, err);
-// }
+    const referencedDisplaySets = displaySetService.getDisplaySetsForSeries(seriesUid);
+    const referencedDisplaySet = referencedDisplaySets?.[0];
+    const image0 = referencedDisplaySet.images[0];
 
-// if (!image) {
-//   console.warn('No cornerstone image for pixel measures');
-// } else {
-//   const {
-//     rowPixelSpacing,
-//     columnPixelSpacing,
-//   } = image;
+    // /////////// FOR DEBUG ////////////
+    // const pixelSpacing = image0.PixelSpacing; // [row, col]
+    // const sliceThickness = image0.SliceThickness;
+    // const spacingBetweenSlices = image0.SpacingBetweenSlices ?? image0.SliceThickness ?? 1;
+    // const iop = image0.ImageOrientationPatient;
+    // const ipp = image0.ImagePositionPatient;
 
-
-const referencedDisplaySets = displaySetService.getDisplaySetsForSeries(seriesUid);
-const referencedDisplaySet = referencedDisplaySets?.[0];
-const image0 = referencedDisplaySet.images[0];
-
-const pixelSpacing = image0.PixelSpacing; // [row, col]
-const sliceThickness = image0.SliceThickness;
-const spacingBetweenSlices = image0.SpacingBetweenSlices ?? image0.SliceThickness ?? 1;
-const iop = image0.ImageOrientationPatient;
-const ipp = image0.ImagePositionPatient;
-
-console.log(
-    " *** PIXEL MEASURES:",
-    "row:", pixelSpacing[0],
-    "col:", pixelSpacing[1],
-    "thickness:", sliceThickness,
-    "spacing:", pixelSpacing,
-    "spacingBetweenSlices:", spacingBetweenSlices,
-    "IOP:", iop,
-    "IPP:", ipp,
-  );
-// }
+    // console.log(
+    //     " *** PIXEL MEASURES:",
+    //     "row:", pixelSpacing[0],
+    //     "col:", pixelSpacing[1],
+    //     "thickness:", sliceThickness,
+    //     "spacing:", pixelSpacing,
+    //     "spacingBetweenSlices:", spacingBetweenSlices,
+    //     "IOP:", iop,
+    //     "IPP:", ipp,
+    //   );
+    // /////////// END FOR DEBUG ////////////
 
     const displaySets = displaySetService.getDisplaySetsForSeries(seriesUid);
     const displaySetInstanceUID = displaySets[0]?.displaySetInstanceUID;
@@ -970,6 +1043,8 @@ console.log(
     const denaturalizedMetadata = dcmjs.data.DicomMetaDictionary.denaturalizeDataset(meta);
     const denaturalizedDataset = dcmjs.data.DicomMetaDictionary.denaturalizeDataset(generatedSeg.dataset);
 
+    // Adding PixelMeasuresSequence so that the exported SEG file is compatible with
+    //    other viewers (e.g. 3D Slicer)
     if (image0 && denaturalizedDataset["52009229"]?.Value?.[0]) {
       const sharedFG = denaturalizedDataset["52009229"].Value[0];
 
@@ -1007,6 +1082,7 @@ console.log(
       };
     }
 
+    // create Blob for export using dicomDict to write the array buffer
     const dicomDict = new DicomDict(denaturalizedMetadata);
     dicomDict.dict = denaturalizedDataset;
 
@@ -1037,6 +1113,7 @@ console.log(
 ///////////////////////////////////////////////
 //////////////// HELPERS /////////////////////
 ///////////////////////////////////////////////
+
 // =====================================
 type NumericValue = number | number[];
 
