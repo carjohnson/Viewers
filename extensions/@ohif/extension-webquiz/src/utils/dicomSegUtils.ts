@@ -1,103 +1,22 @@
-
-// //////////////////////////// WORKS FOR CREATELABELMAPFORDISPLAYSET /////////////////////
-// import dicomParser from 'dicom-parser';
-// /**
-//  * Create an OHIF-compatible SEG display set from a DICOM SEG ArrayBuffer.
-//  */
-// export function createSegDisplaySetFromArrayBuffer(
-//   arrayBuffer: ArrayBuffer,
-//   segmentationId: string,
-//   referencedDisplaySetInstanceUID: string,
-//   referencedImageIds: string[],
-//   segImageId: any,
-//   segments?: Record<number, Partial<Segment>>,
-// ) {
-//   const arrayBufferView = new Uint8Array(arrayBuffer);
-//   const dataset = dicomParser.parseDicom(arrayBufferView);
-
-//   const sopInstanceUid = dataset.string('x00080018'); // SOP Instance UID
-//   const seriesInstanceUid = dataset.string('x0020000E'); // Series Instance UID
-//   const studyInstanceUidFromDicom = dataset.string('x0020000D'); // Study Instance UID
-//   const sopClassUid = dataset.string('x00080016'); // SOP Class UID
-
-//   const effectiveStudyUid =  studyInstanceUidFromDicom;
-//   const effectiveSeriesUid = referencedDisplaySetInstanceUID;
-
-//   if (!sopInstanceUid) {
-//     throw new Error('DICOM SEG missing SOP Instance UID (0008,0018)');
-//   }
-
-//     // Build labelMapImages as an array of image objects
-//   // Each SEG frame maps to a source image
-//   const labelMapImages = referencedImageIds.map((referencedImageId, index) => ({
-//     segImageId,                    // The SEG imageId (same for all frames, or you could create per-frame)
-//     referencedImageId,          // The source image this frame/segment maps to
-//     index,                      // Frame index
-//   }));
-
-//   const images = referencedImageIds.map(imgId => ({ imageId: imgId }));
-
-//  const displaySet = {
-//     uid: segmentationId,
-//     displaySetInstanceUID: segmentationId,
-//     seriesInstanceUID: effectiveSeriesUid,
-//     studyInstanceUID: effectiveStudyUid,
-//     modality: 'SEG',
-//     seriesDescription: 'SEG',
-//     sopClassUID: sopClassUid,
-//     segData: arrayBuffer,
-//     referencedDisplaySetInstanceUID,
-//     labelMapImages: [labelMapImages],
-//     imageIds: referencedImageIds,
-//     referenceImageIds: referencedImageIds,
-//     images,
-//     segments,
-//     instances: [
-//       {
-//         instanceUid: sopInstanceUid,
-//         data: arrayBuffer, // raw ArrayBuffer
-//         sopClassUid: sopClassUid,
-//         seriesInstanceUid: effectiveSeriesUid,
-//         studyInstanceUid: effectiveStudyUid,
-//         modality: 'SEG',
-//         metadata: dataset,
-//         segImageId,
-//       },
-//     ],
-//     numberOfInstances: 1,
-//   };
-
-//   return displaySet;
-// }
-// /////////////// END WORKS FOR CREATELABELMAPFORDISPLAYSET /////////////////////
-
-
-// =====================================
-// // //////////////////////////// FROM PERPLEXITY /////////////////////
-
-// =====================================
 import dicomParser from 'dicom-parser';
 import { adaptersSEG } from '@cornerstonejs/adapters';
 import { metaData } from '@cornerstonejs/core';
 import { dicomlabToRGB } from './../../../../cornerstone-dicom-seg/src/utils/dicomlabToRGB';
 import { CONSTANTS } from '@cornerstonejs/tools';
+import dcmjs from 'dcmjs';
+import { SegmentData } from './../models/SegmentationData';
 
 
-
-type Segment = {
-  label?: string;
-  color?: [number, number, number, number];
-  active?: boolean;
-};
-
+// =====================================
 export async function createSegDisplaySetFromArrayBuffer(
   arrayBuffer: ArrayBuffer,
   segmentationId: string,
   referencedDisplaySetInstanceUID: string,
   referencedImageIds: string[],
   segImageId: any,
-  segments?: Record<number, Partial<Segment>>,
+  segments?: Record<number, Partial<SegmentData>>,
 ) {
+
   const dataset = dicomParser.parseDicom(new Uint8Array(arrayBuffer));
 
   const sopInstanceUID = dataset.string('x00080018');
@@ -109,11 +28,14 @@ export async function createSegDisplaySetFromArrayBuffer(
     throw new Error('DICOM SEG missing SOP Instance UID (0008,0018)');
   }
 
-  console.log(' *** metaData:', metaData);
   const segResult = await adaptersSEG.Cornerstone3D.Segmentation.createFromDICOMSegBuffer(referencedImageIds, arrayBuffer, {
     metadataProvider: metaData,
   });
   console.log(' *** segResult:', segResult);
+
+  // set up the default colors for the segments in the metadata
+  //    colorLUT is created from data.rgba in the SegmentationService
+  //     function createSegmentationForSEGDisplaySet
   let usedRecommendedDisplayCIELabValue = true;
   segResult.segMetadata.data.forEach((data, i) => {
     if (i > 0) {
@@ -163,248 +85,293 @@ export async function createSegDisplaySetFromArrayBuffer(
 }
 
 // =====================================
-// import { createFromDICOMSegBuffer } from '@cornerstonejs/adapters';
 
-export async function parseSegArrayBuffer(
-  arrayBuffer: ArrayBuffer,
-  referencedImageIds: string[],
-  metadataProvider: any
-) {
-  const arrayBufferView = new Uint8Array(arrayBuffer);  // bytes
-  const dataSet = dicomParser.parseDicom(arrayBufferView);
+// =====================================
 
-  const sopClassUID = dataSet.string('x00080016');
-  if (sopClassUID !== '1.2.840.10008.5.1.4.1.1.66.4') {
-    throw new Error('Not a DICOM SEG object');
+// =====================================
+
+// =====================================
+///////////////////////////////////////////////
+//////////////  DEBUG HELPERS /////////////////
+///////////////////////////////////////////////
+
+
+
+// =====================================
+/**
+ * Extract pixel data from DICOM SEG ArrayBuffer and count segment values
+ */
+function extractPixelDataFromSEG(arrayBuffer) {
+  const uint8Array = new Uint8Array(arrayBuffer);
+  const dicomData = dcmjs.data.DicomMessage.readFile(uint8Array);
+  const dataset = dcmjs.data.DicomMetaDictionary.naturalizeDataset(dicomData.dict);
+  
+  // Extract pixel data
+  const pixelData = dataset.PixelData;
+  
+  if (!pixelData) {
+    throw new Error('No PixelData in DICOM SEG');
   }
-
-  const result = adaptersSEG.Cornerstone3D.Segmentation.createFromDICOMSegBuffer(referencedImageIds, arrayBuffer, {
-    metadataProvider,
+  
+  // PixelData can be a Buffer or array
+  let pixelArray;
+  if (pixelData instanceof Buffer) {
+    pixelArray = new Uint8Array(pixelData.buffer, pixelData.byteOffset, pixelData.byteLength);
+  } else if (Array.isArray(pixelData)) {
+    pixelArray = new Uint8Array(pixelData);
+  } else {
+    pixelArray = new Uint8Array(pixelData.buffer);
+  }
+  
+  // Get number of frames
+  const numberOfFrames = dataset.NumberOfFrames || 1;
+  const rows = dataset.Rows;
+  const columns = dataset.Columns;
+  const bitsAllocated = dataset.BitsAllocated || 8;
+  
+  // Determine if 8-bit or 16-bit
+  const is16Bit = bitsAllocated === 16;
+  const bytesPerFrame = rows * columns * (is16Bit ? 2 : 1);
+  
+  console.log('SEG info:', {
+    numberOfFrames,
+    rows,
+    columns,
+    bitsAllocated,
+    bytesPerFrame,
+    totalPixelDataLength: pixelArray.length,
   });
-
+  
   return {
-    dataSet,
-    ...result,
+    pixelArray,
+    numberOfFrames,
+    rows,
+    columns,
+    is16Bit,
   };
 }
 
 
 // =====================================
-const DEFAULT_COLORS: [number, number, number, number][] = [
-  [255, 0, 0, 255],
-  [0, 255, 0, 255],
-  [0, 0, 255, 255],
-  [255, 255, 0, 255],
-  [255, 0, 255, 255],
-  [0, 255, 255, 255],
-];
+/**
+ * Updated bufferCounter for DICOM SEG pixel data
+ */
+function bufferCounterForSEG(pixelData, numberOfFrames, rows, columns, is16Bit) {
+  const valueStats = new Map();
+  let nonZeroCount = 0;
+  
+  const bytesPerPixel = is16Bit ? 2 : 1;
+  const pixelsPerFrame = rows * columns;
+  
+  for (let frame = 0; frame < numberOfFrames; frame++) {
+    const frameOffset = frame * pixelsPerFrame;
+    
+    for (let pixel = 0; pixel < pixelsPerFrame; pixel++) {
+      const offset = frameOffset + pixel;
+      const value = is16Bit 
+        ? pixelData[offset * 2] | (pixelData[offset * 2 + 1] << 8)
+        : pixelData[offset];
+      
+      if (value !== 0) {
+        nonZeroCount++;
+        
+        if (!valueStats.has(value)) {
+          valueStats.set(value, {
+            count: 1,
+            firstSlice: frame,
+            firstIndex: pixel,
+          });
+        } else {
+          valueStats.get(value).count++;
+        }
+      }
+    }
+  }
+  
+  // Debug output
+  console.log('***** DEBUG DICOM SEG Pixel Data *****');
+  console.log('Non-zero voxels:', nonZeroCount);
+  console.log('Unique non-zero values:', [...valueStats.keys()]);
+  
+  for (const [value, stats] of valueStats.entries()) {
+    console.log(
+      `Value ${value}: count=${stats.count}, firstSlice=${stats.firstSlice}, firstIndex=${stats.firstIndex}`
+    );
+  }
+  
+  return valueStats;
+}
+
+// =====================================
+/**
+ * Combined helper: extract and count from DICOM SEG ArrayBuffer
+ */
+export function analyzeSegmentationBuffer(arrayBuffer) {
+  const { pixelArray, numberOfFrames, rows, columns, is16Bit } = extractPixelDataFromSEG(arrayBuffer);
+  return bufferCounterForSEG(pixelArray, numberOfFrames, rows, columns, is16Bit);
+}
+
+export function analyzeSEGSegmentMapping(arrayBuffer) {
+  const uint8Array = new Uint8Array(arrayBuffer);
+  const dicomData = dcmjs.data.DicomMessage.readFile(uint8Array);
+  const dataset = dcmjs.data.DicomMetaDictionary.naturalizeDataset(dicomData.dict);
+  
+  console.log('===== SEG SEGMENT INFORMATION =====');
+  
+  // Check SegmentSequence
+  if (dataset.SegmentSequence) {
+    console.log('Number of segments:', dataset.SegmentSequence.length);
+    dataset.SegmentSequence.forEach((seg, idx) => {
+      console.log(`Segment ${idx + 1}:`, {
+        segmentNumber: seg.SegmentNumber,
+        segmentLabel: seg.SegmentLabel,
+        segmentAlgorithmType: seg.SegmentAlgorithmType,
+        // segmentedPropertyCategory: seg roi?.SegmentedPropertyCategoryCodeSequence?.[0]?.CodingValue,
+      });
+    });
+  }
+  
+  // Check PerFrameFunctionalGroupsSequence for frame-to-segment mapping
+  if (dataset.PerFrameFunctionalGroupsSequence) {
+    const frames = dataset.PerFrameFunctionalGroupsSequence;
+    console.log('\nNumber of frames:', frames.length);
+    
+    frames.forEach((frame, idx) => {
+      const segmentationRef = frame.FrameContentSequence?.[0];
+      const segmentRef = frame.PerFrameFunctionalGroupsSequence?.[0]?.SegmentIdentificationSequence?.[0];
+      
+      console.log(`Frame ${idx}:`, {
+        referencedSegmentNumber: segmentRef?.ReferencedSegmentNumber,
+        presetSegmentNumber: segmentationRef?.PresetSegmentNumber,
+      });
+    });
+  }
+  
+  // Check NumberOfFrames
+  console.log('\nNumberOfFrames:', dataset.NumberOfFrames);
+  console.log('BitsAllocated:', dataset.BitsAllocated);
+  console.log('Rows:', dataset.Rows);
+  console.log('Columns:', dataset.Columns);
+  
+  // Extract pixel data per frame
+  const numberOfFrames = dataset.NumberOfFrames || 1;
+  const rows = dataset.Rows;
+  const columns = dataset.Columns;
+  const bytesPerFrame = Math.ceil((rows * columns) / 8); // 1-bit packed
+  
+  console.log('\nBytes per frame:', bytesPerFrame);
+  console.log('Total pixel data bytes:', numberOfFrames * bytesPerFrame);
+  
+  const pixelData = new Uint8Array(arrayBuffer);
+  
+  // Analyze each frame separately
+  console.log('\n===== PER-FRAME ANALYSIS =====');
+  for (let frame = 0; frame < numberOfFrames; frame++) {
+    const frameOffset = frame * bytesPerFrame;
+    const frameBytes = pixelData.slice(frameOffset, frameOffset + bytesPerFrame);
+    
+    let nonZeroCount = 0;
+    for (let byteIdx = 0; byteIdx < frameBytes.length; byteIdx++) {
+      const byte = frameBytes[byteIdx];
+      for (let bit = 0; bit < 8; bit++) {
+        const value = (byte >> (7 - bit)) & 1;
+        if (value !== 0) nonZeroCount++;
+      }
+    }
+    
+    console.log(`Frame ${frame}: ${nonZeroCount} non-zero voxels`);
+  }
+}
+// =====================================
+/**
+ * Extract per-frame binary masks from DICOM SEG and map to segments
+ */
+export function extractSegmentMasksFromSEG(arrayBuffer) {
+  const uint8Array = new Uint8Array(arrayBuffer);
+  const dicomData = dcmjs.data.DicomMessage.readFile(uint8Array);
+  const dataset = dcmjs.data.DicomMetaDictionary.naturalizeDataset(dicomData.dict);
+  
+  const numberOfFrames = dataset.NumberOfFrames || 1;
+  const rows = dataset.Rows;
+  const columns = dataset.Columns;
+  const bytesPerFrame = Math.ceil((rows * columns) / 8); // 1-bit packed
+  
+  const pixelData = new Uint8Array(arrayBuffer);
+  const segmentSequence = dataset.SegmentSequence || [];
+  
+  // Extract each frame as unpacked binary mask
+  const frameMasks = [];
+  
+  for (let frame = 0; frame < numberOfFrames; frame++) {
+    const frameOffset = frame * bytesPerFrame;
+    const frameBytes = pixelData.slice(frameOffset, frameOffset + bytesPerFrame);
+    
+    // Unpack 1-bit data to Uint8Array (0 or 1 per voxel)
+    const unpackedMask = new Uint8Array(rows * columns);
+    
+    for (let byteIdx = 0; byteIdx < frameBytes.length; byteIdx++) {
+      const byte = frameBytes[byteIdx];
+      const basePixel = byteIdx * 8;
+      
+      for (let bit = 0; bit < 8 && (basePixel + bit) < unpackedMask.length; bit++) {
+        const value = (byte >> (7 - bit)) & 1;
+        unpackedMask[basePixel + bit] = value;
+      }
+    }
+    
+    frameMasks.push(unpackedMask);
+  }
+  
+  // Map frames to segments (assuming sequential mapping: Frame 0 → Segment 1, etc.)
+  const segmentMasks = {};
+  
+  segmentSequence.forEach((seg, frameIdx) => {
+    if (frameIdx < frameMasks.length) {
+      const segmentNumber = seg.SegmentNumber;
+      const segmentLabel = seg.SegmentLabel;
+      
+      // Count non-zero voxels for this segment
+      let voxelCount = 0;
+      for (let i = 0; i < frameMasks[frameIdx].length; i++) {
+        if (frameMasks[frameIdx][i] !== 0) voxelCount++;
+      }
+      
+      segmentMasks[segmentNumber] = {
+        label: segmentLabel,
+        mask: frameMasks[frameIdx],
+        voxelCount,
+        frameIndex: frameIdx,
+      };
+      
+      console.log(`Segment ${segmentNumber} (${segmentLabel}): ${voxelCount} voxels from Frame ${frameIdx}`);
+    }
+  });
+  
+  return segmentMasks;
+}
 
 
 // =====================================
-
-
-// // //////////////////////////// FROM COPILOT - not debugged yet /////////////////////
-// import dicomParser from 'dicom-parser';
-// import type { Segment } from '@ohif/core'; // adjust import to your types
-// import dcmjs from 'dcmjs';
-// import { metaData } from '@cornerstonejs/core';
-
-// export function createSegDisplaySetFromArrayBuffer(
-//   arrayBuffer: ArrayBuffer,
-//   segmentationId: string,
-//   referencedDisplaySetInstanceUID: string,
-//   referencedImageIds: string[],
-//   segImageId: string,
-//   segments?: Record<number, Partial<Segment>>,
-// ) {
-//   const uint8Array = new Uint8Array(arrayBuffer);
-
-
-// const { dataset } = parseSegWithDcmjs(arrayBuffer);
-//   const sopInstanceUid = dataset.SOPInstanceUID; // SOP Instance UID
-//   const seriesInstanceUid = dataset.seriesInstanceUID; // Series Instance UID
-//   const studyInstanceUidFromDicom = dataset.studyInstanceUID; // Study Instance UID
-//   const sopClassUid = dataset.sopClassUID; // SOP Class UID
-
-//   if (!sopInstanceUid) {
-//     throw new Error('DICOM SEG missing SOPInstanceUID');
-//   }
-
-//   // Build frame → segment + frame → source mapping + scalarData
-//   const frameInfos = buildFrameSegmentMap(meta);
-
-//   // Map ReferencedSOPInstanceUID → referencedImageId (from the parent displaySet)
-//   const sopToImageIdMap: Record<string, string> = {};
-//   referencedImageIds.forEach(imageId => {
-//     const imageMeta = metaData.get('dicom', imageId) as any;
-//     const sop = imageMeta?.SOPInstanceUID;
-//     if (sop) {
-//       sopToImageIdMap[sop] = imageId;
-//     }
-//   });
-
-//   // Build labelMapImages: one entry per frame
-//   const labelMapImages: any[] = [];
-
-//   frameInfos.forEach((frameInfo, idx) => {
-//     const { segmentNumber, frameIndex, referencedSOPInstanceUID, scalarData } = frameInfo;
-
-//     let referencedImageId: string | undefined;
-//     if (referencedSOPInstanceUID && sopToImageIdMap[referencedSOPInstanceUID]) {
-//       referencedImageId = sopToImageIdMap[referencedSOPInstanceUID];
-//     } else {
-//       // Fallback: align by index if mapping is missing
-//       referencedImageId = referencedImageIds[idx] ?? referencedImageIds[0];
-//     }
-
-//     // For now, we reuse segImageId as the "imageId" key for this frame.
-//     // If you want per-frame imageIds, you can generate them here.
-//     const segFrameImageId = `${segImageId}?frame=${frameIndex}`;
-
-//     // Register per-frame metadata so OHIF/cornerstone can query it
-//     metaData.add('dicom', segFrameImageId, {
-//       ...meta,
-//       // You can also attach frame-specific info if needed:
-//       PerFrameFunctionalGroupsSequenceIndex: frameIndex,
-//       ReferencedSegmentNumber: segmentNumber,
-//       ReferencedSOPInstanceUID: referencedSOPInstanceUID,
-//     });
-
-//     labelMapImages.push({
-//       imageId: segFrameImageId,
-//       referencedImageId,
-//       frameIndex,
-//       segmentNumber,
-//       scalarData, // this is what you’ll feed into voxelManager later
-//     });
-//   });
-
-//   const images = referencedImageIds.map(imageId => ({ imageId }));
-
-//   const displaySet = {
-//     uid: segmentationId,
-//     displaySetInstanceUID: segmentationId,
-//     seriesInstanceUID: seriesInstanceUid ?? referencedDisplaySetInstanceUID,
-//     studyInstanceUID: studyInstanceUid,
-//     modality: 'SEG',
-//     seriesDescription: meta.SeriesDescription || 'SEG',
-//     sopClassUID: sopClassUid,
-//     segData: arrayBuffer,
-//     referencedDisplaySetInstanceUID,
-//     labelMapImages, // flat array of per-frame labelmap images
-//     imageIds: referencedImageIds,
-//     referenceImageIds: referencedImageIds,
-//     images,
-//     segments,
-//     instances: [
-//       {
-//         instanceUid: sopInstanceUid,
-//         data: arrayBuffer,
-//         sopClassUid,
-//         seriesInstanceUid,
-//         studyInstanceUid,
-//         modality: 'SEG',
-//         metadata: meta,
-//         segImageId,
-//       },
-//     ],
-//     numberOfInstances: 1,
-//   };
-
-//   return displaySet;
-// }
-// // =====================================
-
-// type SegmentMaskInfo = {
-//   segmentNumber: number;
-//   frameIndex: number;
-//   referencedSOPInstanceUID?: string;
-//   scalarData: Uint8Array;
-// };
-
-// // =====================================
-// function unpackBitPackedFrame(
-//   frameBytes: Uint8Array,
-//   rows: number,
-//   columns: number
-// ): Uint8Array {
-//   const unpacked = new Uint8Array(rows * columns);
-//   for (let byteIdx = 0; byteIdx < frameBytes.length; byteIdx++) {
-//     const byte = frameBytes[byteIdx];
-//     const basePixel = byteIdx * 8;
-//     for (let bit = 0; bit < 8 && basePixel + bit < unpacked.length; bit++) {
-//       const value = (byte >> (7 - bit)) & 1;
-//       unpacked[basePixel + bit] = value;
-//     }
-//   }
-//   return unpacked;
-// }
-
-// // =====================================
-// function buildFrameSegmentMap(dataset: any): SegmentMaskInfo[] {
-//   const {
-//     NumberOfFrames,
-//     Rows,
-//     Columns,
-//     PixelData,
-//     PerFrameFunctionalGroupsSequence = [],
-//   } = dataset;
-
-//   if (!NumberOfFrames || !Rows || !Columns || !PixelData) {
-//     throw new Error('SEG missing NumberOfFrames/Rows/Columns/PixelData');
-//   }
-
-//   const bytesPerFrame = Math.ceil((Rows * Columns) / 8);
-//   const pixelData = new Uint8Array(PixelData);
-//   const frameInfos: SegmentMaskInfo[] = [];
-
-//   for (let frame = 0; frame < NumberOfFrames; frame++) {
-//     const frameOffset = frame * bytesPerFrame;
-//     const frameBytes = pixelData.slice(frameOffset, frameOffset + bytesPerFrame);
-//     const scalarData = unpackBitPackedFrame(frameBytes, Rows, Columns);
-
-//     const pffg = PerFrameFunctionalGroupsSequence[frame] || {};
-//     const segIdSeq = pffg.SegmentIdentificationSequence || {};
-//     const segmentNumber = segIdSeq.ReferencedSegmentNumber;
-
-//     let referencedSOPInstanceUID: string | undefined;
-//     const derivationImageSequence = pffg.DerivationImageSequence?.[0];
-//     const sourceImageSequence = derivationImageSequence?.SourceImageSequence?.[0];
-//     if (sourceImageSequence?.ReferencedSOPInstanceUID) {
-//       referencedSOPInstanceUID = sourceImageSequence.ReferencedSOPInstanceUID;
-//     }
-
-//     if (!segmentNumber) {
-//       console.warn('Frame without ReferencedSegmentNumber, skipping frame', frame);
-//       continue;
-//     }
-
-//     frameInfos.push({
-//       segmentNumber,
-//       frameIndex: frame,
-//       referencedSOPInstanceUID,
-//       scalarData,
-//     });
-//   }
-
-//   return frameInfos;
-// }
-
-// // =====================================
-// function parseSegWithDcmjs(arrayBuffer: ArrayBuffer) {
-//   const uint8 = new Uint8Array(arrayBuffer);
-
-//   // Raw DICOM message
-//   const dicomData = dcmjs.data.DicomMessage.readFile(uint8);
-
-//   // Naturalized dataset with proper JS types (strings, numbers, arrays)
-//   const dataset = dcmjs.data.DicomMetaDictionary.naturalizeDataset(dicomData.dict);
-//   const meta = dcmjs.data.DicomMetaDictionary.namifyDataset(dataset);
-
-//   return { dicomData, dataset: meta };
-// }
-
-// /////////////// END FROM COPILOT /////////////////////
-
-// =====================================
-// =====================================
+/**
+ * Count voxels per segment with proper frame mapping
+ */
+export function countSegmentVoxels(arrayBuffer) {
+  const segmentMasks = extractSegmentMasksFromSEG(arrayBuffer);
+  
+  const valueStats = new Map();
+  
+  Object.entries(segmentMasks).forEach(([segmentNumber, segData]) => {
+    valueStats.set(parseInt(segmentNumber), {
+      count: segData.voxelCount,
+      label: segData.label,
+      frameIndex: segData.frameIndex,
+    });
+  });
+  
+  console.log('===== FINAL SEGMENT VOXEL COUNTS =====');
+  for (const [value, stats] of valueStats.entries()) {
+    console.log(`Segment ${value} (${stats.label}): ${stats.count} voxels`);
+  }
+  
+  return valueStats;
+}

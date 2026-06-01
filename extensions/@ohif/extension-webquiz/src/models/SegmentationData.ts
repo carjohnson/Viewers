@@ -24,6 +24,16 @@ export type  SegmentationStats = {
 }
 
 // =====================================
+export type SegmentData = {
+  label?: string;
+  color?: [number, number, number, number];
+  active?: boolean;
+  cachedStats?: Record<string, any>;
+  visibility?: boolean;
+  locked?: boolean;
+};
+
+// =====================================
 export type SegmentMetadata = {
   groundTruth: string;
   referenceStandardMethod: string;
