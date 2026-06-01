@@ -352,6 +352,66 @@ useEffect(() => {
     // ********************* Segmentations ************************
     // ************************************************************
 
+    // //=========================================================
+    // useEffect(() => {
+    //     async function loadSegmentations() {
+    //         const username = userInfo?.username;
+
+    //         const currentLoaded = useSegmentationLoadStore.getState().getLoadedForStudy(studyUID);
+    //         console.log('*** IN FETCH ... user:', username, 'study:', studyUID, 'loaded:', currentLoaded);
+            
+    //         if (!username || !studyUID || currentLoaded) return;
+
+
+    //         try {
+
+    //             const res = await fetch(
+    //                 `${API_BASE_URL}/webquiz/list-study-segmentations?username=${username}&studyUID=${studyUID}`,
+    //                 { credentials: 'include' }
+    //             )
+    //             const data = await res.json();
+    //             console.log('📥 Segmentations response:', data);
+
+    //             const { payload } = data;
+
+    //             // make sure all display sets are available for loading
+    //             if (!activeViewportId || !seriesInstanceUID) {
+    //                 return;
+    //             }
+
+    //             for (const seg of payload) {
+    //                 if (!seg.base64Buffer) continue;
+
+    //                 const arrayBuffer = base64ToArrayBuffer(seg.base64Buffer);
+    //                 console.log(' *** IN FETCH SEGS ... url', seg.segmentationFileUrl);
+
+    //                 await loadDicomSegIntoOHIF({
+    //                     segmentationId: seg.segmentationId,
+    //                     referencedSeriesInstanceUID: seg.referencedSeriesUID,
+    //                     segmentationLabel: seg.segmentationLabel,
+    //                     segmentMetadata: seg.dbSegmentInfo,
+    //                     arrayBuffer,
+    //                     servicesManager,
+    //                     activeViewportId,
+    //                 });
+    //             }
+    //             // flag set to true after load
+    //             // - even if there were no entries in the database (starting fresh)
+    //             useSegmentationLoadStore.getState().setLoaded(loadStudyUID!, true);
+
+    //         } catch (err) {
+    //             console.error('❌ Error fetching segmentations:', err);
+    //         }
+    //     }
+    //     loadSegmentations();
+
+    //     // // for debug
+    //     // const allSegmentations = segmentationService.getSegmentations();
+    //     // Object.entries(allSegmentations).forEach(([id, seg]) => {
+    //     // console.log(`Seg ${id}:`, Object.keys(seg.segments || {}).length, 'segments');
+    //     // });        
+        
+    // }, [userInfo?.username, studyUID, activeViewportId, seriesInstanceUID]);
     //=========================================================
     useEffect(() => {
         async function loadSegmentations() {
@@ -380,17 +440,22 @@ useEffect(() => {
                 }
 
                 for (const seg of payload) {
-                    if (!seg.base64Buffer) continue;
+                    console.log(' *** IN FETCH SEGS ... url', seg.segmentationFileUrl);
+                    const res = await fetch(
+                    `${API_BASE_URL}/webquiz/get-segmentation-file?segmentationId=${seg.segmentationId}`,
+                    { credentials: 'include' }
+                    );
+                    if (!res.ok) throw new Error('Failed to fetch SEG file');
 
-                    const arrayBuffer = base64ToArrayBuffer(seg.base64Buffer);
+                    const arrayBuffer = await res.arrayBuffer();
 
                     await loadDicomSegIntoOHIF({
                         segmentationId: seg.segmentationId,
                         referencedSeriesInstanceUID: seg.referencedSeriesUID,
                         segmentationLabel: seg.segmentationLabel,
                         segmentMetadata: seg.dbSegmentInfo,
-                        arrayBuffer,
                         servicesManager,
+                        arrayBuffer,
                         activeViewportId,
                     });
                 }

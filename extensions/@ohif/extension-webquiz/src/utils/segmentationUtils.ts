@@ -1,6 +1,6 @@
 import { adaptersSEG } from '@cornerstonejs/adapters';
 import { imageLoader } from '@cornerstonejs/core';
-import { metaData } from '@cornerstonejs/core';
+import { metaData, Types } from '@cornerstonejs/core';
 import { useSegmentMetadataStore } from '../stores/useSegmentMetadataStore';
 import { OhifSegmentInfo, SegmentationData, SegmentMetadata, DEFAULT_SEGMENT_METADATA } from './../models/SegmentationData';
 import {
@@ -10,6 +10,12 @@ import {
 } from '../init';
 import dcmjs from 'dcmjs';
 import { postSegmentations } from '../handlers/postSegmentations';
+import { SegmentationRepresentations } from '@cornerstonejs/tools/enums';
+import { segmentation, Enums as ToolEnums } from '@cornerstonejs/tools';
+import { createSegDisplaySetFromArrayBuffer, parseSegArrayBuffer } from './dicomSegUtils';
+import dicomImageLoader from '@cornerstonejs/dicom-image-loader';
+
+
 
 // for creating the blob when saving a segment
 const { DicomMetaDictionary, DicomDict } = dcmjs.data;
@@ -17,16 +23,445 @@ const { DicomMetaDictionary, DicomDict } = dcmjs.data;
 
 
 // =====================================
-export async function loadDicomSegIntoOHIF({
-//   dicomSegSeriesUID,
-  segmentationId,
-  referencedSeriesInstanceUID,
-  segmentationLabel,
-  segmentMetadata,
-  arrayBuffer,
-  servicesManager,
-  activeViewportId,
-}) {
+// export async function loadDicomSegIntoOHIF({
+// //   dicomSegSeriesUID,
+//   segmentationId,
+//   referencedSeriesInstanceUID,
+//   segmentationLabel,
+//   segmentMetadata,
+//   arrayBuffer,
+//   servicesManager,
+//   activeViewportId,
+// }) {
+
+//   // ~~~~~~~~~~
+//   const {
+//         segmentationService,
+//         displaySetService,
+//         viewportGridService,
+//   } = servicesManager.services;
+
+//   // ~~~~~~~~~~
+//   // get referenced display sets and image ids
+//   const referencedDisplaySets =
+//     displaySetService.getDisplaySetsForSeries(referencedSeriesInstanceUID);
+//   const referencedDisplaySet = referencedDisplaySets?.[0];
+
+//   if (!referencedDisplaySet) {
+//     // console.warn('No referenced displaySet for SEG', dicomSegSeriesUID);
+//     console.warn('No referenced displaySet for SEG', segmentationId);
+//     return;
+//   }
+
+//   const imageIds = referencedDisplaySet.images?.map(i => i.imageId) ?? [];
+//   if (!imageIds.length) {
+//     console.warn('No imageIds found for referenced displaySet', referencedSeriesInstanceUID);
+//     return;
+//   }
+
+//   // ~~~~~~~~~~
+//   // generate the tool state - and get the segmentation labelmap buffer
+//   const segToolState =
+//     await adaptersSEG.Cornerstone3D.Segmentation.generateToolState(
+//       imageIds,
+//       arrayBuffer,
+//       metaData
+//     );
+//     // console.log('segToolState:', segToolState);
+//     // console.log('labelmapBufferArray:', segToolState.labelmapBufferArray?.length);
+//     const segLabelmap = new Uint8Array(segToolState.labelmapBufferArray[0]);
+
+//     // ~~~~~~~~~~
+//     // ensure the referenced displayset is being displayed in the viewport
+//     const currentDisplaySets = viewportGridService.getDisplaySetsUIDsForViewport(activeViewportId);
+//     const isReferencedSeriesActive = currentDisplaySets.includes(referencedDisplaySet.displaySetInstanceUID);
+
+//     if (!isReferencedSeriesActive) {
+//         // Switch the viewport to the correct series
+//         await viewportGridService.setDisplaySetsForViewport({
+//             viewportId: activeViewportId,
+//             displaySetInstanceUIDs: [referencedDisplaySet.displaySetInstanceUID],
+//         });
+        
+//         // Give the viewer a moment to switch display sets
+//         await new Promise(resolve => setTimeout(resolve, 100));
+//     }
+
+//     //////////////////////// ORIGINAL ///////////////////////////////
+//     //////////////////////// ORIGINAL ///////////////////////////////
+//     // ~~~~~~~~~~
+//     // create one empty labelmap segmentation - this automatically creates one segment
+//     await segmentationService.createLabelmapForDisplaySet(
+//         referencedDisplaySet,
+//         {
+//         segmentationId: segmentationId,
+//         label: segmentationLabel,
+//         },
+//     );
+//     // console.log(' *** IN LOAD DICOM SEG INTO OHIF ... segmentMetadata', segmentMetadata);
+
+//     segmentMetadata.forEach(s => {
+//       const isComplete = computeSegmentDataIsComplete(s)
+   
+
+//       const ohifInfo: OhifSegmentInfo = {
+//       segmentIndex: s.segmentMaskValue,   // matches backend schema on load
+//       label: s.label,
+//       cachedStats: s.cachedStats,
+//       quizSegmentMetadata: {
+//         groundTruth: s.groundTruth,
+//         referenceStandardMethod: s.referenceStandardMethod,
+//         hepaticSegment: s.hepaticSegment,
+//         isComplete: isComplete,
+//         dicomSegMaskValue: s.segmentMaskValue,
+//       }
+//     };
+
+//     segmentationService.addSegment(segmentationId, ohifInfo);
+//       console.log(' *** IN LOAD DICOM SEG INTO OHIF ... each segment', s, ohifInfo);
+
+//     useSegmentMetadataStore
+//       .getState()
+//       .setSegmentInfo(
+//         segmentationId,
+//         s.segmentMaskValue, //1-based - match to backend on load
+//         ohifInfo,
+//       );
+//     })
+//     ////////////////////////       END         ///////////////////////////////
+//     //////////////////////////////////////////////////////////////////////////
+
+
+//     // //////////////////////// WITH NO QUIZMETADATA ///////////////////////////////
+//     // ////////////////////////     TWO PASSES       ///////////////////////////////
+//     // const segments = Object.fromEntries(
+//     //   segmentMetadata.map(s => [
+//     //     s.segmentMaskValue,
+//     //     {
+//     //       label: s.label,
+//     //       active: s.segmentMaskValue === 1,
+//     //       visibility: true,
+//     //     },
+//     //   ])
+//     // );
+
+//     // await segmentationService.createLabelmapForDisplaySet(referencedDisplaySet, {
+//     //   segmentationId,
+//     //   label: segmentationLabel,
+//     //   segments,
+//     // });
+
+//     // segmentMetadata.forEach(s => {
+//     //   const isComplete = computeSegmentDataIsComplete(s);
+
+//     //   const ohifInfo: OhifSegmentInfo = {
+//     //     segmentIndex: s.segmentMaskValue,
+//     //     label: s.label,
+//     //     cachedStats: s.cachedStats,
+//     //     quizSegmentMetadata: {
+//     //       groundTruth: s.groundTruth,
+//     //       referenceStandardMethod: s.referenceStandardMethod,
+//     //       hepaticSegment: s.hepaticSegment,
+//     //       isComplete,
+//     //       dicomSegMaskValue: s.segmentMaskValue,
+//     //     },
+//     //   };
+
+//     //   useSegmentMetadataStore
+//     //     .getState()
+//     //     .setSegmentInfo(segmentationId, s.segmentMaskValue, ohifInfo);
+//     // });
+//     // ////////////////////////       END         ///////////////////////////////
+//     // //////////////////////////////////////////////////////////////////////////
+
+
+//     // //////////////////////// WITH NO QUIZMETADATA ///////////////////////////////
+//     // ////////////////////////      ONE PASS        ///////////////////////////////
+//     // const segments: Record<number, Partial<Segment>> = {};
+
+//     // segmentMetadata.forEach(s => {
+//     //   const isComplete = computeSegmentDataIsComplete(s);
+
+//     //   segments[s.segmentMaskValue] = {
+//     //     label: s.label,
+//     //     active: s.segmentMaskValue === 1,
+//     //     cachedStats: s.cachedStats,
+//     //     visibility: true,
+//     //     locked: false,
+//     //   };
+
+//     //   // add segment with quiz metadata into the store
+//     //   const ohifInfo: OhifSegmentInfo = {
+//     //     segmentIndex: s.segmentMaskValue,
+//     //     label: s.label,
+//     //     cachedStats: s.cachedStats,
+//     //     quizSegmentMetadata: {
+//     //       groundTruth: s.groundTruth,
+//     //       referenceStandardMethod: s.referenceStandardMethod,
+//     //       hepaticSegment: s.hepaticSegment,
+//     //       isComplete,
+//     //       dicomSegMaskValue: s.segmentMaskValue,
+//     //     },
+//     //   };
+
+//     //   useSegmentMetadataStore
+//     //     .getState()
+//     //     .setSegmentInfo(segmentationId, s.segmentMaskValue, ohifInfo);
+//     // });
+
+//     // await segmentationService.createLabelmapForDisplaySet(referencedDisplaySet, {
+//     //   segmentationId,
+//     //   label: segmentationLabel,
+//     //   segments,
+//     // });
+  
+
+//     // const justLoadedSegments = segmentationService.getSegmentation(segmentationId).segments;
+//     // console.log(' *** IN LOAD - Just created', justLoadedSegments);
+
+//     // ////////////////////////       END         ///////////////////////////////
+//     // //////////////////////////////////////////////////////////////////////////
+
+
+//     // // for debug
+//     // const startingSeg = segmentationService.getSegmentation(segmentationId);
+//     // console.log(' *** STARTING SEG', startingSeg);
+//     // console.log('segToolState:', segToolState);
+//     // console.log('labelmapBufferArray:', segToolState.labelmapBufferArray?.length);
+
+//     const cachedStore = useSegmentMetadataStore.getState().getAllSegments(segmentationId);
+//     console.log('🔥 CACHED:', segmentationId, cachedStore);
+
+//     // ~~~~~~~~~~
+//     // get labelmap ids and split the buffer into per Slice arrays
+//     const segmentationData = segmentationService.getSegmentation(segmentationId) as SegmentationData;
+//     console.log(' *** IN LOAD DICOM SEG INTO OHIF ... segmentationData:', segmentationData);
+
+//     const labelmapRep = segmentationData.representationData.Labelmap;
+//     const labelmapImageIds = labelmapRep.imageIds; //derived images from representation data
+
+//     const bytesPerSlice = segLabelmap.length / labelmapImageIds.length;
+//     const labelmapBufferArray: Uint8Array[] = [];
+//     for (let i = 0; i < labelmapImageIds.length; i++) {
+//     const sliceStart = i * bytesPerSlice;
+//     const sliceEnd = sliceStart + bytesPerSlice;
+//     labelmapBufferArray.push(segLabelmap.subarray(sliceStart, sliceEnd));
+//     }
+
+//     bufferCounter(labelmapBufferArray, '*** LabelmapBufferArray - AFTER load subarrays');   // for debug
+
+//     // ~~~~~~~~~~
+//     // load each labelmap image and replace its scalar data
+//     const labelmapImages = await Promise.all(
+//         labelmapImageIds.map(id => imageLoader.loadAndCacheImage(id))
+//     );
+//     labelmapBufferArray.forEach((buffer, i) => {
+//         labelmapImages[i].getPixelData().set(buffer);
+//     });
+
+
+//     // ~~~~~~~~~~
+//     // Add to active viewport(s)
+//     const updatedSeg = segmentationService.getSegmentation(segmentationId);
+//     console.log(' *** UPDATED SEG', updatedSeg);
+//     const viewportId = viewportGridService.getActiveViewportId();
+//     await segmentationService.addSegmentationRepresentation(viewportId, updatedSeg);
+
+//     console.log('🎉 Loaded SEG:', segmentationId);
+
+// }
+
+
+
+////////////////////// TRY WITH VOLUME - BUT OHIF IS NOW Stack-Based /////////////
+// =====================================
+// export async function loadDicomSegIntoOHIF({
+// //   dicomSegSeriesUID,
+//   segmentationId,
+//   referencedSeriesInstanceUID,
+//   segmentationLabel,
+//   segmentMetadata,
+//   arrayBuffer,
+//   servicesManager,
+//   activeViewportId,
+// }) {
+
+//   // ~~~~~~~~~~
+//   const {
+//         segmentationService,
+//         displaySetService,
+//         viewportGridService,
+//   } = servicesManager.services;
+
+//   // ~~~~~~~~~~
+//   // get referenced display sets and image ids
+//   const referencedDisplaySets =
+//     displaySetService.getDisplaySetsForSeries(referencedSeriesInstanceUID);
+//   const referencedDisplaySet = referencedDisplaySets?.[0];
+
+//   if (!referencedDisplaySet) {
+//     // console.warn('No referenced displaySet for SEG', dicomSegSeriesUID);
+//     console.warn('No referenced displaySet for SEG', segmentationId);
+//     return;
+//   }
+
+//   const imageIds = referencedDisplaySet.images?.map(i => i.imageId) ?? [];
+//   if (!imageIds.length) {
+//     console.warn('No imageIds found for referenced displaySet', referencedSeriesInstanceUID);
+//     return;
+//   }
+
+//   // ~~~~~~~~~~
+//   // generate the tool state - and get the segmentation labelmap buffer
+//   const segToolState =
+//     await adaptersSEG.Cornerstone3D.Segmentation.generateToolState(
+//       imageIds,
+//       arrayBuffer,
+//       metaData
+//     );
+//     // console.log('segToolState:', segToolState);
+//     // console.log('labelmapBufferArray:', segToolState.labelmapBufferArray?.length);
+//     const segLabelmap = new Uint8Array(segToolState.labelmapBufferArray[0]);
+
+//     // ~~~~~~~~~~
+//     // ensure the referenced displayset is being displayed in the viewport
+//     const currentDisplaySets = viewportGridService.getDisplaySetsUIDsForViewport(activeViewportId);
+//     const isReferencedSeriesActive = currentDisplaySets.includes(referencedDisplaySet.displaySetInstanceUID);
+
+//     if (!isReferencedSeriesActive) {
+//         // Switch the viewport to the correct series
+//         await viewportGridService.setDisplaySetsForViewport({
+//             viewportId: activeViewportId,
+//             displaySetInstanceUIDs: [referencedDisplaySet.displaySetInstanceUID],
+//         });
+        
+//         // Give the viewer a moment to switch display sets
+//         await new Promise(resolve => setTimeout(resolve, 100));
+//     }
+
+
+//     //////////////////////// WITH NO QUIZMETADATA ///////////////////////////////
+//     ////////////////////////      ONE PASS        ///////////////////////////////
+//     const segments: Record<number, Partial<Segment>> = {};
+
+//     segmentMetadata.forEach(s => {
+//       const isComplete = computeSegmentDataIsComplete(s);
+
+//       segments[s.segmentMaskValue] = {
+//         label: s.label,
+//         active: s.segmentMaskValue === 1,
+//         cachedStats: s.cachedStats,
+//         visibility: true,
+//         locked: false,
+//       };
+
+//       // add segment with quiz metadata into the store
+//       const ohifInfo: OhifSegmentInfo = {
+//         segmentIndex: s.segmentMaskValue,
+//         label: s.label,
+//         cachedStats: s.cachedStats,
+//         quizSegmentMetadata: {
+//           groundTruth: s.groundTruth,
+//           referenceStandardMethod: s.referenceStandardMethod,
+//           hepaticSegment: s.hepaticSegment,
+//           isComplete,
+//           dicomSegMaskValue: s.segmentMaskValue,
+//         },
+//       };
+
+//       useSegmentMetadataStore
+//         .getState()
+//         .setSegmentInfo(segmentationId, s.segmentMaskValue, ohifInfo);
+//     });
+
+//     await segmentationService.createLabelmapForDisplaySet(referencedDisplaySet, {
+//       segmentationId,
+//       label: segmentationLabel,
+//       segments,
+//     });
+  
+
+//     const justLoadedSegments = segmentationService.getSegmentation(segmentationId).segments;
+//     console.log(' *** IN LOAD - Just created', justLoadedSegments);
+
+//     ////////////////////////       END         ///////////////////////////////
+//     //////////////////////////////////////////////////////////////////////////
+
+
+//     // // for debug
+//     // const startingSeg = segmentationService.getSegmentation(segmentationId);
+//     // console.log(' *** STARTING SEG', startingSeg);
+//     // console.log('segToolState:', segToolState);
+//     // console.log('labelmapBufferArray:', segToolState.labelmapBufferArray?.length);
+
+//     const cachedStore = useSegmentMetadataStore.getState().getAllSegments(segmentationId);
+//     console.log('🔥 CACHED:', segmentationId, cachedStore);
+
+// // 3. Add segmentation representation to viewport (CORRECT API)
+//       // const segmentation = segmentationService.getSegmentation(segmentationId);
+
+// await segmentation.addSegmentationRepresentations(activeViewportId, [
+//   {
+//     segmentationId,
+//     type: ToolEnums.SegmentationRepresentations.Labelmap,
+//   },
+// ]);
+
+// // 2. Get the labelmap volume and update scalar data (your fetched pixel data)
+// const volume = segmentationService.getLabelmapVolume(segmentationId);
+// console.log('🔥 Volume:', volume);  // Should NOT be null now
+
+// if (!volume) {
+//   console.error('Volume is still null after adding representation!');
+//   return;
+// }
+
+// const { voxelManager } = volume;
+// const scalarData = voxelManager?.getCompleteScalarDataArray();
+
+// console.log(' *** scalarData length:', scalarData.length);
+// console.log(' *** segLabelmap length:', segLabelmap.length);
+// console.log(' *** Match?', scalarData.length === segLabelmap.length);
+
+// if (scalarData && segLabelmap) {
+//   scalarData.set(segLabelmap);
+//   voxelManager?.setCompleteScalarDataArray(scalarData);
+// }
+
+// // 4. Render the viewport
+//       const renderingEngine =
+//         viewportGridService.getRenderingEngine() as Types.IRenderingEngine;
+        
+// // const viewport = renderingEngine.getViewport(activeViewportId);
+// // await viewport.render();
+//   renderingEngine.renderViewports([activeViewportId]);
+
+
+//   }
+
+// =====================================
+export interface LoadDicomSegParams {
+  segmentationId: string;
+  referencedSeriesInstanceUID: string;
+  segmentationLabel: string;
+  segmentMetadata: any;
+  servicesManager: any;
+  arrayBuffer: ArrayBuffer;
+  activeViewportId: string;
+}
+
+export async function loadDicomSegIntoOHIF(
+  params: LoadDicomSegParams
+): Promise<void> {
+  const {
+    segmentationId,
+    referencedSeriesInstanceUID,
+    segmentationLabel,
+    segmentMetadata,
+    servicesManager,
+    arrayBuffer,
+    activeViewportId,
+  } = params;
 
   // ~~~~~~~~~~
   const {
@@ -35,7 +470,7 @@ export async function loadDicomSegIntoOHIF({
         viewportGridService,
   } = servicesManager.services;
 
-  // ~~~~~~~~~~
+
   // get referenced display sets and image ids
   const referencedDisplaySets =
     displaySetService.getDisplaySetsForSeries(referencedSeriesInstanceUID);
@@ -47,217 +482,126 @@ export async function loadDicomSegIntoOHIF({
     return;
   }
 
-  const imageIds = referencedDisplaySet.images?.map(i => i.imageId) ?? [];
-  if (!imageIds.length) {
+  const referencedDisplaySetInstanceUID = referencedDisplaySet.displaySetInstanceUID;
+  const referencedImageIds = referencedDisplaySet.images?.map(i => i.imageId) ?? [];
+  if (!referencedImageIds.length) {
     console.warn('No imageIds found for referenced displaySet', referencedSeriesInstanceUID);
     return;
   }
 
-  // ~~~~~~~~~~
-  // generate the tool state - and get the segmentation labelmap buffer
-  const segToolState =
-    await adaptersSEG.Cornerstone3D.Segmentation.generateToolState(
-      imageIds,
-      arrayBuffer,
-      metaData
-    );
-    // console.log('segToolState:', segToolState);
-    // console.log('labelmapBufferArray:', segToolState.labelmapBufferArray?.length);
-    const segLabelmap = new Uint8Array(segToolState.labelmapBufferArray[0]);
+  const DEFAULT_COLORS: [number, number, number, number][] = [
+  [255, 0, 0, 255],
+  [0, 255, 0, 255],
+  [0, 0, 255, 255],
+  [255, 255, 0, 255],
+  [255, 0, 255, 255],
+  [0, 255, 255, 255],
+];
 
-    // ~~~~~~~~~~
-    // ensure the referenced displayset is being displayed in the viewport
-    const currentDisplaySets = viewportGridService.getDisplaySetsUIDsForViewport(activeViewportId);
-    const isReferencedSeriesActive = currentDisplaySets.includes(referencedDisplaySet.displaySetInstanceUID);
 
-    if (!isReferencedSeriesActive) {
-        // Switch the viewport to the correct series
-        await viewportGridService.setDisplaySetsForViewport({
-            viewportId: activeViewportId,
-            displaySetInstanceUIDs: [referencedDisplaySet.displaySetInstanceUID],
-        });
-        
-        // Give the viewer a moment to switch display sets
-        await new Promise(resolve => setTimeout(resolve, 100));
-    }
+    // create segments and update SegmentMetadataStore
+    const segments: Record<number, Partial<Segment>> = {};
 
-    //////////////////////// ORIGINAL ///////////////////////////////
-    //////////////////////// ORIGINAL ///////////////////////////////
-    // ~~~~~~~~~~
-    // create one empty labelmap segmentation - this automatically creates one segment
-    await segmentationService.createLabelmapForDisplaySet(
-        referencedDisplaySet,
-        {
-        segmentationId: segmentationId,
-        label: segmentationLabel,
-        },
-    );
-    // console.log(' *** IN LOAD DICOM SEG INTO OHIF ... segmentMetadata', segmentMetadata);
+    segmentMetadata.forEach((s, idx) => {
+      const isComplete = computeSegmentDataIsComplete(s);
+      const color = DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
 
-    segmentMetadata.forEach(s => {
-      const isComplete = computeSegmentDataIsComplete(s)
-   
+      segments[s.segmentMaskValue] = {
+        label: s.label,
+        active: s.segmentMaskValue === 1,
+        color,
+        cachedStats: s.cachedStats,
+        visibility: true,
+        locked: false,
+      };
 
+      // add segment with quiz metadata into the store
       const ohifInfo: OhifSegmentInfo = {
-      segmentIndex: s.segmentMaskValue,   // matches backend schema on load
-      label: s.label,
-      cachedStats: s.cachedStats,
-      quizSegmentMetadata: {
-        groundTruth: s.groundTruth,
-        referenceStandardMethod: s.referenceStandardMethod,
-        hepaticSegment: s.hepaticSegment,
-        isComplete: isComplete,
-        dicomSegMaskValue: s.segmentMaskValue,
-      }
-    };
+        segmentIndex: s.segmentMaskValue,
+        label: s.label,
+        cachedStats: s.cachedStats,
+        quizSegmentMetadata: {
+          groundTruth: s.groundTruth,
+          referenceStandardMethod: s.referenceStandardMethod,
+          hepaticSegment: s.hepaticSegment,
+          isComplete,
+          dicomSegMaskValue: s.segmentMaskValue,
+        },
+      };
 
-    segmentationService.addSegment(segmentationId, ohifInfo);
-      console.log(' *** IN LOAD DICOM SEG INTO OHIF ... each segment', s, ohifInfo);
-
-    useSegmentMetadataStore
-      .getState()
-      .setSegmentInfo(
-        segmentationId,
-        s.segmentMaskValue, //1-based - match to backend on load
-        ohifInfo,
-      );
-    })
-    // ////////////////////////       END         ///////////////////////////////
-    // //////////////////////////////////////////////////////////////////////////
-
-
-    // //////////////////////// WITH NO QUIZMETADATA ///////////////////////////////
-    // ////////////////////////     TWO PASSES       ///////////////////////////////
-    // const segments = Object.fromEntries(
-    //   segmentMetadata.map(s => [
-    //     s.segmentMaskValue,
-    //     {
-    //       label: s.label,
-    //       active: s.segmentMaskValue === 1,
-    //       visibility: true,
-    //     },
-    //   ])
-    // );
-
-    // await segmentationService.createLabelmapForDisplaySet(referencedDisplaySet, {
-    //   segmentationId,
-    //   label: segmentationLabel,
-    //   segments,
-    // });
-
-    // segmentMetadata.forEach(s => {
-    //   const isComplete = computeSegmentDataIsComplete(s);
-
-    //   const ohifInfo: OhifSegmentInfo = {
-    //     segmentIndex: s.segmentMaskValue,
-    //     label: s.label,
-    //     cachedStats: s.cachedStats,
-    //     quizSegmentMetadata: {
-    //       groundTruth: s.groundTruth,
-    //       referenceStandardMethod: s.referenceStandardMethod,
-    //       hepaticSegment: s.hepaticSegment,
-    //       isComplete,
-    //       dicomSegMaskValue: s.segmentMaskValue,
-    //     },
-    //   };
-
-    //   useSegmentMetadataStore
-    //     .getState()
-    //     .setSegmentInfo(segmentationId, s.segmentMaskValue, ohifInfo);
-    // });
-    // ////////////////////////       END         ///////////////////////////////
-    // //////////////////////////////////////////////////////////////////////////
-
-
-    // //////////////////////// WITH QUIZMETADATA ///////////////////////////////
-    // ////////////////////////    ONE PASS       ///////////////////////////////
-    // const segments: Record<number, Partial<Segment>> = {};
-
-    // segmentMetadata.forEach(s => {
-    //   const isComplete = computeSegmentDataIsComplete(s);
-
-    //   segments[s.segmentMaskValue] = {
-    //     label: s.label,
-    //     active: s.segmentMaskValue === 1,
-    //     visibility: true,
-    //     cachedStats: s.cachedStats,
-    //   };
-
-    //   const ohifInfo: OhifSegmentInfo = {
-    //     segmentIndex: s.segmentMaskValue,
-    //     label: s.label,
-    //     cachedStats: s.cachedStats,
-    //     quizSegmentMetadata: {
-    //       groundTruth: s.groundTruth,
-    //       referenceStandardMethod: s.referenceStandardMethod,
-    //       hepaticSegment: s.hepaticSegment,
-    //       isComplete,
-    //       dicomSegMaskValue: s.segmentMaskValue,
-    //     },
-    //   };
-
-    //   useSegmentMetadataStore
-    //     .getState()
-    //     .setSegmentInfo(segmentationId, s.segmentMaskValue, ohifInfo);
-    // });
-
-    // await segmentationService.createLabelmapForDisplaySet(referencedDisplaySet, {
-    //   segmentationId,
-    //   label: segmentationLabel,
-    //   segments,
-    // });
-    // ////////////////////////       END         ///////////////////////////////
-    // //////////////////////////////////////////////////////////////////////////
-
-
-    // // for debug
-    // const startingSeg = segmentationService.getSegmentation(segmentationId);
-    // console.log(' *** STARTING SEG', startingSeg);
-    // console.log('segToolState:', segToolState);
-    // console.log('labelmapBufferArray:', segToolState.labelmapBufferArray?.length);
-
-    const cachedStore = useSegmentMetadataStore.getState().getAllSegments(segmentationId);
-    console.log('🔥 CACHED:', segmentationId, cachedStore);
-
-    // ~~~~~~~~~~
-    // get labelmap ids and split the buffer into per Slice arrays
-    const segmentationData = segmentationService.getSegmentation(segmentationId) as SegmentationData;
-    console.log(' *** IN LOAD DICOM SEG INTO OHIF ... segmentationData:', segmentationData);
-
-    const labelmapRep = segmentationData.representationData.Labelmap;
-    const labelmapImageIds = labelmapRep.imageIds; //derived images from representation data
-
-    const bytesPerSlice = segLabelmap.length / labelmapImageIds.length;
-    const labelmapBufferArray: Uint8Array[] = [];
-    for (let i = 0; i < labelmapImageIds.length; i++) {
-    const sliceStart = i * bytesPerSlice;
-    const sliceEnd = sliceStart + bytesPerSlice;
-    labelmapBufferArray.push(segLabelmap.subarray(sliceStart, sliceEnd));
-    }
-
-    // bufferCounter(labelmapBufferArray, '*** LabelmapBufferArray - AFTER load subarrays');   // for debug
-
-    // ~~~~~~~~~~
-    // load each labelmap image and replace its scalar data
-    const labelmapImages = await Promise.all(
-        labelmapImageIds.map(id => imageLoader.loadAndCacheImage(id))
-    );
-    labelmapBufferArray.forEach((buffer, i) => {
-        labelmapImages[i].getPixelData().set(buffer);
+      useSegmentMetadataStore
+        .getState()
+        .setSegmentInfo(segmentationId, s.segmentMaskValue, ohifInfo);
     });
 
 
-    // ~~~~~~~~~~
-    // Add to active viewport(s)
-    const updatedSeg = segmentationService.getSegmentation(segmentationId);
-    console.log(' *** UPDATED SEG', updatedSeg);
-    const viewportId = viewportGridService.getActiveViewportId();
-    await segmentationService.addSegmentationRepresentation(viewportId, updatedSeg);
+const blob = new Blob([arrayBuffer], { type: 'application/dicom' });
+const segImageId = dicomImageLoader.wadouri.fileManager.add(blob);
+// console.log('segImageId:', segImageId);
+// console.log('fileManager keys:', Object.keys(dicomImageLoader.wadouri.fileManager.cache || {}));
+// const image = await dicomImageLoader.wadouri.loadImage(segImageId);
+// // console.log('Image loaded:', image?.imageId);
 
-    console.log('🎉 Loaded SEG:', segmentationId);
+
+
+// analyzeSegmentationBuffer(arrayBuffer);
+// bufferCounterForSEG1Bit(arrayBuffer);
+analyzeSegmentationBuffer(arrayBuffer);
+analyzeSEGSegmentMapping(arrayBuffer);
+extractSegmentMasksFromSEG(arrayBuffer);
+countSegmentVoxels(arrayBuffer);
+
+
+// Build segDisplaySet from arrayBuffer (OHIF-specific)
+const segDisplaySet = await createSegDisplaySetFromArrayBuffer(
+  arrayBuffer,
+  segmentationId,
+  referencedDisplaySetInstanceUID,
+  referencedImageIds,
+  segImageId,
+  segments,
+);
+
+console.log (' *** segDisplaySet:', segDisplaySet);
+
+
+// const segmentationIdCreated = await segmentationService.createSegmentationForSEGDisplaySet(
+//   segDisplaySet,
+//   {
+//     segmentationId,
+//     label: segmentationLabel,
+//     segments: segmentMetadata,
+//     type: ToolEnums.SegmentationRepresentations.Labelmap,
+//   }
+// );
+
+const createdSegmentationId =
+  await segmentationService.createSegmentationForSEGDisplaySet(segDisplaySet, {
+    segmentationId,
+    type: ToolEnums.SegmentationRepresentations.Labelmap,
+  });
+
+// ////////////////////////// Creates EMPTY Segmentation \\\\\\\\\\\\\\\\\\\\\\\\\\
+// ////////////////////////// WORKS! 3 empty segments 
+// const createdSegmentationId = await segmentationService.createLabelmapForDisplaySet(
+//   segDisplaySet,
+//   {
+//     segmentationId,
+//     label: segmentationLabel,
+//     segments,
+//     type: ToolEnums.SegmentationRepresentations.Labelmap,
+//   }
+// );
+
+await segmentation.addSegmentationRepresentations(activeViewportId, [
+  {
+    segmentationId: createdSegmentationId,
+    type: ToolEnums.SegmentationRepresentations.Labelmap,
+  },
+]);
+   console.log('Created segmentation:', createdSegmentationId);
 
 }
-
 // =====================================
 export async function saveSegmentation({
   seg,
@@ -298,7 +642,7 @@ export async function saveSegmentation({
       dicomSegMaskValue: seg.segments?.[segmentIndex]?.quizSegmentMetadata.dicomSegMaskValue,
     },
   };
-  segmentationService.addSegment(editedSegmentation, ohifInfo);
+  // segmentationService.addSegment(editedSegmentation, ohifInfo);
 
 
   const allSegmentations = segmentationService.getSegmentations();
@@ -631,47 +975,42 @@ export function refreshSegmentMetadataStore (segmentationService: any) {
   //           - add unmatched service ids into store
   //           - signal that a save to db is required
   //    - if matched array > 0 
-  //           - check for mismatched segments service to store
-  //           - replace all segments in store with those in the service
-  //             This ensures that any changes to the segments (add or delete) is captured
+  //           - call fn to sync segments service <==> store
+  //           - remove unmatched segments from store
+  //           - add unmatched service segments to store
+  //           - signal that a save to db is required
 
   let bDatabaseUpdateRequired = false;
 
-  const lSegmentationsFromService = segmentationService.getSegmentations();
-  let lIdsFromService = [];
-  lSegmentationsFromService.forEach(s => {
-    lIdsFromService.push(s.segmentationId);
-  })
+  const lSegmentationsFromService: any[] = segmentationService.getSegmentations();
+  const lIdsFromService: string[] =   lSegmentationsFromService.map(s => s.segmentationId);
   const lIdsFromStore = useSegmentMetadataStore.getState().getAllSegmentationsIds();
   
-  let lUnmatchedIdsFromService = [];
-  let lUnmatchedIdsFromStore = [];
-  let lMatchedIds = [];
-
   // look for segmentations missing in each list
-  lUnmatchedIdsFromService = lIdsFromService.filter(s => !lIdsFromStore.includes(s));
-  lUnmatchedIdsFromStore = lIdsFromStore.filter(s => !lIdsFromService.includes(s));
-  lMatchedIds = lIdsFromService.filter(s => lIdsFromStore.includes(s));
+  const lUnmatchedIdsFromStore: string[] = lIdsFromStore.filter(s => !lIdsFromService.includes(s));
+  const lUnmatchedIdsFromService: string[] = lIdsFromService.filter(s => !lIdsFromStore.includes(s));
+  const lMatchedIds: string[] = lIdsFromService.filter(s => lIdsFromStore.includes(s));
 
   const store = useSegmentMetadataStore.getState();
 
+  // exists in store but not in service
   // remove segmentation items from store if there is no match in the service
   lUnmatchedIdsFromStore.forEach( segmentationId => {
     store.clearSegmentation(segmentationId);
     bDatabaseUpdateRequired = true;
   });
 
+  // exists in service but not in store
   // add segmentations and segments from service to store
-  lUnmatchedIdsFromService.forEach( segmentationId => {
+  lUnmatchedIdsFromService.forEach( segmentationId  => {
     const segmentation = lSegmentationsFromService.find(s => s.segmentationId === segmentationId);
     if (!segmentation) return;
 
     const oSegments = segmentation?.segments || {};
 
     Object.values(oSegments as Record<number, OhifSegmentInfo>).forEach((segment, arrayIndex) => {
-      // const segmentIndex = arrayIndex + 1;
       const segmentIndex = segment.segmentIndex;
-      const quizSegmentMetadata = normalizeSegmentMetadata(segment, arrayIndex);
+      const quizSegmentMetadata = buildQuizSegmentMetadata(segment, arrayIndex);
 
       const ohifInfo: OhifSegmentInfo = {
         segmentIndex,
@@ -681,10 +1020,6 @@ export function refreshSegmentMetadataStore (segmentationService: any) {
       };
 
       store.setSegmentInfo(segmentationId, segmentIndex, ohifInfo);
-
-      // update the service with the segment metadata structure
-      segmentationService.addSegment(segmentationId, ohifInfo);
-
 
       bDatabaseUpdateRequired = true;
     });
@@ -698,27 +1033,30 @@ export function refreshSegmentMetadataStore (segmentationService: any) {
       s => s.segmentationId === segmentationId
     );
 
-    const serviceSegments = Object.values(
-      (segmentation?.segments || {}) as Record<number, OhifSegmentInfo>
-    );
+    // const serviceSegments = Object.values(
+    //   (segmentation?.segments || {}) as Record<number, OhifSegmentInfo>
+    // );
     const storeState = useSegmentMetadataStore.getState();
     const storeSegments = storeState.getAllSegments(segmentationId) || {};
 
-    // ////////////
-    // // for debug
-    // console.log('📊 beforeRebuild store keys:', Object.keys(storeSegments));
-    // console.log('📊 beforeRebuild service keys:', Object.keys(segmentation?.segments || {}));
-    // ////////////
+    ////////////
+    // for debug
+    console.log('📊 before sync store keys:', Object.keys(storeSegments));
+    console.log('📊 before sync service keys:', Object.keys(segmentation?.segments || {}));
+    ////////////
 
-    const needsRefresh = shouldRefreshSegmentMetadata(
+
+    bDatabaseUpdateRequired = syncSegmentsInStore(
       segmentationId,
       segmentation,
-      storeSegments
-    );
+      storeSegments,
+    )
 
-    if (needsRefresh) {
-      bDatabaseUpdateRequired = rebuildSegmentsFromService(segmentationId, serviceSegments, segmentationService);
-    }
+    ////////////
+    // for debug
+    console.log('📊 after sync store keys:', Object.keys(storeSegments));
+    console.log('📊 after sync service keys:', Object.keys(segmentation?.segments || {}));
+    ////////////
 
 
   });
@@ -728,41 +1066,113 @@ export function refreshSegmentMetadataStore (segmentationService: any) {
 
 // =====================================
 /**
- * Function to pull information from the segmentation service and update the store.
- *    Also update the service segments with updated quiz metadata.
+ * Function to test if a refresh of the database is needed for different circumstances:
+ *    1) was there a segment in the service not represented in the store
+ *    2) was there a segment in the store no longer in the service
+ *    3) for a matched segment service to store, check if the cached stats are the same
  * @param segmentationId 
- * @param serviceSegments 
+ * @param segmentationFromService 
+ * @param storeSegments 
  * @returns 
  */
-const rebuildSegmentsFromService = (
+function syncSegmentsInStore(
   segmentationId: string,
-  serviceSegments: OhifSegmentInfo[],
-  segmentationService: any
-) => {
-  const store = useSegmentMetadataStore.getState();
-  store.clearAllSegmentInfo(segmentationId);
+  segmentationFromService: {
+    segments: Record<number, OhifSegmentInfo>;
+  } | null | undefined,
+  storeSegments: Record<number, OhifSegmentInfo>
+): boolean {
 
-  for (const [arrayIndex, segment] of serviceSegments.entries()) {
-    const updatedQuizMetadata = normalizeSegmentMetadata(segment, arrayIndex);
+  let bDatabaseUpdateRequired = false;
 
+  const storeSegmentIndices = Object.keys(storeSegments).map(Number);
+  const serviceSegments = segmentationFromService?.segments || {};
+
+  const serviceSegmentTriples = Object.entries(serviceSegments).map(
+    ([segmentIndexStr, segment], arrayIndex) => ({
+      segmentIndex: Number(segmentIndexStr),
+      arrayIndex,
+      segment,
+    })
+  );
+
+  // 1. Check: every service segment exists in store, and cachedStats match
+  serviceSegmentTriples.forEach(s => {
+    const segmentFromStore = storeSegments[s.segmentIndex];
+
+    const quizSegmentMetadata = buildQuizSegmentMetadata(s.segment, s.arrayIndex);
     const ohifInfo: OhifSegmentInfo = {
-      segmentIndex: segment.segmentIndex,
-      label: segment.label,
-      cachedStats: segment.cachedStats,
-      quizSegmentMetadata: updatedQuizMetadata,
+      segmentIndex: s.segmentIndex,
+      label: s.segment.label,
+      cachedStats: s.segment.cachedStats,
+      quizSegmentMetadata: quizSegmentMetadata,
     };
-    // update the service and the store with the updated quiz metadata
-    segmentationService.addSegment(segmentationId, ohifInfo);
+
+  const needsUpdate =
+    !segmentFromStore ||
+    !cachedStatsEqual(s.segment.cachedStats, segmentFromStore.cachedStats);
+
+    if (needsUpdate ) {
+      useSegmentMetadataStore
+        .getState()
+        .setSegmentInfo(segmentationId, s.segmentIndex, ohifInfo);
+      bDatabaseUpdateRequired = true;
+      }
+  });
+
+  // 2. Check: every store segment exists in service - if stale - remove it
+  const serviceIndexSet = new Set(serviceSegmentTriples.map(t => t.segmentIndex));
+
+  for (const idx of storeSegmentIndices) {
+    if (!serviceIndexSet.has(idx)) {
+      useSegmentMetadataStore
+            .getState()
+            .removeSegmentInfo(segmentationId, idx);
+          bDatabaseUpdateRequired = true;
+        }
+      }
+  
+  return bDatabaseUpdateRequired;
+}
+
+
+// // =====================================
+// /**
+//  * Function to pull information from the segmentation service and update the store.
+//  *    Also update the service segments with updated quiz metadata.
+//  * @param segmentationId 
+//  * @param serviceSegments 
+//  * @returns 
+//  */
+// const rebuildSegmentsFromService = (
+//   segmentationId: string,
+//   serviceSegments: OhifSegmentInfo[],
+//   segmentationService: any
+// ) => {
+//   const store = useSegmentMetadataStore.getState();
+//   store.clearAllSegmentInfo(segmentationId);
+
+//   for (const [arrayIndex, segment] of serviceSegments.entries()) {
+//     const updatedQuizMetadata = buildQuizSegmentMetadata(segment, arrayIndex);
+
+//     const ohifInfo: OhifSegmentInfo = {
+//       segmentIndex: segment.segmentIndex,
+//       label: segment.label,
+//       cachedStats: segment.cachedStats,
+//       quizSegmentMetadata: updatedQuizMetadata,
+//     };
+//     // update the service and the store with the updated quiz metadata
+//     segmentationService.addSegment(segmentationId, ohifInfo);
     
-    store.setSegmentInfo(segmentationId, segment.segmentIndex, ohifInfo);
+//     store.setSegmentInfo(segmentationId, segment.segmentIndex, ohifInfo);
 
-  }
+//   }
 
-  const allSegs = segmentationService.getSegmentations();
-  console.log(' *** IN REBUILD ... segs:', allSegs);
+//   const allSegs = segmentationService.getSegmentations();
+//   console.log(' *** IN REBUILD ... segs:', allSegs);
 
-  return true;
-};
+//   return true;
+// };
 
 
 // =====================================
@@ -781,7 +1191,7 @@ export function computeSegmentDataIsComplete(m: SegmentMetadata) {
  * @param arrayIndex 
  * @returns 
  */
-function normalizeSegmentMetadata(
+function buildQuizSegmentMetadata(
   segment: OhifSegmentInfo,
   arrayIndex: number
 ): SegmentMetadata {
@@ -802,88 +1212,17 @@ function normalizeSegmentMetadata(
           ...DEFAULT_SEGMENT_METADATA,
         };
 
-  const normalizedMeta: SegmentMetadata = {
+  const enrichedMeta: SegmentMetadata = {
     ...baseMeta,
     dicomSegMaskValue: arrayIndex + 1,
   };
 
   return {
-    ...normalizedMeta,
-    isComplete: computeSegmentDataIsComplete(normalizedMeta),
+    ...enrichedMeta,
+    isComplete: computeSegmentDataIsComplete(enrichedMeta),
   };
 }
 
-// =====================================
-
-// =====================================
-/**
- * Function to test if a refresh of the database is needed for different circumstances:
- *    1) was there a segment in the service not represented in the store
- *    2) was there a segment in the store no longer in the service
- *    3) for a matched segment service to store, check if the cached stats are the same
- * @param segmentationId 
- * @param segmentationFromService 
- * @param storeSegments 
- * @returns 
- */
-function shouldRefreshSegmentMetadata(
-  segmentationId: string,
-  segmentationFromService: {
-    segments: Record<number, OhifSegmentInfo>;
-  } | null | undefined,
-  storeSegments: Record<number, OhifSegmentInfo>
-): boolean {
-  const serviceSegmentIndices = Object.keys(segmentationFromService?.segments || {}).map(Number);
-  const storeSegmentIndices = Object.keys(storeSegments).map(Number);
-
-  const serviceCount = serviceSegmentIndices.length;
-  const storeCount = storeSegmentIndices.length;
-
-  let needsRefresh = serviceCount !== storeCount;
-
-
-  // 1. Check: every service segment exists in store, and cachedStats match
-  if (!needsRefresh && segmentationFromService?.segments) {
-    for (const segmentIndex of serviceSegmentIndices) {
-      const segmentFromServiceInfo = segmentationFromService.segments[segmentIndex];
-      const segmentFromStore = storeSegments[segmentIndex];
-
-      if (!segmentFromStore) {
-        console.warn(
-          `Segment missing in store: serviceIndex=${segmentIndex}, segId=${segmentationId}`
-        );
-        needsRefresh = true;
-        break;
-      }
-
-      if (!cachedStatsEqual(segmentFromServiceInfo?.cachedStats, segmentFromStore.cachedStats)) {
-        console.warn(
-          `cachedStats mismatch: serviceIndex=${segmentIndex}, segId=${segmentationId}`
-        );
-        needsRefresh = true;
-        break;
-      }
-    }
-  }
-
-  // 2. Check: every store segment exists in service
-  if (!needsRefresh) {
-    for (const segmentIndex of storeSegmentIndices) {
-      const segmentFromStore = storeSegments[segmentIndex];
-      const segmentFromServiceInfo = segmentationFromService?.segments[segmentIndex];
-
-      if (!segmentFromServiceInfo) {
-        console.warn(
-          `Segment missing in service: storeIndex=${segmentIndex}, segId=${segmentationId}`
-        );
-        needsRefresh = true;
-        break;
-      }
-    }
-  }
-
-  return needsRefresh;
-}
 
 // =====================================
 
@@ -1291,7 +1630,334 @@ function bufferCounter(buf: any, timePoint: any) {
 
 // =====================================
 // =====================================
+
+
+/**
+ * Updated bufferCounter for 1-bit binary DICOM SEG
+ */
+function bufferCounterForSEG1Bit(arrayBuffer) {
+  const valueStats = new Map();
+  let nonZeroCount = 0;
+  
+  // Convert ArrayBuffer to Uint8Array
+  const byteData = new Uint8Array(arrayBuffer);
+  
+  console.log('Byte data length:', byteData.length);
+  console.log('First 10 bytes:', byteData.slice(0, 10));
+  
+  // For 1-bit data, each byte contains 8 voxels
+  // Bits are typically stored MSB first (bit 7 = first pixel)
+  for (let byteIdx = 0; byteIdx < byteData.length; byteIdx++) {
+    const byte = byteData[byteIdx];
+    
+    // Extract each of the 8 bits
+    for (let bit = 0; bit < 8; bit++) {
+      // Check if this bit is set (MSB first)
+      const bitValue = (byte >> (7 - bit)) & 1;
+      
+      if (bitValue !== 0) {
+        nonZeroCount++;
+        
+        if (!valueStats.has(1)) {
+          valueStats.set(1, {
+            count: 1,
+            firstByte: byteIdx,
+            firstBit: bit,
+          });
+        } else {
+          valueStats.get(1).count++;
+        }
+      }
+    }
+  }
+  
+  // Debug output
+  console.log('***** DEBUG 1-BIT DICOM SEG Pixel Data *****');
+  console.log('Total bytes:', byteData.length);
+  console.log('Non-zero voxels (pixels with value=1):', nonZeroCount);
+  console.log('Unique non-zero values:', [...valueStats.keys()]);
+  
+  for (const [value, stats] of valueStats.entries()) {
+    console.log(
+      `Value ${value}: count=${stats.count}, firstByte=${stats.firstByte}, firstBit=${stats.firstBit}`
+    );
+  }
+  
+  return valueStats;
+}
+/**
+ * Extract pixel data from DICOM SEG ArrayBuffer and count segment values
+ */
+function extractPixelDataFromSEG(arrayBuffer) {
+  const uint8Array = new Uint8Array(arrayBuffer);
+  const dicomData = dcmjs.data.DicomMessage.readFile(uint8Array);
+  const dataset = dcmjs.data.DicomMetaDictionary.naturalizeDataset(dicomData.dict);
+  
+  // Extract pixel data
+  const pixelData = dataset.PixelData;
+  
+  if (!pixelData) {
+    throw new Error('No PixelData in DICOM SEG');
+  }
+  
+  // PixelData can be a Buffer or array
+  let pixelArray;
+  if (pixelData instanceof Buffer) {
+    pixelArray = new Uint8Array(pixelData.buffer, pixelData.byteOffset, pixelData.byteLength);
+  } else if (Array.isArray(pixelData)) {
+    pixelArray = new Uint8Array(pixelData);
+  } else {
+    pixelArray = new Uint8Array(pixelData.buffer);
+  }
+  
+  // Get number of frames
+  const numberOfFrames = dataset.NumberOfFrames || 1;
+  const rows = dataset.Rows;
+  const columns = dataset.Columns;
+  const bitsAllocated = dataset.BitsAllocated || 8;
+  
+  // Determine if 8-bit or 16-bit
+  const is16Bit = bitsAllocated === 16;
+  const bytesPerFrame = rows * columns * (is16Bit ? 2 : 1);
+  
+  console.log('SEG info:', {
+    numberOfFrames,
+    rows,
+    columns,
+    bitsAllocated,
+    bytesPerFrame,
+    totalPixelDataLength: pixelArray.length,
+  });
+  
+  return {
+    pixelArray,
+    numberOfFrames,
+    rows,
+    columns,
+    is16Bit,
+  };
+}
+
+/**
+ * Updated bufferCounter for DICOM SEG pixel data
+ */
+function bufferCounterForSEG(pixelData, numberOfFrames, rows, columns, is16Bit) {
+  const valueStats = new Map();
+  let nonZeroCount = 0;
+  
+  const bytesPerPixel = is16Bit ? 2 : 1;
+  const pixelsPerFrame = rows * columns;
+  
+  for (let frame = 0; frame < numberOfFrames; frame++) {
+    const frameOffset = frame * pixelsPerFrame;
+    
+    for (let pixel = 0; pixel < pixelsPerFrame; pixel++) {
+      const offset = frameOffset + pixel;
+      const value = is16Bit 
+        ? pixelData[offset * 2] | (pixelData[offset * 2 + 1] << 8)
+        : pixelData[offset];
+      
+      if (value !== 0) {
+        nonZeroCount++;
+        
+        if (!valueStats.has(value)) {
+          valueStats.set(value, {
+            count: 1,
+            firstSlice: frame,
+            firstIndex: pixel,
+          });
+        } else {
+          valueStats.get(value).count++;
+        }
+      }
+    }
+  }
+  
+  // Debug output
+  console.log('***** DEBUG DICOM SEG Pixel Data *****');
+  console.log('Non-zero voxels:', nonZeroCount);
+  console.log('Unique non-zero values:', [...valueStats.keys()]);
+  
+  for (const [value, stats] of valueStats.entries()) {
+    console.log(
+      `Value ${value}: count=${stats.count}, firstSlice=${stats.firstSlice}, firstIndex=${stats.firstIndex}`
+    );
+  }
+  
+  return valueStats;
+}
+
+/**
+ * Combined helper: extract and count from DICOM SEG ArrayBuffer
+ */
+function analyzeSegmentationBuffer(arrayBuffer) {
+  const { pixelArray, numberOfFrames, rows, columns, is16Bit } = extractPixelDataFromSEG(arrayBuffer);
+  return bufferCounterForSEG(pixelArray, numberOfFrames, rows, columns, is16Bit);
+}
+
+function analyzeSEGSegmentMapping(arrayBuffer) {
+  const uint8Array = new Uint8Array(arrayBuffer);
+  const dicomData = dcmjs.data.DicomMessage.readFile(uint8Array);
+  const dataset = dcmjs.data.DicomMetaDictionary.naturalizeDataset(dicomData.dict);
+  
+  console.log('===== SEG SEGMENT INFORMATION =====');
+  
+  // Check SegmentSequence
+  if (dataset.SegmentSequence) {
+    console.log('Number of segments:', dataset.SegmentSequence.length);
+    dataset.SegmentSequence.forEach((seg, idx) => {
+      console.log(`Segment ${idx + 1}:`, {
+        segmentNumber: seg.SegmentNumber,
+        segmentLabel: seg.SegmentLabel,
+        segmentAlgorithmType: seg.SegmentAlgorithmType,
+        // segmentedPropertyCategory: seg roi?.SegmentedPropertyCategoryCodeSequence?.[0]?.CodingValue,
+      });
+    });
+  }
+  
+  // Check PerFrameFunctionalGroupsSequence for frame-to-segment mapping
+  if (dataset.PerFrameFunctionalGroupsSequence) {
+    const frames = dataset.PerFrameFunctionalGroupsSequence;
+    console.log('\nNumber of frames:', frames.length);
+    
+    frames.forEach((frame, idx) => {
+      const segmentationRef = frame.FrameContentSequence?.[0];
+      const segmentRef = frame.PerFrameFunctionalGroupsSequence?.[0]?.SegmentIdentificationSequence?.[0];
+      
+      console.log(`Frame ${idx}:`, {
+        referencedSegmentNumber: segmentRef?.ReferencedSegmentNumber,
+        presetSegmentNumber: segmentationRef?.PresetSegmentNumber,
+      });
+    });
+  }
+  
+  // Check NumberOfFrames
+  console.log('\nNumberOfFrames:', dataset.NumberOfFrames);
+  console.log('BitsAllocated:', dataset.BitsAllocated);
+  console.log('Rows:', dataset.Rows);
+  console.log('Columns:', dataset.Columns);
+  
+  // Extract pixel data per frame
+  const numberOfFrames = dataset.NumberOfFrames || 1;
+  const rows = dataset.Rows;
+  const columns = dataset.Columns;
+  const bytesPerFrame = Math.ceil((rows * columns) / 8); // 1-bit packed
+  
+  console.log('\nBytes per frame:', bytesPerFrame);
+  console.log('Total pixel data bytes:', numberOfFrames * bytesPerFrame);
+  
+  const pixelData = new Uint8Array(arrayBuffer);
+  
+  // Analyze each frame separately
+  console.log('\n===== PER-FRAME ANALYSIS =====');
+  for (let frame = 0; frame < numberOfFrames; frame++) {
+    const frameOffset = frame * bytesPerFrame;
+    const frameBytes = pixelData.slice(frameOffset, frameOffset + bytesPerFrame);
+    
+    let nonZeroCount = 0;
+    for (let byteIdx = 0; byteIdx < frameBytes.length; byteIdx++) {
+      const byte = frameBytes[byteIdx];
+      for (let bit = 0; bit < 8; bit++) {
+        const value = (byte >> (7 - bit)) & 1;
+        if (value !== 0) nonZeroCount++;
+      }
+    }
+    
+    console.log(`Frame ${frame}: ${nonZeroCount} non-zero voxels`);
+  }
+}
 // =====================================
+/**
+ * Extract per-frame binary masks from DICOM SEG and map to segments
+ */
+function extractSegmentMasksFromSEG(arrayBuffer) {
+  const uint8Array = new Uint8Array(arrayBuffer);
+  const dicomData = dcmjs.data.DicomMessage.readFile(uint8Array);
+  const dataset = dcmjs.data.DicomMetaDictionary.naturalizeDataset(dicomData.dict);
+  
+  const numberOfFrames = dataset.NumberOfFrames || 1;
+  const rows = dataset.Rows;
+  const columns = dataset.Columns;
+  const bytesPerFrame = Math.ceil((rows * columns) / 8); // 1-bit packed
+  
+  const pixelData = new Uint8Array(arrayBuffer);
+  const segmentSequence = dataset.SegmentSequence || [];
+  
+  // Extract each frame as unpacked binary mask
+  const frameMasks = [];
+  
+  for (let frame = 0; frame < numberOfFrames; frame++) {
+    const frameOffset = frame * bytesPerFrame;
+    const frameBytes = pixelData.slice(frameOffset, frameOffset + bytesPerFrame);
+    
+    // Unpack 1-bit data to Uint8Array (0 or 1 per voxel)
+    const unpackedMask = new Uint8Array(rows * columns);
+    
+    for (let byteIdx = 0; byteIdx < frameBytes.length; byteIdx++) {
+      const byte = frameBytes[byteIdx];
+      const basePixel = byteIdx * 8;
+      
+      for (let bit = 0; bit < 8 && (basePixel + bit) < unpackedMask.length; bit++) {
+        const value = (byte >> (7 - bit)) & 1;
+        unpackedMask[basePixel + bit] = value;
+      }
+    }
+    
+    frameMasks.push(unpackedMask);
+  }
+  
+  // Map frames to segments (assuming sequential mapping: Frame 0 → Segment 1, etc.)
+  const segmentMasks = {};
+  
+  segmentSequence.forEach((seg, frameIdx) => {
+    if (frameIdx < frameMasks.length) {
+      const segmentNumber = seg.SegmentNumber;
+      const segmentLabel = seg.SegmentLabel;
+      
+      // Count non-zero voxels for this segment
+      let voxelCount = 0;
+      for (let i = 0; i < frameMasks[frameIdx].length; i++) {
+        if (frameMasks[frameIdx][i] !== 0) voxelCount++;
+      }
+      
+      segmentMasks[segmentNumber] = {
+        label: segmentLabel,
+        mask: frameMasks[frameIdx],
+        voxelCount,
+        frameIndex: frameIdx,
+      };
+      
+      console.log(`Segment ${segmentNumber} (${segmentLabel}): ${voxelCount} voxels from Frame ${frameIdx}`);
+    }
+  });
+  
+  return segmentMasks;
+}
+
+
+/**
+ * Count voxels per segment with proper frame mapping
+ */
+function countSegmentVoxels(arrayBuffer) {
+  const segmentMasks = extractSegmentMasksFromSEG(arrayBuffer);
+  
+  const valueStats = new Map();
+  
+  Object.entries(segmentMasks).forEach(([segmentNumber, segData]) => {
+    valueStats.set(parseInt(segmentNumber), {
+      count: segData.voxelCount,
+      label: segData.label,
+      frameIndex: segData.frameIndex,
+    });
+  });
+  
+  console.log('===== FINAL SEGMENT VOXEL COUNTS =====');
+  for (const [value, stats] of valueStats.entries()) {
+    console.log(`Segment ${value} (${stats.label}): ${stats.count} voxels`);
+  }
+  
+  return valueStats;
+}
 // =====================================
 // =====================================
 
