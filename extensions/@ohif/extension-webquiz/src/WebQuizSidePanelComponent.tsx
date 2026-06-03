@@ -179,7 +179,7 @@ function WebQuizSidePanelComponent() {
 
 
     const loadStudyUID = studyUID ?? '';
-    const hasLoaded = useSegmentationLoadStore((state: any) =>
+    const hasLoadedSegmentations = useSegmentationLoadStore((state: any) =>
         loadStudyUID ? state.hasLoadedInitialSegmentations[loadStudyUID] : false);
     
     //=========================================================
@@ -422,6 +422,7 @@ useEffect(() => {
         // save all segmentations when extension is mounted
         if (!activeViewportId) return; 
         if (!studyInfoFromHook?.studyUID) return;
+        if (!hasLoadedSegmentations ) return;
 
         // Give the segmentationservice a moment to finish add/remove
         const timerId = setTimeout(() => {
@@ -444,7 +445,7 @@ useEffect(() => {
 
         }, 500); // small delay, adjust as needed - temporary - change to event listeners? or remove?
 
-    }, [activeViewportId, studyInfoFromHook?.studyUID]);
+    }, [hasLoadedSegmentations , activeViewportId, studyInfoFromHook?.studyUID]);
 
 
     //~~~~~~~~~~~~~~~~~

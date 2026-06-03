@@ -14,13 +14,21 @@ import dcmjs from 'dcmjs';
 import { postSegmentations } from '../handlers/postSegmentations';
 import { segmentation, Enums as ToolEnums } from '@cornerstonejs/tools';
 import { createSegDisplaySetFromArrayBuffer } from './dicomSegUtils';
-import { analyzeSegmentationBuffer, analyzeSEGSegmentMapping, extractSegmentMasksFromSEG, countSegmentVoxels } from './dicomSegUtils';  // debug tools
 import dicomImageLoader from '@cornerstonejs/dicom-image-loader';
+import { eventTarget, EVENTS } from '@cornerstonejs/core';
+
 
 // for creating the blob when saving a segment
 const { DicomMetaDictionary, DicomDict } = dcmjs.data;
 
-
+/**
+ *  loadDicomSegIntoOHIF
+ *    Uses OHIF's native functionality to create the segmentation.
+ *    Code triggers an event to force namedStats to be calculated 
+ *      and added to each segment's cachedStats property
+ * 
+ */
+ 
 // =====================================
 export interface LoadDicomSegParams {
   segmentationId: string;
@@ -49,10 +57,11 @@ export async function loadDicomSegIntoOHIF(
   const {
         segmentationService,
         displaySetService,
-        viewportGridService,
   } = servicesManager.services;
 
-
+  eventTarget.addEventListener('SEGMENTATION_DATA_MODIFIED', evt => {
+  console.log('📊 Stats updated:', evt.detail);
+});
   // get referenced display sets and image ids
   const referencedDisplaySets =
     displaySetService.getDisplaySetsForSeries(referencedSeriesInstanceUID);
@@ -142,8 +151,29 @@ export async function loadDicomSegIntoOHIF(
       type: ToolEnums.SegmentationRepresentations.Labelmap,
     },
   ]);
-    console.log('Created segmentation:', createdSegmentationId);
 
+  await forceStatsRecompute(segmentationService, createdSegmentationId, 1);
+
+  const createdSegmentation = segmentationService.getSegmentation(createdSegmentationId);
+  console.log('Created segmentation:', createdSegmentation);
+
+}
+
+// =====================================
+
+export function forceStatsRecompute(segmentationService: any, segmentationId: string, segmentIndex: number) {
+  if (!segmentationId) return;
+
+  eventTarget.dispatchEvent(
+    new CustomEvent(segmentationService.EVENTS.SEGMENTATION_DATA_MODIFIED, {
+      detail: { segmentationId, segmentIndex },
+    })
+  );
+
+  // Wait longer than the debounce before trusting stats have been computed
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, 1200); // 1.2s > 1s debounce
+  });
 }
 
 // =====================================
@@ -227,7 +257,7 @@ export async function saveSegmentation({
       .filter(result => !result.success)
       .map(result => result.segmentationId);
     console.error('❌ Aborting save: failures in segmentations', failedIds);
-    alert('⚠️ SaveSegmentation failed - nothing posted to db; Press F12 to display console details.');
+    alert('⚠️ In SaveSegmentation - failed - nothing posted to db; Press F12 to display console details.');
     return;  // Nothing gets posted!
   }
 
@@ -277,22 +307,22 @@ export async function saveAllSegmentations({
   const allSegmentations: SegmentationData = segmentationService.getSegmentations();
   console.log(' *** In saveAllSegmentations ... allSegmentations', allSegmentations);
 
-  // //////////////////////////////
-  // //////////////////////////////
-  // // for debug
-  // Object.values(allSegmentations).forEach(segmentation => {
-  //   const segId = segmentation.segmentationId;
-  //   const serviceKeys = Object.keys(segmentation?.segments || {});
+  //////////////////////////////
+  //////////////////////////////
+  // for debug
+  Object.values(allSegmentations).forEach(segmentation => {
+    const segId = segmentation.segmentationId;
+    const serviceKeys = Object.keys(segmentation?.segments || {});
 
-  //   const storeState = useSegmentMetadataStore.getState();
-  //   const storeSegments = storeState.getAllSegments(segId) || {};
+    const storeState = useSegmentMetadataStore.getState();
+    const storeSegments = storeState.getAllSegments(segId) || {};
 
-  //   console.log('📊 in SaveAll store keys:', Object.keys(storeSegments), `segmentation ${segId}`);
-  //   console.log('📊 in SaveAll service keys:', serviceKeys, `segmentation ${segId}`);
+    console.log('📊 in SaveAll store keys:', Object.keys(storeSegments), `segmentation ${segId}`);
+    console.log('📊 in SaveAll service keys:', serviceKeys, `segmentation ${segId}`);
 
-  // });
-  // //////////////////////////////
-  // //////////////////////////////
+  });
+  //////////////////////////////
+  //////////////////////////////
 
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -351,7 +381,7 @@ for (const seg of Object.values(allSegmentations)) {
       .filter(result => !result.success)
       .map(result => result.segmentationId);
     console.error('❌ Aborting save: failures in segmentations', failedIds);
-    alert('⚠️ saveAllSegmentations failed - nothing posted to db; Press F12 to display console details.');
+    alert('⚠️ In saveAllSegmentations - failed - nothing posted to db; Press F12 to display console details.');
     return;  // Nothing gets posted!
   }
 
@@ -529,6 +559,8 @@ export function refreshSegmentMetadataStore (segmentationService: any) {
   const lSegmentationsFromService: any[] = segmentationService.getSegmentations();
   const lIdsFromService: string[] =   lSegmentationsFromService.map(s => s.segmentationId);
   const lIdsFromStore = useSegmentMetadataStore.getState().getAllSegmentationsIds();
+
+  console.log(' *** IN REFRESH - SERVICE SEGMENTATIONS:', lSegmentationsFromService);
   
   // look for segmentations missing in each list
   const lUnmatchedIdsFromStore: string[] = lIdsFromStore.filter(s => !lIdsFromService.includes(s));
@@ -554,7 +586,7 @@ export function refreshSegmentMetadataStore (segmentationService: any) {
 
     Object.values(oSegments as Record<number, OhifSegmentInfo>).forEach((segment, arrayIndex) => {
       const segmentIndex = segment.segmentIndex;
-      const quizSegmentMetadata = buildQuizSegmentMetadata(segment, arrayIndex);
+      const quizSegmentMetadata = updateQuizSegmentMetadata(segment, arrayIndex);
 
       const ohifInfo: OhifSegmentInfo = {
         segmentIndex,
@@ -595,12 +627,6 @@ export function refreshSegmentMetadataStore (segmentationService: any) {
       segmentation,
       storeSegments,
     )
-
-    ////////////
-    // for debug
-    console.log('📊 after sync store keys:', Object.keys(storeSegments));
-    console.log('📊 after sync service keys:', Object.keys(segmentation?.segments || {}));
-    ////////////
 
 
   });
@@ -644,7 +670,7 @@ function syncSegmentsInStore(
   serviceSegmentTriples.forEach(s => {
     const segmentFromStore = storeSegments[s.segmentIndex];
 
-    const quizSegmentMetadata = buildQuizSegmentMetadata(s.segment, s.arrayIndex);
+    const quizSegmentMetadata = updateQuizSegmentMetadata(s.segment, s.arrayIndex);
     const ohifInfo: OhifSegmentInfo = {
       segmentIndex: s.segmentIndex,
       label: s.segment.label,
@@ -654,7 +680,7 @@ function syncSegmentsInStore(
 
   const needsUpdate =
     !segmentFromStore ||
-    !cachedStatsEqual(s.segment.cachedStats, segmentFromStore.cachedStats);
+    !cachedStatsEqual(s.segment.cachedStats?.namedStats, segmentFromStore.cachedStats?.namedStats);
 
     if (needsUpdate ) {
       useSegmentMetadataStore
@@ -697,7 +723,7 @@ function syncSegmentsInStore(
 //   store.clearAllSegmentInfo(segmentationId);
 
 //   for (const [arrayIndex, segment] of serviceSegments.entries()) {
-//     const updatedQuizMetadata = buildQuizSegmentMetadata(segment, arrayIndex);
+//     const updatedQuizMetadata = updateQuizSegmentMetadata(segment, arrayIndex);
 
 //     const ohifInfo: OhifSegmentInfo = {
 //       segmentIndex: segment.segmentIndex,
@@ -735,7 +761,7 @@ export function computeSegmentDataIsComplete(m: SegmentMetadata) {
  * @param arrayIndex 
  * @returns 
  */
-function buildQuizSegmentMetadata(
+function updateQuizSegmentMetadata(
   segment: OhifSegmentInfo,
   arrayIndex: number
 ): SegmentMetadata {
@@ -767,6 +793,57 @@ function buildQuizSegmentMetadata(
   };
 }
 
+// =====================================
+function prepForPost(segmentation: any)  {
+  
+    const oSegments = segmentation?.segments || {};
+
+
+      //////////////////////////////
+      //////////////////////////////
+      // for debug
+        const segId = segmentation.segmentationId;
+        const serviceKeys = Object.keys(segmentation?.segments || {});
+
+        const storeState = useSegmentMetadataStore.getState();
+        const storeSegments = storeState.getAllSegments(segId) || {};
+
+        console.log('📊 in prepForPost-before update... store keys:', Object.keys(storeSegments), `segmentation ${segId}`);
+        console.log('📊 in prepForPost-before update... service keys:', serviceKeys, `segmentation ${segId}`);
+
+      //////////////////////////////
+      //////////////////////////////
+      
+      Object.values(oSegments as Record<number, OhifSegmentInfo>).forEach((segment, arrayIndex) => {
+
+      const segmentIndex = segment.segmentIndex;
+      const quizSegmentMetadata = updateQuizSegmentMetadata(segment, arrayIndex);
+
+      const ohifInfo: OhifSegmentInfo = {
+        segmentIndex,
+        label: segment.label,
+        cachedStats: segment.cachedStats,
+        quizSegmentMetadata
+      };
+
+      useSegmentMetadataStore.getState().setSegmentInfo(segmentation.segmentationId, segmentIndex, ohifInfo);
+
+    });
+
+      //////////////////////////////
+      //////////////////////////////
+      // for debug
+
+        const storeState2 = useSegmentMetadataStore.getState();
+        const storeSegments2 = storeState2.getAllSegments(segId) || {};
+
+        console.log('📊 in prepForPost-after update... store keys:', Object.keys(storeSegments2), `segmentation ${segId}`);
+        console.log('📊 in prepForPost-after update... service keys:', serviceKeys, `segmentation ${segId}`);
+
+      //////////////////////////////
+      //////////////////////////////
+
+  };
 
 // =====================================
 
@@ -911,6 +988,8 @@ export async function generateSegmentationActivity(
     }
 
     console.log(' *** GENERATED SEG:', generatedSeg);
+    // make sure all indices from service are in line with the store
+    prepForPost(seg);
 
     // Metadata for DICOM‑SEG file meta
     const meta = {
@@ -986,7 +1065,7 @@ export async function generateSegmentationActivity(
     return segResult ;
   } catch (err) {
     console.warn( `Skipping segmentation ${seg.segmentationId}: generation failed. Check existing segmentation collection in database.`, err );
-    alert('⚠️ Segmentation ${seg.segmentationId} : generation failed; Press F12 to display console details.');
+    alert('⚠️ In generateSegmentationActivity - Segmentation ${seg.segmentationId} : generation failed; Press F12 to display console details.');
 
     return segResult;
   }

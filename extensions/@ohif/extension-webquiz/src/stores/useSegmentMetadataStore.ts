@@ -25,6 +25,11 @@ interface Store {
     segmentIndex: number
   ) => OhifSegmentInfo | undefined;
 
+  removeSegmentInfo: (
+    segmentationId: string,
+    segmentIndex: number,
+  ) => void;
+
   getAllSegments: (
     segmentationId: string
   ) => Record<number, OhifSegmentInfo> | undefined;
@@ -69,6 +74,22 @@ export const useSegmentMetadataStore = create<Store>((set, get) => ({
 
   getSegmentInfo: (segmentationId, segmentIndex) =>
     get().ohifInfo[segmentationId]?.[segmentIndex],
+
+  removeSegmentInfo: (segmentationId, segmentIndex) =>
+    set(state => {
+      const seg = state.ohifInfo[segmentationId];
+      if (!seg) return state;
+
+      const updatedSeg = { ...seg };
+      delete updatedSeg[segmentIndex];
+
+      return {
+        ohifInfo: {
+          ...state.ohifInfo,
+          [segmentationId]: updatedSeg,
+        },
+      };
+    }),
 
   getAllSegments: segmentationId =>
     get().ohifInfo[segmentationId],
