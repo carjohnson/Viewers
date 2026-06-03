@@ -48,6 +48,7 @@ export const DEFAULT_SEGMENT_METADATA: SegmentMetadata = {
   referenceStandardMethod: "",
   hepaticSegment: [],
   isComplete: false,
+  dicomSegMaskValue: 1,
 };
 
 // =====================================

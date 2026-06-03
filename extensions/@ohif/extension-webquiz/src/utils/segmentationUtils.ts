@@ -202,7 +202,10 @@ export async function saveSegmentation({
   const editedSegmentation = seg.segmentationId;
 
   // update the service with the metatdata for the edited segment
+  const currentSegmentInfoFromStore = useSegmentMetadataStore.getState().getSegmentInfo(seg.segmentationId, segmentIndex);
+  const currentDicomSegMaskValue = currentSegmentInfoFromStore?.quizSegmentMetadata?.dicomSegMaskValue;
   const isComplete = computeSegmentDataIsComplete(segmentMetadata);
+
   const ohifInfo: OhifSegmentInfo = {
     segmentIndex: segmentIndex, // 1‑based
     label: seg.segments?.[segmentIndex]?.label,
@@ -212,11 +215,15 @@ export async function saveSegmentation({
       referenceStandardMethod: segmentMetadata.referenceStandardMethod,
       hepaticSegment: segmentMetadata.hepaticSegment,
       isComplete,
-      // dicomSegMaskValue: segmentIndex,
-      dicomSegMaskValue: seg.segments?.[segmentIndex]?.quizSegmentMetadata.dicomSegMaskValue,
+      dicomSegMaskValue: currentDicomSegMaskValue,
     },
   };
   // segmentationService.addSegment(editedSegmentation, ohifInfo);
+
+
+      useSegmentMetadataStore.getState().setSegmentInfo(seg.segmentationId, segmentIndex, ohifInfo);
+      const quizSegmentInfo = useSegmentMetadataStore.getState().getSegmentInfo(seg.segmentationId, segmentIndex);
+      console.log(' *** IN SAVESEGMENTATION - segment quiz info from store:', quizSegmentInfo);
 
 
   const allSegmentations = segmentationService.getSegmentations();
@@ -235,7 +242,7 @@ export async function saveSegmentation({
       commandsManager,
       activeViewportId,
       buildSegmentFn: (segmentationId: string) =>
-        buildSegmentListForPosting(segmentationId, segmentMetadata, segmentArrayIndex, segmentIndex, editedSegmentation),
+        buildSegmentListForPosting(segmentationId, ohifInfo, segmentArrayIndex, editedSegmentation),
     });
 
     allResults.push(result);  // Track for stats
@@ -410,76 +417,67 @@ for (const seg of Object.values(allSegmentations)) {
 /**
  * Function to build the segment list - ready for posting to the DB.
  *  As it iterates through all the segments, only the 'segment to update' is adjusted
- *    The value stored in the customized quiz metadata field in the service segmentation 
- *    is assigned to the segmentIndex field. This is interpreted in the backend as the mask value.
+ *    The dicomSegMaskValue stored in the quiz metadata field 
+ *    is assigned to the segmentIndex field for the database.
  * @param currentSegmentationId 
- * @param updatedMetadata 
+ * @param updatedOhifInfo 
  * @param arrayIndexToUpdate 
- * @param segmentIndexToUpdate 
  * @param editedSegmentationId 
  * @returns 
  */
 function buildSegmentListForPosting(
   currentSegmentationId: string,
-  updatedMetadata: SegmentMetadata,
+  updatedOhifInfo: OhifSegmentInfo,
   arrayIndexToUpdate: number,
-  segmentIndexToUpdate: number,
   editedSegmentationId: string,
 ) {
-  const allSegments = useSegmentMetadataStore
-    .getState()
-    .getAllSegments(currentSegmentationId);
-
-  console.log(
-    ' *** IN buildSegmentListForPosting - id:',
-    currentSegmentationId,
-    allSegments,
-    arrayIndexToUpdate,
-    updatedMetadata,
-    editedSegmentationId,
-  );
+  const store = useSegmentMetadataStore.getState();
+  const allSegments = store.getAllSegments(currentSegmentationId);
 
   if (!allSegments) return [];
 
   return Object.entries(allSegments).map(([segmentIndexStr, stored]) => {
-    const segmentIndex = Number(segmentIndexStr);
+    const segmentIndex = Number(segmentIndexStr); // 1‑based key in store
 
-    const storedMaskValue =
-      stored.quizSegmentMetadata?.dicomSegMaskValue ?? arrayIndexToUpdate + 1;
-
-    console.log(` *** IN BUILD SEGMENT LIST... segmentIndex: ${segmentIndex} arrayIndexToUpdate: ${arrayIndexToUpdate} segmentIndexToUpdate: ${segmentIndexToUpdate} storedMask: ${storedMaskValue}`);
-    const storedArrayIndex = storedMaskValue - 1;
-
-    let isUpdatedSegment = false;
-    if (
-      storedArrayIndex === arrayIndexToUpdate &&
-      currentSegmentationId === editedSegmentationId
-    ) {
-      isUpdatedSegment = true;
-    }
-
-    const metadata = isUpdatedSegment
-      ? { ...updatedMetadata }
-      : stored.quizSegmentMetadata
-        ? { ...stored.quizSegmentMetadata }
-        : {
-            ...DEFAULT_SEGMENT_METADATA,
-            hepaticSegment: [...DEFAULT_SEGMENT_METADATA.hepaticSegment],
-          };
-
-    console.log(
-      ' *** IN buildSegmentListForPosting after adjustment - id, metadata for post: ',
-      currentSegmentationId, 
-      metadata,
+    // Pull the authoritative OHIF info from store
+    const segmentInfoFromStore = store.getSegmentInfo(
+      editedSegmentationId,
+      segmentIndex
     );
 
+    const maskValue =
+      segmentInfoFromStore?.quizSegmentMetadata?.dicomSegMaskValue ??
+      segmentIndex; // fallback: identity mapping
+
+    const arrayIndexInferredFromStore = maskValue - 1;
+
+    console.log(` *** IN BUILD SEGMENT LIST... segmentIndexStr in store: ${segmentIndexStr} arrayIndexToUpdate: ${arrayIndexToUpdate} storedMask: ${maskValue}`);
+
+
+    const isUpdatedSegment =
+      currentSegmentationId === editedSegmentationId &&
+      arrayIndexInferredFromStore === arrayIndexToUpdate;
+
+    // Choose metadata source
+    //    if updated, use the updated metadata, 
+    //      else use the data in the store (if present)
+    //        else use the default meta data
+    const metadata = isUpdatedSegment
+      ? { ...updatedOhifInfo.quizSegmentMetadata }
+      : segmentInfoFromStore?.quizSegmentMetadata
+      ? { ...segmentInfoFromStore.quizSegmentMetadata }
+      : {
+          ...DEFAULT_SEGMENT_METADATA,
+          hepaticSegment: [...DEFAULT_SEGMENT_METADATA.hepaticSegment],
+        };
+
     return {
-      segmentIndex: storedMaskValue,  // backend stores this as segmentMaskValue
+      segmentIndex: maskValue, // backend expects segmentMaskValue
       label: stored.label,
       cachedStats: stored.cachedStats,
       groundTruth: metadata.groundTruth,
       referenceStandardMethod: metadata.referenceStandardMethod,
-      hepaticSegment: [...metadata.hepaticSegment],
+      hepaticSegment: [...(metadata.hepaticSegment ?? [])],
     };
   });
 }
@@ -586,7 +584,7 @@ export function refreshSegmentMetadataStore (segmentationService: any) {
 
     Object.values(oSegments as Record<number, OhifSegmentInfo>).forEach((segment, arrayIndex) => {
       const segmentIndex = segment.segmentIndex;
-      const quizSegmentMetadata = updateQuizSegmentMetadata(segment, arrayIndex);
+      const quizSegmentMetadata = updateQuizSegmentMetadata(segment, segmentationId, arrayIndex);
 
       const ohifInfo: OhifSegmentInfo = {
         segmentIndex,
@@ -670,7 +668,7 @@ function syncSegmentsInStore(
   serviceSegmentTriples.forEach(s => {
     const segmentFromStore = storeSegments[s.segmentIndex];
 
-    const quizSegmentMetadata = updateQuizSegmentMetadata(s.segment, s.arrayIndex);
+    const quizSegmentMetadata = updateQuizSegmentMetadata(s.segment, segmentationId, s.arrayIndex);
     const ohifInfo: OhifSegmentInfo = {
       segmentIndex: s.segmentIndex,
       label: s.segment.label,
@@ -762,10 +760,14 @@ export function computeSegmentDataIsComplete(m: SegmentMetadata) {
  * @returns 
  */
 function updateQuizSegmentMetadata(
-  segment: OhifSegmentInfo,
+  segmentFromService: any,
+  segmentationId: string,
   arrayIndex: number
 ): SegmentMetadata {
-  const meta = segment.quizSegmentMetadata;
+  // const meta = segment.quizSegmentMetadata;
+  const store = useSegmentMetadataStore.getState();
+  const segmentInfo = store.getSegmentInfo(segmentationId, segmentFromService.segmentIndex)
+  const meta = segmentInfo?.quizSegmentMetadata;
 
   const baseMeta: SegmentMetadata =
     meta &&
@@ -817,7 +819,7 @@ function prepForPost(segmentation: any)  {
       Object.values(oSegments as Record<number, OhifSegmentInfo>).forEach((segment, arrayIndex) => {
 
       const segmentIndex = segment.segmentIndex;
-      const quizSegmentMetadata = updateQuizSegmentMetadata(segment, arrayIndex);
+      const quizSegmentMetadata = updateQuizSegmentMetadata(segment, segmentation.segmentationId, arrayIndex);
 
       const ohifInfo: OhifSegmentInfo = {
         segmentIndex,

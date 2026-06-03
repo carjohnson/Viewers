@@ -126,7 +126,8 @@ export const handleSegmentClick = ({
             // Update segmentation in cornerstone + backend
              const segmentationToUpdate = segmentationService.getSegmentation(segmentationId);
 
-
+            // get current state of segment in metadata store
+            const currentStoreSegment = useSegmentMetadataStore.getState().getSegmentInfo(segmentationToUpdate.segmentationId, segmentIndex);
 
             // Update metadata store as modal closes
             const segmentToUpdate = segmentationToUpdate?.segments?.[segmentIndex];
@@ -148,7 +149,7 @@ export const handleSegmentClick = ({
                 referenceStandardMethod: segmentMetadata.referenceStandardMethod,
                 hepaticSegment: segmentMetadata.hepaticSegment,
                 isComplete: segmentMetadata.isComplete,
-                dicomSegMaskValue: segmentToUpdate.quizSegmentMetadata.dicomSegMaskValue,
+                dicomSegMaskValue: currentStoreSegment?.quizSegmentMetadata?.dicomSegMaskValue,
               }
             };
 
