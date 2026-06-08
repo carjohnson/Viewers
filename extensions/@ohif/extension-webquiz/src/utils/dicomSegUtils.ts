@@ -4,7 +4,7 @@ import { metaData } from '@cornerstonejs/core';
 import { dicomlabToRGB } from './../../../../cornerstone-dicom-seg/src/utils/dicomlabToRGB';
 import { CONSTANTS } from '@cornerstonejs/tools';
 import dcmjs from 'dcmjs';
-import { SegmentData } from './../models/SegmentationData';
+import { SegmentServiceState } from './../models/SegmentationData';
 
 
 // =====================================
@@ -14,7 +14,7 @@ export async function createSegDisplaySetFromArrayBuffer(
   referencedDisplaySetInstanceUID: string,
   referencedImageIds: string[],
   segImageId: any,
-  segments?: Record<number, Partial<SegmentData>>,
+  segments?: Record<number, Partial<SegmentServiceState>>,
 ) {
 
   const dataset = dicomParser.parseDicom(new Uint8Array(arrayBuffer));

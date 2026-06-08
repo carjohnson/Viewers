@@ -24,7 +24,7 @@ export type  SegmentationStats = {
 }
 
 // =====================================
-export type SegmentData = {
+export interface SegmentServiceState {
   label?: string;
   color?: [number, number, number, number];
   active?: boolean;
@@ -48,7 +48,6 @@ export const DEFAULT_SEGMENT_METADATA: SegmentMetadata = {
   referenceStandardMethod: "",
   hepaticSegment: [],
   isComplete: false,
-  dicomSegMaskValue: 1,
 };
 
 // =====================================

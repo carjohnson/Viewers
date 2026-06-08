@@ -3,7 +3,7 @@ import { OhifSegmentInfo,
         SegmentationData,
         SegmentMetadata,
         DEFAULT_SEGMENT_METADATA ,
-        SegmentData
+        SegmentServiceState
        } from './../models/SegmentationData';
 import {
   ImplementationClassUID,
@@ -38,6 +38,7 @@ export interface LoadDicomSegParams {
   servicesManager: any;
   arrayBuffer: ArrayBuffer;
   activeViewportId: string;
+  viewportGridService: any;
 }
 
 export async function loadDicomSegIntoOHIF(
@@ -51,6 +52,7 @@ export async function loadDicomSegIntoOHIF(
     servicesManager,
     arrayBuffer,
     activeViewportId,
+    viewportGridService,
   } = params;
 
   // ~~~~~~~~~~
@@ -80,8 +82,27 @@ export async function loadDicomSegIntoOHIF(
     return;
   }
 
+    // ~~~~~~~~~~
+    // ensure the referenced displayset is being displayed in the viewport
+    const currentDisplaySets = viewportGridService.getDisplaySetsUIDsForViewport(activeViewportId);
+    const isReferencedSeriesActive = currentDisplaySets.includes(referencedDisplaySet.displaySetInstanceUID);
+
+    if (!isReferencedSeriesActive) {
+        // Switch the viewport to the correct series
+        await viewportGridService.setDisplaySetsForViewport({
+            viewportId: activeViewportId,
+            displaySetInstanceUIDs: [referencedDisplaySet.displaySetInstanceUID],
+        });
+        
+        // Give the viewer a moment to switch display sets
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+
+
+
     // create segments and update SegmentMetadataStore
-    const segments: Record<number, Partial<SegmentData>> = {};
+    const segments: Record<number, Partial<SegmentServiceState>> = {};
 
     segmentMetadata.forEach(s => {
       const isComplete = computeSegmentDataIsComplete(s);
@@ -425,6 +446,7 @@ for (const seg of Object.values(allSegmentations)) {
  * @param editedSegmentationId 
  * @returns 
  */
+
 function buildSegmentListForPosting(
   currentSegmentationId: string,
   updatedOhifInfo: OhifSegmentInfo,
@@ -436,51 +458,75 @@ function buildSegmentListForPosting(
 
   if (!allSegments) return [];
 
-  return Object.entries(allSegments).map(([segmentIndexStr, stored]) => {
-    const segmentIndex = Number(segmentIndexStr); // 1‑based key in store
-
-    // Pull the authoritative OHIF info from store
-    const segmentInfoFromStore = store.getSegmentInfo(
+  return Object.entries(allSegments).map(([segmentIndexStr, stored]) =>
+    buildSegmentPostingItem({
+      store,
+      currentSegmentationId,
       editedSegmentationId,
-      segmentIndex
-    );
+      updatedOhifInfo,
+      arrayIndexToUpdate,
+      segmentIndexStr,
+      stored,
+    })
+  );
+}
 
-    const maskValue =
-      segmentInfoFromStore?.quizSegmentMetadata?.dicomSegMaskValue ??
-      segmentIndex; // fallback: identity mapping
+function buildSegmentPostingItem({
+  store,
+  currentSegmentationId,
+  editedSegmentationId,
+  updatedOhifInfo,
+  arrayIndexToUpdate,
+  segmentIndexStr,
+  stored,
+}: {
+  store: ReturnType<typeof useSegmentMetadataStore.getState>;
+  currentSegmentationId: string;
+  editedSegmentationId: string;
+  updatedOhifInfo: OhifSegmentInfo;
+  arrayIndexToUpdate: number;
+  segmentIndexStr: string;
+  stored: {
+    label: string;
+    cachedStats?: unknown;
+  };
+}) {
+  const segmentIndex = Number(segmentIndexStr);
 
-    const arrayIndexInferredFromStore = maskValue - 1;
+  const segmentInfoFromStore = store.getSegmentInfo(
+    currentSegmentationId,
+    segmentIndex
+  );
 
-    console.log(` *** IN BUILD SEGMENT LIST... segmentIndexStr in store: ${segmentIndexStr} arrayIndexToUpdate: ${arrayIndexToUpdate} storedMask: ${maskValue}`);
+  const maskValue =
+    segmentInfoFromStore?.quizSegmentMetadata?.dicomSegMaskValue ??
+    segmentIndex;
 
+  const arrayIndexInferredFromStore = maskValue - 1;
 
-    const isUpdatedSegment =
-      currentSegmentationId === editedSegmentationId &&
-      arrayIndexInferredFromStore === arrayIndexToUpdate;
+  const isUpdatedSegment =
+    currentSegmentationId === editedSegmentationId &&
+    arrayIndexInferredFromStore === arrayIndexToUpdate;
 
-    // Choose metadata source
-    //    if updated, use the updated metadata, 
-    //      else use the data in the store (if present)
-    //        else use the default meta data
-    const metadata = isUpdatedSegment
-      ? { ...updatedOhifInfo.quizSegmentMetadata }
-      : segmentInfoFromStore?.quizSegmentMetadata
+  const metadata = isUpdatedSegment
+    ? { ...updatedOhifInfo.quizSegmentMetadata }
+    : segmentInfoFromStore?.quizSegmentMetadata
       ? { ...segmentInfoFromStore.quizSegmentMetadata }
       : {
           ...DEFAULT_SEGMENT_METADATA,
           hepaticSegment: [...DEFAULT_SEGMENT_METADATA.hepaticSegment],
         };
 
-    return {
-      segmentIndex: maskValue, // backend expects segmentMaskValue
-      label: stored.label,
-      cachedStats: stored.cachedStats,
-      groundTruth: metadata.groundTruth,
-      referenceStandardMethod: metadata.referenceStandardMethod,
-      hepaticSegment: [...(metadata.hepaticSegment ?? [])],
-    };
-  });
+  return {
+    segmentIndex: maskValue,
+    label: stored.label,
+    cachedStats: stored.cachedStats,
+    groundTruth: metadata.groundTruth,
+    referenceStandardMethod: metadata.referenceStandardMethod,
+    hepaticSegment: [...(metadata.hepaticSegment ?? [])],
+  };
 }
+
 
 // =====================================
 function buildAllSegmentsListForPosting( segmentationId: string) {

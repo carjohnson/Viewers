@@ -397,6 +397,7 @@ useEffect(() => {
                         servicesManager,
                         arrayBuffer,
                         activeViewportId,
+                        viewportGridService,
                     });
                 }
                 // flag set to true after load
