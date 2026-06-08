@@ -173,9 +173,14 @@ export async function loadDicomSegIntoOHIF(
     },
   ]);
 
+  // add label and compute the stats
+  const createdSegmentation = segmentationService.getSegmentation(createdSegmentationId);
+  segmentationService.addOrUpdateSegmentation({
+    ...createdSegmentation,
+    label: segmentationLabel,
+  });
   await forceStatsRecompute(segmentationService, createdSegmentationId, 1);
 
-  const createdSegmentation = segmentationService.getSegmentation(createdSegmentationId);
   console.log('Created segmentation:', createdSegmentation);
 
 }
