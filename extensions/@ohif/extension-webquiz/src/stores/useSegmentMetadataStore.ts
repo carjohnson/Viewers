@@ -7,8 +7,8 @@ import { SegmentRecord } from './../models/SegmentationData';
 
 interface Store {
 
-  // OHIF info: segmentationId → segmentIndex → SegmentRecord
-  ohifInfo: Record<string, Record<number, SegmentRecord>>;
+  // SegmentRecord info: segmentationId → segmentIndex → SegmentRecord
+  segmentRecord: Record<string, Record<number, SegmentRecord>>;
 
   getAllSegmentationsIds: () => string[];
 
@@ -17,7 +17,7 @@ interface Store {
   setSegmentInfo: (
     segmentationId: string,
     segmentIndex: number,
-    ohif: SegmentRecord
+    segmentRecord: SegmentRecord
   ) => void;
 
   getSegmentInfo: (
@@ -41,64 +41,63 @@ interface Store {
 }
 
 export const useSegmentMetadataStore = create<Store>((set, get) => ({
-  // metadata: {},
-  ohifInfo: {},
+  segmentRecord: {},
 
   // -----------------------------
   // STORED SEGMENTATIONS
   // -----------------------------
-  getAllSegmentationsIds: () => Object.keys(get().ohifInfo),
+  getAllSegmentationsIds: () => Object.keys(get().segmentRecord),
 
   clearSegmentation: segmentationId => {
     set(state => {
-      const updated = { ...state.ohifInfo };
+      const updated = { ...state.segmentRecord };
       delete updated[segmentationId];
-      return { ohifInfo: updated };
+      return { segmentRecord: updated };
     })
   },
 
 
   // -----------------------------
-  // OHIF SEGMENT INFO
+  // SEGMENT RECORD INFO
   // -----------------------------
-  setSegmentInfo: (segmentationId, segmentIndex, ohif) =>
+  setSegmentInfo: (segmentationId, segmentIndex, segmentRecord) =>
     set(state => ({
-      ohifInfo: {
-        ...state.ohifInfo,
+      segmentRecord: {
+        ...state.segmentRecord,
         [segmentationId]: {
-          ...(state.ohifInfo[segmentationId] || {}),
-          [segmentIndex]: ohif,
+          ...(state.segmentRecord[segmentationId] || {}),
+          [segmentIndex]: segmentRecord,
         },
       },
     })),
 
   getSegmentInfo: (segmentationId, segmentIndex) =>
-    get().ohifInfo[segmentationId]?.[segmentIndex],
+    get().segmentRecord[segmentationId]?.[segmentIndex],
 
   removeSegmentInfo: (segmentationId, segmentIndex) =>
     set(state => {
-      const seg = state.ohifInfo[segmentationId];
+      const seg = state.segmentRecord[segmentationId];
       if (!seg) return state;
 
       const updatedSeg = { ...seg };
       delete updatedSeg[segmentIndex];
 
       return {
-        ohifInfo: {
-          ...state.ohifInfo,
+        segmentRecord: {
+          ...state.segmentRecord,
           [segmentationId]: updatedSeg,
         },
       };
     }),
 
   getAllSegments: segmentationId =>
-    get().ohifInfo[segmentationId],
+    get().segmentRecord[segmentationId],
 
 
   clearAllSegmentInfo: segmentationId =>
   set(state => ({
-    ohifInfo: {
-      ...state.ohifInfo,
+    segmentRecord: {
+      ...state.segmentRecord,
       [segmentationId]: {}   // keep the key, wipe the segments
     }
   })),

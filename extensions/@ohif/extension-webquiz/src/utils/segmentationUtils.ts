@@ -116,7 +116,7 @@ export async function loadDicomSegIntoOHIF(
       };
 
       // add segment with quiz metadata into the store
-      const ohifInfo: SegmentRecord = {
+      const segmentRecord: SegmentRecord = {
         segmentIndex: s.segmentMaskValue,
         label: s.label,
         cachedStats: s.cachedStats,
@@ -131,7 +131,7 @@ export async function loadDicomSegIntoOHIF(
 
       useSegmentMetadataStore
         .getState()
-        .setSegmentInfo(segmentationId, s.segmentMaskValue, ohifInfo);
+        .setSegmentInfo(segmentationId, s.segmentMaskValue, segmentRecord);
     });
 
 
@@ -232,7 +232,7 @@ export async function saveSegmentation({
   const currentDicomSegMaskValue = currentSegmentInfoFromStore?.quizSegmentMetadata?.dicomSegMaskValue;
   const isComplete = computeSegmentDataIsComplete(segmentMetadata);
 
-  const ohifInfo: SegmentRecord = {
+  const segmentRecord: SegmentRecord = {
     segmentIndex: segmentIndex, // 1‑based
     label: seg.segments?.[segmentIndex]?.label,
     cachedStats: seg.segments?.[segmentIndex]?.cachedStats ?? {},
@@ -244,10 +244,10 @@ export async function saveSegmentation({
       dicomSegMaskValue: currentDicomSegMaskValue,
     },
   };
-  // segmentationService.addSegment(editedSegmentation, ohifInfo);
+  // segmentationService.addSegment(editedSegmentation, segmentRecord);
 
 
-      useSegmentMetadataStore.getState().setSegmentInfo(seg.segmentationId, segmentIndex, ohifInfo);
+      useSegmentMetadataStore.getState().setSegmentInfo(seg.segmentationId, segmentIndex, segmentRecord);
       const quizSegmentInfo = useSegmentMetadataStore.getState().getSegmentInfo(seg.segmentationId, segmentIndex);
       console.log(' *** IN SAVESEGMENTATION - segment quiz info from store:', quizSegmentInfo);
 
@@ -268,7 +268,7 @@ export async function saveSegmentation({
       commandsManager,
       activeViewportId,
       buildSegmentFn: (segmentationId: string) =>
-        buildSegmentListForPosting(segmentationId, ohifInfo, segmentArrayIndex, editedSegmentation),
+        buildSegmentListForPosting(segmentationId, segmentRecord, segmentArrayIndex, editedSegmentation),
     });
 
     allResults.push(result);  // Track for stats
@@ -446,7 +446,7 @@ for (const seg of Object.values(allSegmentations)) {
  *    The dicomSegMaskValue stored in the quiz metadata field 
  *    is assigned to the segmentIndex field for the database.
  * @param currentSegmentationId 
- * @param updatedOhifInfo 
+ * @param updatedsegmentRecord 
  * @param arrayIndexToUpdate 
  * @param editedSegmentationId 
  * @returns 
@@ -454,7 +454,7 @@ for (const seg of Object.values(allSegmentations)) {
 
 function buildSegmentListForPosting(
   currentSegmentationId: string,
-  updatedOhifInfo: SegmentRecord,
+  updatedsegmentRecord: SegmentRecord,
   arrayIndexToUpdate: number,
   editedSegmentationId: string,
 ) {
@@ -468,7 +468,7 @@ function buildSegmentListForPosting(
       store,
       currentSegmentationId,
       editedSegmentationId,
-      updatedOhifInfo,
+      updatedsegmentRecord,
       arrayIndexToUpdate,
       segmentIndexStr,
       stored,
@@ -480,7 +480,7 @@ function buildSegmentPostingItem({
   store,
   currentSegmentationId,
   editedSegmentationId,
-  updatedOhifInfo,
+  updatedsegmentRecord,
   arrayIndexToUpdate,
   segmentIndexStr,
   stored,
@@ -488,7 +488,7 @@ function buildSegmentPostingItem({
   store: ReturnType<typeof useSegmentMetadataStore.getState>;
   currentSegmentationId: string;
   editedSegmentationId: string;
-  updatedOhifInfo: SegmentRecord;
+  updatedsegmentRecord: SegmentRecord;
   arrayIndexToUpdate: number;
   segmentIndexStr: string;
   stored: {
@@ -514,7 +514,7 @@ function buildSegmentPostingItem({
     arrayIndexInferredFromStore === arrayIndexToUpdate;
 
   const metadata = isUpdatedSegment
-    ? { ...updatedOhifInfo.quizSegmentMetadata }
+    ? { ...updatedsegmentRecord.quizSegmentMetadata }
     : segmentInfoFromStore?.quizSegmentMetadata
       ? { ...segmentInfoFromStore.quizSegmentMetadata }
       : {
@@ -637,14 +637,14 @@ export function refreshSegmentMetadataStore (segmentationService: any) {
       const segmentIndex = segment.segmentIndex;
       const quizSegmentMetadata = updateQuizSegmentMetadata(segment, segmentationId, arrayIndex);
 
-      const ohifInfo: SegmentRecord = {
+      const segmentRecord: SegmentRecord = {
         segmentIndex,
         label: segment.label,
         cachedStats: segment.cachedStats,
         quizSegmentMetadata
       };
 
-      store.setSegmentInfo(segmentationId, segmentIndex, ohifInfo);
+      store.setSegmentInfo(segmentationId, segmentIndex, segmentRecord);
 
       bDatabaseUpdateRequired = true;
     });
@@ -720,7 +720,7 @@ function syncSegmentsInStore(
     const segmentFromStore = storeSegments[s.segmentIndex];
 
     const quizSegmentMetadata = updateQuizSegmentMetadata(s.segment, segmentationId, s.arrayIndex);
-    const ohifInfo: SegmentRecord = {
+    const segmentRecord: SegmentRecord = {
       segmentIndex: s.segmentIndex,
       label: s.segment.label,
       cachedStats: s.segment.cachedStats,
@@ -734,7 +734,7 @@ function syncSegmentsInStore(
     if (needsUpdate ) {
       useSegmentMetadataStore
         .getState()
-        .setSegmentInfo(segmentationId, s.segmentIndex, ohifInfo);
+        .setSegmentInfo(segmentationId, s.segmentIndex, segmentRecord);
       bDatabaseUpdateRequired = true;
       }
   });
@@ -774,16 +774,16 @@ function syncSegmentsInStore(
 //   for (const [arrayIndex, segment] of serviceSegments.entries()) {
 //     const updatedQuizMetadata = updateQuizSegmentMetadata(segment, arrayIndex);
 
-//     const ohifInfo: SegmentRecord = {
+//     const segmentRecord: SegmentRecord = {
 //       segmentIndex: segment.segmentIndex,
 //       label: segment.label,
 //       cachedStats: segment.cachedStats,
 //       quizSegmentMetadata: updatedQuizMetadata,
 //     };
 //     // update the service and the store with the updated quiz metadata
-//     segmentationService.addSegment(segmentationId, ohifInfo);
+//     segmentationService.addSegment(segmentationId, segmentRecord);
     
-//     store.setSegmentInfo(segmentationId, segment.segmentIndex, ohifInfo);
+//     store.setSegmentInfo(segmentationId, segment.segmentIndex, segmentRecord);
 
 //   }
 
@@ -872,14 +872,14 @@ function prepForPost(segmentation: any)  {
       const segmentIndex = segment.segmentIndex;
       const quizSegmentMetadata = updateQuizSegmentMetadata(segment, segmentation.segmentationId, arrayIndex);
 
-      const ohifInfo: SegmentRecord = {
+      const segmentRecord: SegmentRecord = {
         segmentIndex,
         label: segment.label,
         cachedStats: segment.cachedStats,
         quizSegmentMetadata
       };
 
-      useSegmentMetadataStore.getState().setSegmentInfo(segmentation.segmentationId, segmentIndex, ohifInfo);
+      useSegmentMetadataStore.getState().setSegmentInfo(segmentation.segmentationId, segmentIndex, segmentRecord);
 
     });
 

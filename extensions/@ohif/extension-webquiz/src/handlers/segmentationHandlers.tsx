@@ -140,7 +140,7 @@ export const handleSegmentClick = ({
               return;
             }
 
-            const ohifInfo: SegmentRecord = {
+            const segmentRecord: SegmentRecord = {
               segmentIndex,   // matches backend schema - mask value
               label: segmentLabel,
               cachedStats: segmentToUpdate.cachedStats,
@@ -153,7 +153,7 @@ export const handleSegmentClick = ({
               }
             };
 
-            useSegmentMetadataStore.getState().setSegmentInfo( segmentationId, segmentIndex, ohifInfo );
+            useSegmentMetadataStore.getState().setSegmentInfo( segmentationId, segmentIndex, segmentRecord );
 
   // //////////////////////////////
   // //////////////////////////////
