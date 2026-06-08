@@ -3,12 +3,12 @@
 //
 
 import { create } from 'zustand';
-import { OhifSegmentInfo } from './../models/SegmentationData';
+import { SegmentRecord } from './../models/SegmentationData';
 
 interface Store {
 
-  // OHIF info: segmentationId → segmentIndex → OhifSegmentInfo
-  ohifInfo: Record<string, Record<number, OhifSegmentInfo>>;
+  // OHIF info: segmentationId → segmentIndex → SegmentRecord
+  ohifInfo: Record<string, Record<number, SegmentRecord>>;
 
   getAllSegmentationsIds: () => string[];
 
@@ -17,13 +17,13 @@ interface Store {
   setSegmentInfo: (
     segmentationId: string,
     segmentIndex: number,
-    ohif: OhifSegmentInfo
+    ohif: SegmentRecord
   ) => void;
 
   getSegmentInfo: (
     segmentationId: string,
     segmentIndex: number
-  ) => OhifSegmentInfo | undefined;
+  ) => SegmentRecord | undefined;
 
   removeSegmentInfo: (
     segmentationId: string,
@@ -32,7 +32,7 @@ interface Store {
 
   getAllSegments: (
     segmentationId: string
-  ) => Record<number, OhifSegmentInfo> | undefined;
+  ) => Record<number, SegmentRecord> | undefined;
 
   clearAllSegmentInfo: (
     segmentationId: string,

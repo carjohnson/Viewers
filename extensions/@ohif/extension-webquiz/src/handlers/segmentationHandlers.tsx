@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 
 import { SegmentDetailsModal } from '../components/SegmentationList/SegmentDetailsModal';
 import { computeSegmentDataIsComplete, saveSegmentation } from '../utils/segmentationUtils';
-import { SegmentMetadata, OhifSegmentInfo } from './../models/SegmentationData';
+import { SegmentMetadata, SegmentRecord } from './../models/SegmentationData';
 import { useSegmentMetadataStore } from '../stores/useSegmentMetadataStore';
 
 //=========================================================
@@ -140,7 +140,7 @@ export const handleSegmentClick = ({
               return;
             }
 
-            const ohifInfo: OhifSegmentInfo = {
+            const ohifInfo: SegmentRecord = {
               segmentIndex,   // matches backend schema - mask value
               label: segmentLabel,
               cachedStats: segmentToUpdate.cachedStats,

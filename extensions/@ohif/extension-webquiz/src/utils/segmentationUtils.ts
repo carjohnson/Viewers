@@ -1,5 +1,5 @@
 import { useSegmentMetadataStore } from '../stores/useSegmentMetadataStore';
-import { OhifSegmentInfo, 
+import { SegmentRecord, 
         SegmentationData,
         SegmentMetadata,
         DEFAULT_SEGMENT_METADATA ,
@@ -116,7 +116,7 @@ export async function loadDicomSegIntoOHIF(
       };
 
       // add segment with quiz metadata into the store
-      const ohifInfo: OhifSegmentInfo = {
+      const ohifInfo: SegmentRecord = {
         segmentIndex: s.segmentMaskValue,
         label: s.label,
         cachedStats: s.cachedStats,
@@ -227,7 +227,7 @@ export async function saveSegmentation({
   const currentDicomSegMaskValue = currentSegmentInfoFromStore?.quizSegmentMetadata?.dicomSegMaskValue;
   const isComplete = computeSegmentDataIsComplete(segmentMetadata);
 
-  const ohifInfo: OhifSegmentInfo = {
+  const ohifInfo: SegmentRecord = {
     segmentIndex: segmentIndex, // 1‑based
     label: seg.segments?.[segmentIndex]?.label,
     cachedStats: seg.segments?.[segmentIndex]?.cachedStats ?? {},
@@ -449,7 +449,7 @@ for (const seg of Object.values(allSegmentations)) {
 
 function buildSegmentListForPosting(
   currentSegmentationId: string,
-  updatedOhifInfo: OhifSegmentInfo,
+  updatedOhifInfo: SegmentRecord,
   arrayIndexToUpdate: number,
   editedSegmentationId: string,
 ) {
@@ -483,7 +483,7 @@ function buildSegmentPostingItem({
   store: ReturnType<typeof useSegmentMetadataStore.getState>;
   currentSegmentationId: string;
   editedSegmentationId: string;
-  updatedOhifInfo: OhifSegmentInfo;
+  updatedOhifInfo: SegmentRecord;
   arrayIndexToUpdate: number;
   segmentIndexStr: string;
   stored: {
@@ -628,11 +628,11 @@ export function refreshSegmentMetadataStore (segmentationService: any) {
 
     const oSegments = segmentation?.segments || {};
 
-    Object.values(oSegments as Record<number, OhifSegmentInfo>).forEach((segment, arrayIndex) => {
+    Object.values(oSegments as Record<number, SegmentRecord>).forEach((segment, arrayIndex) => {
       const segmentIndex = segment.segmentIndex;
       const quizSegmentMetadata = updateQuizSegmentMetadata(segment, segmentationId, arrayIndex);
 
-      const ohifInfo: OhifSegmentInfo = {
+      const ohifInfo: SegmentRecord = {
         segmentIndex,
         label: segment.label,
         cachedStats: segment.cachedStats,
@@ -654,7 +654,7 @@ export function refreshSegmentMetadataStore (segmentationService: any) {
     );
 
     // const serviceSegments = Object.values(
-    //   (segmentation?.segments || {}) as Record<number, OhifSegmentInfo>
+    //   (segmentation?.segments || {}) as Record<number, SegmentRecord>
     // );
     const storeState = useSegmentMetadataStore.getState();
     const storeSegments = storeState.getAllSegments(segmentationId) || {};
@@ -692,9 +692,9 @@ export function refreshSegmentMetadataStore (segmentationService: any) {
 function syncSegmentsInStore(
   segmentationId: string,
   segmentationFromService: {
-    segments: Record<number, OhifSegmentInfo>;
+    segments: Record<number, SegmentRecord>;
   } | null | undefined,
-  storeSegments: Record<number, OhifSegmentInfo>
+  storeSegments: Record<number, SegmentRecord>
 ): boolean {
 
   let bDatabaseUpdateRequired = false;
@@ -715,7 +715,7 @@ function syncSegmentsInStore(
     const segmentFromStore = storeSegments[s.segmentIndex];
 
     const quizSegmentMetadata = updateQuizSegmentMetadata(s.segment, segmentationId, s.arrayIndex);
-    const ohifInfo: OhifSegmentInfo = {
+    const ohifInfo: SegmentRecord = {
       segmentIndex: s.segmentIndex,
       label: s.segment.label,
       cachedStats: s.segment.cachedStats,
@@ -760,7 +760,7 @@ function syncSegmentsInStore(
 //  */
 // const rebuildSegmentsFromService = (
 //   segmentationId: string,
-//   serviceSegments: OhifSegmentInfo[],
+//   serviceSegments: SegmentRecord[],
 //   segmentationService: any
 // ) => {
 //   const store = useSegmentMetadataStore.getState();
@@ -769,7 +769,7 @@ function syncSegmentsInStore(
 //   for (const [arrayIndex, segment] of serviceSegments.entries()) {
 //     const updatedQuizMetadata = updateQuizSegmentMetadata(segment, arrayIndex);
 
-//     const ohifInfo: OhifSegmentInfo = {
+//     const ohifInfo: SegmentRecord = {
 //       segmentIndex: segment.segmentIndex,
 //       label: segment.label,
 //       cachedStats: segment.cachedStats,
@@ -862,12 +862,12 @@ function prepForPost(segmentation: any)  {
       //////////////////////////////
       //////////////////////////////
       
-      Object.values(oSegments as Record<number, OhifSegmentInfo>).forEach((segment, arrayIndex) => {
+      Object.values(oSegments as Record<number, SegmentRecord>).forEach((segment, arrayIndex) => {
 
       const segmentIndex = segment.segmentIndex;
       const quizSegmentMetadata = updateQuizSegmentMetadata(segment, segmentation.segmentationId, arrayIndex);
 
-      const ohifInfo: OhifSegmentInfo = {
+      const ohifInfo: SegmentRecord = {
         segmentIndex,
         label: segment.label,
         cachedStats: segment.cachedStats,

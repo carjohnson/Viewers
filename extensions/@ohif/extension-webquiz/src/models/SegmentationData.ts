@@ -1,5 +1,5 @@
 // =====================================
-export interface OhifSegmentInfo {
+export interface SegmentRecord {
   segmentIndex: number;
   label: string;
   cachedStats?: SegmentationStats;
