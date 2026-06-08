@@ -1042,7 +1042,7 @@ export async function generateSegmentationActivity(
 
     console.log(' *** GENERATED SEG:', generatedSeg);
     // make sure all indices from service are in line with the store
-    prepForPost(seg);
+    // prepForPost(seg);
 
     // Metadata for DICOM‑SEG file meta
     const meta = {
