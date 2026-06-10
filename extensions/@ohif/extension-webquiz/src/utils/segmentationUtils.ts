@@ -244,8 +244,6 @@ export async function saveSegmentation({
       dicomSegMaskValue: currentDicomSegMaskValue,
     },
   };
-  // segmentationService.addSegment(editedSegmentation, segmentRecord);
-
 
       useSegmentMetadataStore.getState().setSegmentInfo(seg.segmentationId, segmentIndex, segmentRecord);
       const quizSegmentInfo = useSegmentMetadataStore.getState().getSegmentInfo(seg.segmentationId, segmentIndex);
@@ -284,32 +282,63 @@ export async function saveSegmentation({
   // Add failure reporting
   // Check for ANY failures - if any !result.success, abort entirely
   // const failures = allResults.filter(r => !r.success);
-  const hasFailures = allResults.some(result => !result.success);
+
+  const validObjects = allResults.filter(r => r.generateStatus === 'valid');
+
+  const errorResults = allResults.filter(r => r.generateStatus === 'error');
+  const hasFailures = errorResults.length > 0;
+
   if (hasFailures) {
-    const failedIds = allResults
-      .filter(result => !result.success)
-      .map(result => result.segmentationId);
+    const failedIds = errorResults.map(r => r.segmentationId);
     console.error('❌ Aborting save: failures in segmentations', failedIds);
     alert('⚠️ In SaveSegmentation - failed - nothing posted to db; Press F12 to display console details.');
     return;  // Nothing gets posted!
   }
 
-  const validCount = segmentationObjects.length;
-  console.log(`✅ ${validCount}/${allResults.length} succeeded`);
+  const deletedIds = allResults
+  .filter(r => r.databaseAction === 'delete')
+  .map(r => r.segmentationId);
 
+console.log(' *** In saveAllSegmentations... segmentations to be removed from DB:', deletedIds);
 
-  console.log('segObjects to post in SaveSegmentation:', segmentationObjects);
+const hasAnySegmentations = Object.values(allSegmentations).length > 0;
+const hasValidObjects = validObjects.length > 0;
 
-  let postSegmentationResult;
-  if (segmentationObjects.length > 0) {
-    postSegmentationResult = postSegmentations({
-      segmentationObjects,
-      studyUID: studyInstanceUID,
-    });
-  } else {
-    console.warn('🛑 No valid segmentations to post - skipping');
-    postSegmentationResult = { success: false, reason: 'no_valid_objects' };
-  }
+// Are all remaining segmentations "skipped + delete"?
+const allRemainingAreDeleted =
+  hasAnySegmentations &&
+  !hasValidObjects &&
+  deletedIds.length > 0 &&
+  deletedIds.length === Object.values(allSegmentations).length;
+
+let postSegmentationResult;
+
+if (hasValidObjects) {
+  postSegmentationResult = await postSegmentations({
+    segmentationObjects: validObjects,
+    studyUID: studyInstanceUID,
+    deleteAll: false,
+  });
+} else if (!hasAnySegmentations) {
+  // User deleted all segmentations from the service
+  postSegmentationResult = await postSegmentations({
+    segmentationObjects: [],
+    studyUID: studyInstanceUID,
+    deleteAll: true,
+  });
+} else if (allRemainingAreDeleted) {
+  // Only one (or more) segmentations left, but they are all skipped + delete
+  // -> delete all segmentations for this study
+  postSegmentationResult = await postSegmentations({
+    segmentationObjects: [],
+    studyUID: studyInstanceUID,
+    deleteAll: true,
+  });
+} else {
+  console.warn('🛑 No valid segmentations to post - skipping');
+  postSegmentationResult = { success: false, reason: 'no_valid_objects' };
+}
+
 
   if (!postSegmentationResult?.success) {
     console.warn('⚠️ Failed to post:', postSegmentationResult?.error );
@@ -362,7 +391,7 @@ export async function saveAllSegmentations({
 // -  highjacking the UI here to display each series before generating segmentation
 // -  causes flickering
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  
-const allResults = [];
+const allResults: GenerateSegmentationActivityResult[] = [];
 
 for (const seg of Object.values(allSegmentations)) {
     // Identify the series
@@ -371,8 +400,17 @@ for (const seg of Object.values(allSegmentations)) {
 
     if (!referencedDisplaySet) {
         console.warn(`Could not find display set for series ${seg.referencedSeriesInstanceUID}`);
-        allResults.push({ success: false, error: 'missing_display_set', segmentationId: seg.segmentationId });
-        continue;
+        allResults.push({ 
+          segmentationId: seg.segmentationId, 
+          sourceSeriesInstanceUid: seg.referencedSeriesInstanceUID,
+          label:seg.label,
+          segments: null,
+          generateStatus: 'error',
+          segmentationDataRef: null,
+          resultStatusNote: 'missing_display_set - cannot save this segmentation', 
+          databaseAction: 'n/a',
+          });
+        continue; // to next iteration
     }
 
     // Check current viewport
@@ -405,30 +443,61 @@ for (const seg of Object.values(allSegmentations)) {
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  
 
-  const validObjects = allResults.filter(r => r.success)
+const validObjects = allResults.filter(r => r.generateStatus === 'valid');
 
-  // Check for ANY failures - if any !result.success, abort entirely
-  const hasFailures = allResults.some(result => !result.success);
-  if (hasFailures) {
-    const failedIds = allResults
-      .filter(result => !result.success)
-      .map(result => result.segmentationId);
-    console.error('❌ Aborting save: failures in segmentations', failedIds);
-    alert('⚠️ In saveAllSegmentations - failed - nothing posted to db; Press F12 to display console details.');
-    return;  // Nothing gets posted!
-  }
+const errorResults = allResults.filter(r => r.generateStatus === 'error');
+const hasFailures = errorResults.length > 0;
 
+if (hasFailures) {
+  const failedIds = errorResults.map(r => r.segmentationId);
+  console.error('❌ Aborting save: failures in segmentations', failedIds);
+  alert('⚠️ In saveAllSegmentations - failed - nothing posted to db; Press F12 to display console details.');
+  return;
+}
 
-  let postSegmentationResult;
-  if (validObjects.length > 0) {
-    postSegmentationResult = postSegmentations({  // Not async anymore
-      segmentationObjects: validObjects,
-      studyUID: studyInstanceUID,
-    });
-  } else {
-    console.warn('🛑 No valid segmentations to post - skipping');
-    postSegmentationResult = { success: false, reason: 'no_valid_objects' };
-  }
+const deletedIds = allResults
+  .filter(r => r.databaseAction === 'delete')
+  .map(r => r.segmentationId);
+
+console.log(' *** In saveAllSegmentations... segmentations to be removed from DB:', deletedIds);
+
+const hasAnySegmentations = Object.values(allSegmentations).length > 0;
+const hasValidObjects = validObjects.length > 0;
+
+// Are all remaining segmentations "skipped + delete"?
+const allRemainingAreDeleted =
+  hasAnySegmentations &&
+  !hasValidObjects &&
+  deletedIds.length > 0 &&
+  deletedIds.length === Object.values(allSegmentations).length;
+
+let postSegmentationResult;
+
+if (hasValidObjects) {
+  postSegmentationResult = await postSegmentations({
+    segmentationObjects: validObjects,
+    studyUID: studyInstanceUID,
+    deleteAll: false,
+  });
+} else if (!hasAnySegmentations) {
+  // User deleted all segmentations from the service
+  postSegmentationResult = await postSegmentations({
+    segmentationObjects: [],
+    studyUID: studyInstanceUID,
+    deleteAll: true,
+  });
+} else if (allRemainingAreDeleted) {
+  // Only one (or more) segmentations left, but they are all skipped + delete
+  // -> delete all segmentations for this study
+  postSegmentationResult = await postSegmentations({
+    segmentationObjects: [],
+    studyUID: studyInstanceUID,
+    deleteAll: true,
+  });
+} else {
+  console.warn('🛑 No valid segmentations to post - skipping');
+  postSegmentationResult = { success: false, reason: 'no_valid_objects' };
+}
 
   if (!postSegmentationResult?.success) {
     console.warn('⚠️ Failed to post:', postSegmentationResult?.error);
@@ -916,7 +985,9 @@ type GenerateSegmentationActivityResult = {
   label: string;
   segments: any[] | null;
   segmentationDataRef: Blob | null;
-  success: boolean;
+  generateStatus: 'valid' | 'skipped' | 'error';
+  databaseAction: 'keep' | 'delete' | 'n/a';
+  resultStatusNote?: string;
 };
 
 /**
@@ -943,7 +1014,9 @@ export async function generateSegmentationActivity(
     label: seg.label,
     segments: null,
     segmentationDataRef: null,
-    success: false,
+    generateStatus: 'error',
+    databaseAction: 'n/a',
+    resultStatusNote: '',
   };
 
   try {
@@ -960,8 +1033,14 @@ export async function generateSegmentationActivity(
     const refImageId = seg.representationData.Labelmap.referencedImageIds[0];
     const seriesUid = getSeriesUid(refImageId);
     if (!seriesUid) {
-      console.warn(`No series UID for imageId ${refImageId} in ${seg.segmentationId}` );
-      return segResult;
+      const resultsMsg = `No series UID for imageId ${refImageId} in ${seg.segmentationId}`;
+      console.warn(resultsMsg);
+      return {
+        ... segResult,
+        generateStatus: 'error',
+        databaseAction: 'n/a',
+        resultStatusNote: resultsMsg,
+      };
     }
 
     // get pixel measures info for SEG metadata
@@ -994,8 +1073,14 @@ export async function generateSegmentationActivity(
     const displaySetInstanceUID = displaySets[0]?.displaySetInstanceUID;
 
     if (!displaySetInstanceUID) {
-      console.warn(`No displaySet found for series ${seriesUid} in ${seg.segmentationId}`);
-      return segResult;
+      const resultsMsg = `No displaySet found for series ${seriesUid} in ${seg.segmentationId}`;
+      console.warn(resultsMsg);
+      return {
+        ... segResult,
+        generateStatus: 'error',
+        databaseAction: 'n/a',
+        resultStatusNote: resultsMsg,
+      };
     }
 
     await viewportGridService.setDisplaySetsForViewport({
@@ -1006,13 +1091,20 @@ export async function generateSegmentationActivity(
     // Give OHIF a moment to render the new stack
     await new Promise(resolve => setTimeout(resolve, 50));
 
-    // Check if at least one segment has non‑zero volume.
+    // Check if at least one segment has non‑zero volume
+    //    (generateSegmentation will fail if there are no segments with volume)
     let hasVolume = false;
     const segments = useSegmentMetadataStore.getState().getAllSegments(seg.segmentationId);
 
     if (!segments || Object.keys(segments).length === 0) {
-      console.warn(`No segments found for ${seg.segmentationId}; skipping`);
-      return segResult;
+      const resultsMsg = `No segments found for ${seg.segmentationId}; skipping`;
+      console.warn(resultsMsg);
+      return {
+        ... segResult,
+        generateStatus: 'skipped',
+        databaseAction: 'delete',
+        resultStatusNote: resultsMsg,
+      };
     }
 
     for (const [segIdxStr, segment] of Object.entries(segments)) {
@@ -1025,8 +1117,15 @@ export async function generateSegmentationActivity(
     }
 
     if (!hasVolume) {
-      console.log('No volume in any segments; skipping DICOM‑SEG generation', seg.segmentationId);
-      return segResult;
+      const resultsMsg = `No volume in any segments; skipping DICOM‑SEG generation ${seg.segmentationId}`;
+      console.log(resultsMsg, seg.segmentationId);
+      segmentationService.remove(seg.segmentationId);
+      return {
+        ...segResult,
+        generateStatus: 'skipped',
+        databaseAction: 'delete',
+        resultStatusNote: resultsMsg,
+      };
     }
 
     const generatedSeg = commandsManager.runCommand('generateSegmentation', {
@@ -1108,19 +1207,35 @@ export async function generateSegmentationActivity(
       console.log('Blob created successfully, size:', segBlob.size, 'type:', segBlob.type);
     } catch (blobError) {
       console.warn(`Skipping segmentation ${seg.segmentationId}: blob creation failed`,blobError);
-      throw new Error('no_segmentationDataRef_segBlob_generated');
+      const resultsMsg = 'no_segmentationDataRef_segBlob_generated';
+      segResult.resultStatusNote = resultsMsg
+      return {
+        ...segResult,
+        generateStatus: 'error',
+        databaseAction: 'n/a',
+        resultStatusNote: resultsMsg,
+      };
     }
 
     segResult.segments = buildSegmentFn(seg.segmentationId);
     segResult.sourceSeriesInstanceUid = seriesUid;
     segResult.segmentationDataRef = segBlob;
-    segResult.success = true;
+    segResult.generateStatus = 'valid';
+    segResult.databaseAction = 'keep';
+    segResult.resultStatusNote = '';
+    
     return segResult ;
+
   } catch (err) {
     console.warn( `Skipping segmentation ${seg.segmentationId}: generation failed. Check existing segmentation collection in database.`, err );
     alert('⚠️ In generateSegmentationActivity - Segmentation ${seg.segmentationId} : generation failed; Press F12 to display console details.');
-
-    return segResult;
+    
+      return {
+      ...segResult,
+      generateStatus: 'error',
+      databaseAction: 'n/a',
+      resultStatusNote: 'generation_failed',
+    };
   }
 }
 
