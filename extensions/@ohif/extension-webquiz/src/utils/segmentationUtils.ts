@@ -1,6 +1,7 @@
 import { useSegmentMetadataStore } from '../stores/useSegmentMetadataStore';
 import { SegmentRecord, 
         SegmentationData,
+        SegmentationsRecord,
         SegmentMetadata,
         DEFAULT_SEGMENT_METADATA ,
         SegmentServiceState
@@ -250,7 +251,7 @@ export async function saveSegmentation({
       console.log(' *** IN SAVESEGMENTATION - segment quiz info from store:', quizSegmentInfo);
 
 
-  const allSegmentations = segmentationService.getSegmentations();
+  const allSegmentations: SegmentationsRecord = segmentationService.getSegmentations();
   const segmentationObjects = [];
 
   const allResults: GenerateSegmentationActivityResult[] = [];
@@ -279,74 +280,12 @@ export async function saveSegmentation({
     }
   }
 
-  // Add failure reporting
-  // Check for ANY failures - if any !result.success, abort entirely
-  // const failures = allResults.filter(r => !r.success);
-
-  const validObjects = allResults.filter(r => r.generateStatus === 'valid');
-
-  const errorResults = allResults.filter(r => r.generateStatus === 'error');
-  const hasFailures = errorResults.length > 0;
-
-  if (hasFailures) {
-    const failedIds = errorResults.map(r => r.segmentationId);
-    console.error('❌ Aborting save: failures in segmentations', failedIds);
-    alert('⚠️ In SaveSegmentation - failed - nothing posted to db; Press F12 to display console details.');
-    return;  // Nothing gets posted!
-  }
-
-  const deletedIds = allResults
-  .filter(r => r.databaseAction === 'delete')
-  .map(r => r.segmentationId);
-
-console.log(' *** In saveAllSegmentations... segmentations to be removed from DB:', deletedIds);
-
-const hasAnySegmentations = Object.values(allSegmentations).length > 0;
-const hasValidObjects = validObjects.length > 0;
-
-// Are all remaining segmentations "skipped + delete"?
-const allRemainingAreDeleted =
-  hasAnySegmentations &&
-  !hasValidObjects &&
-  deletedIds.length > 0 &&
-  deletedIds.length === Object.values(allSegmentations).length;
-
-let postSegmentationResult;
-
-if (hasValidObjects) {
-  postSegmentationResult = await postSegmentations({
-    segmentationObjects: validObjects,
-    studyUID: studyInstanceUID,
-    deleteAll: false,
+  await processAndPostSegmentationResults({
+    allResults,
+    allSegmentations,
+    studyInstanceUID,
   });
-} else if (!hasAnySegmentations) {
-  // User deleted all segmentations from the service
-  postSegmentationResult = await postSegmentations({
-    segmentationObjects: [],
-    studyUID: studyInstanceUID,
-    deleteAll: true,
-  });
-} else if (allRemainingAreDeleted) {
-  // Only one (or more) segmentations left, but they are all skipped + delete
-  // -> delete all segmentations for this study
-  postSegmentationResult = await postSegmentations({
-    segmentationObjects: [],
-    studyUID: studyInstanceUID,
-    deleteAll: true,
-  });
-} else {
-  console.warn('🛑 No valid segmentations to post - skipping');
-  postSegmentationResult = { success: false, reason: 'no_valid_objects' };
-}
 
-
-  if (!postSegmentationResult?.success) {
-    console.warn('⚠️ Failed to post:', postSegmentationResult?.error );
-  } else {
-    console.log(`📌 Segmentations posted for ${studyInstanceUID}`);
-  }
-
-  console.log(`📬 Confirmed save segmentations to DB`);
 }
 
 
@@ -366,7 +305,7 @@ export async function saveAllSegmentations({
   commandsManager: any;
   studyInstanceUID: string;
 }) {
-  const allSegmentations: SegmentationData = segmentationService.getSegmentations();
+  const allSegmentations: SegmentationsRecord = segmentationService.getSegmentations();
   console.log(' *** In saveAllSegmentations ... allSegmentations', allSegmentations);
 
   //////////////////////////////
@@ -384,7 +323,7 @@ export async function saveAllSegmentations({
 
   });
   //////////////////////////////
-  //////////////////////////////
+  // //////////////////////////////
 
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -440,72 +379,13 @@ for (const seg of Object.values(allSegmentations)) {
 
     allResults.push(result);
 }
-//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  
-//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  
 
-const validObjects = allResults.filter(r => r.generateStatus === 'valid');
-
-const errorResults = allResults.filter(r => r.generateStatus === 'error');
-const hasFailures = errorResults.length > 0;
-
-if (hasFailures) {
-  const failedIds = errorResults.map(r => r.segmentationId);
-  console.error('❌ Aborting save: failures in segmentations', failedIds);
-  alert('⚠️ In saveAllSegmentations - failed - nothing posted to db; Press F12 to display console details.');
-  return;
-}
-
-const deletedIds = allResults
-  .filter(r => r.databaseAction === 'delete')
-  .map(r => r.segmentationId);
-
-console.log(' *** In saveAllSegmentations... segmentations to be removed from DB:', deletedIds);
-
-const hasAnySegmentations = Object.values(allSegmentations).length > 0;
-const hasValidObjects = validObjects.length > 0;
-
-// Are all remaining segmentations "skipped + delete"?
-const allRemainingAreDeleted =
-  hasAnySegmentations &&
-  !hasValidObjects &&
-  deletedIds.length > 0 &&
-  deletedIds.length === Object.values(allSegmentations).length;
-
-let postSegmentationResult;
-
-if (hasValidObjects) {
-  postSegmentationResult = await postSegmentations({
-    segmentationObjects: validObjects,
-    studyUID: studyInstanceUID,
-    deleteAll: false,
+  await processAndPostSegmentationResults({
+    allResults,
+    allSegmentations,
+    studyInstanceUID,
   });
-} else if (!hasAnySegmentations) {
-  // User deleted all segmentations from the service
-  postSegmentationResult = await postSegmentations({
-    segmentationObjects: [],
-    studyUID: studyInstanceUID,
-    deleteAll: true,
-  });
-} else if (allRemainingAreDeleted) {
-  // Only one (or more) segmentations left, but they are all skipped + delete
-  // -> delete all segmentations for this study
-  postSegmentationResult = await postSegmentations({
-    segmentationObjects: [],
-    studyUID: studyInstanceUID,
-    deleteAll: true,
-  });
-} else {
-  console.warn('🛑 No valid segmentations to post - skipping');
-  postSegmentationResult = { success: false, reason: 'no_valid_objects' };
-}
 
-  if (!postSegmentationResult?.success) {
-    console.warn('⚠️ Failed to post:', postSegmentationResult?.error);
-  } else {
-    console.log(`📌 Segmentations posted for ${studyInstanceUID}`);
-  }
-
-  console.log(`📬 Confirmed save segmentations to DB`);
 }
 
 // =====================================
@@ -916,59 +796,6 @@ function updateQuizSegmentMetadata(
 }
 
 // =====================================
-function prepForPost(segmentation: any)  {
-  
-    const oSegments = segmentation?.segments || {};
-
-
-      //////////////////////////////
-      //////////////////////////////
-      // for debug
-        const segId = segmentation.segmentationId;
-        const serviceKeys = Object.keys(segmentation?.segments || {});
-
-        const storeState = useSegmentMetadataStore.getState();
-        const storeSegments = storeState.getAllSegments(segId) || {};
-
-        console.log('📊 in prepForPost-before update... store keys:', Object.keys(storeSegments), `segmentation ${segId}`);
-        console.log('📊 in prepForPost-before update... service keys:', serviceKeys, `segmentation ${segId}`);
-
-      //////////////////////////////
-      //////////////////////////////
-      
-      Object.values(oSegments as Record<number, SegmentRecord>).forEach((segment, arrayIndex) => {
-
-      const segmentIndex = segment.segmentIndex;
-      const quizSegmentMetadata = updateQuizSegmentMetadata(segment, segmentation.segmentationId, arrayIndex);
-
-      const segmentRecord: SegmentRecord = {
-        segmentIndex,
-        label: segment.label,
-        cachedStats: segment.cachedStats,
-        quizSegmentMetadata
-      };
-
-      useSegmentMetadataStore.getState().setSegmentInfo(segmentation.segmentationId, segmentIndex, segmentRecord);
-
-    });
-
-      //////////////////////////////
-      //////////////////////////////
-      // for debug
-
-        const storeState2 = useSegmentMetadataStore.getState();
-        const storeSegments2 = storeState2.getAllSegments(segId) || {};
-
-        console.log('📊 in prepForPost-after update... store keys:', Object.keys(storeSegments2), `segmentation ${segId}`);
-        console.log('📊 in prepForPost-after update... service keys:', serviceKeys, `segmentation ${segId}`);
-
-      //////////////////////////////
-      //////////////////////////////
-
-  };
-
-// =====================================
-
 
 type SegmentationServices = {
   segmentationService: any;
@@ -1237,6 +1064,77 @@ export async function generateSegmentationActivity(
       resultStatusNote: 'generation_failed',
     };
   }
+}
+
+
+// =====================================
+async function processAndPostSegmentationResults({
+  allResults,
+  allSegmentations,
+  studyInstanceUID,
+}: {
+  allResults: GenerateSegmentationActivityResult[];
+  allSegmentations: SegmentationsRecord;
+  studyInstanceUID: string;
+}) {
+  const validObjects = allResults.filter(r => r.generateStatus === 'valid');
+  const errorResults = allResults.filter(r => r.generateStatus === 'error');
+  const hasFailures = errorResults.length > 0;
+
+  if (hasFailures) {
+    const failedIds = errorResults.map(r => r.segmentationId);
+    console.error('❌ Aborting save: failures in segmentations', failedIds);
+    alert('⚠️ Save failed - nothing posted to db; Press F12 to display console details.');
+    return;
+  }
+
+  const deletedIds = allResults
+    .filter(r => r.databaseAction === 'delete')
+    .map(r => r.segmentationId);
+
+  console.log('*** Segmentations to be removed from DB:', deletedIds);
+
+  const hasAnySegmentations = Object.values(allSegmentations).length > 0;
+  const hasValidObjects = validObjects.length > 0;
+
+  const allRemainingAreDeleted =
+    hasAnySegmentations &&
+    !hasValidObjects &&
+    deletedIds.length > 0 &&
+    deletedIds.length === Object.values(allSegmentations).length;
+
+  let postSegmentationResult;
+
+  if (hasValidObjects) {
+    postSegmentationResult = await postSegmentations({
+      segmentationObjects: validObjects,
+      studyUID: studyInstanceUID,
+      deleteAll: false,
+    });
+  } else if (!hasAnySegmentations) {
+    postSegmentationResult = await postSegmentations({
+      segmentationObjects: [],
+      studyUID: studyInstanceUID,
+      deleteAll: true,
+    });
+  } else if (allRemainingAreDeleted) {
+    postSegmentationResult = await postSegmentations({
+      segmentationObjects: [],
+      studyUID: studyInstanceUID,
+      deleteAll: true,
+    });
+  } else {
+    console.warn('🛑 No valid segmentations to post - skipping');
+    postSegmentationResult = { success: false, reason: 'no_valid_objects' };
+  }
+
+  if (!postSegmentationResult?.success) {
+    console.warn('⚠️ Failed to post:', postSegmentationResult?.error);
+  } else {
+    console.log(`📌 Segmentations posted for ${studyInstanceUID}`);
+  }
+
+  console.log(`📬 Confirmed save segmentations to DB`);
 }
 
 
