@@ -87,7 +87,9 @@ window.config = {
       ],
     },
   ],
-  defaultDataSourceName: 'dicomweb',
+  // defaultDataSourceName: 'dicomweb', // for OHIF demo data
+  defaultDataSourceName: 'orthanc', // for deployment
+
   /* Dynamic config allows user to pass "configUrl" query string this allows to load config without recompiling application. The regex will ensure valid configuration source */
   // dangerouslyUseDynamicConfig: {
   //   enabled: true,
@@ -100,6 +102,7 @@ window.config = {
   // },
   dataSources: [
     {
+      // for OHIF demo data
       namespace: '@ohif/extension-default.dataSourcesModule.dicomweb',
       sourceName: 'dicomweb',
       configuration: {
