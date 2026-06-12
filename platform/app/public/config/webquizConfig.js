@@ -269,19 +269,16 @@ window.config = {
         friendlyName: 'dicom local',
       },
     },
-    // added for deployment to Render (April 2026)
+    // added for deployment to Render (April 2026, June 2026)
     {
       namespace: '@ohif/extension-default.dataSourcesModule.dicomweb',
       sourceName: 'orthanc',
       configuration: {
         friendlyName: 'Orthanc PACS',
         name: 'orthanc',
-        // These paths must match your Nginx location block
-        wadoUriRoot: '/pacs/dicom-web',
-        qidoRoot: '/pacs/dicom-web',
-        wadoRoot: '/pacs/dicom-web',
-        
-        // Orthanc-friendly defaults
+        wadoUriRoot: '/pacs/dicom-web/',
+        qidoRoot: '/pacs/dicom-web/',
+        wadoRoot: '/pacs/dicom-web/',
         qidoSupportsIncludeField: true,
         supportsReject: false,
         imageRendering: 'wadors',
@@ -290,18 +287,8 @@ window.config = {
         supportsFuzzyMatching: true,
         supportsWildcard: true,
         omitQuotationForMultipartRequest: true,
-        
-        // IMPORTANT: If you have issues loading bulk data (like PDFs or large images),
-        // Orthanc often returns absolute URLs (e.g., http://localhost:8042/...).
-        // You must use these to "fix" those URLs to match your proxy path:
-        bulkDataURI: {
-          enabled: true,
-          relativeResolution: 'studies',
-          startsWith: 'http://orthanc:8042/', // Your internal Orthanc URL
-          prefixWith: '/pacs/',               // Your Nginx proxy path
-        },
       },
-    },
+    }
   ],
   httpErrorHandler: error => {
     // This is 429 when rejected from the public idc sandbox too often.
