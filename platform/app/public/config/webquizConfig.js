@@ -276,9 +276,9 @@ window.config = {
       configuration: {
         friendlyName: 'Orthanc PACS',
         name: 'orthanc',
-        wadoUriRoot: '/dicom-web',
-        qidoRoot: '/dicom-web',
-        wadoRoot: '/dicom-web',
+        qidoRoot: 'https://webquiz-cors-proxy.onrender.com/dicom-web',
+        wadoRoot: 'https://webquiz-cors-proxy.onrender.com/dicom-web',
+        wadoUriRoot: 'https://webquiz-cors-proxy.onrender.com/dicom-web',
         qidoSupportsIncludeField: true,
         supportsReject: false,
         imageRendering: 'wadors',
