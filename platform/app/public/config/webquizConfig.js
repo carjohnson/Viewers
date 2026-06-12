@@ -276,9 +276,9 @@ window.config = {
       configuration: {
         friendlyName: 'Orthanc PACS',
         name: 'orthanc',
-        wadoUriRoot: '/pacs/dicom-web/',
-        qidoRoot: '/pacs/dicom-web/',
-        wadoRoot: '/pacs/dicom-web/',
+        wadoUriRoot: '/pacs/dicom-web',
+        qidoRoot: '/pacs/dicom-web',
+        wadoRoot: '/pacs/dicom-web',
         qidoSupportsIncludeField: true,
         supportsReject: false,
         imageRendering: 'wadors',
