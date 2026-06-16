@@ -10,6 +10,11 @@ export const useSeriesValidation = ({ studyUID, seriesUID, onValidated }) => {
       // console.log(`🔍 Validating series ${seriesUID} for study ${studyUID}`);
       const result = await validateSeriesFromDB({ baseUrl: API_BASE_URL, studyUID, seriesUID });
       // console.log(`📋 Validation result for ${seriesUID}:`, result?.isValid);
+
+      if (result?.studyNotFound) {
+        console.warn(`⚠️ Study document not found in DB for studyUID: ${studyUID} — it may have been deleted.`);
+      }
+
       setIsValid(result?.isValid ?? false);
       onValidated?.(seriesUID, result?.isValid ?? false);
     };

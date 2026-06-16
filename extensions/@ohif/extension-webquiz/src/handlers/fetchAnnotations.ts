@@ -29,10 +29,16 @@ export const fetchAnnotationsFromDB = async ({
       `${baseUrl}/webquiz/list-users-annotations?username=${username}&studyUID=${studyUID}`,
       { credentials: 'include' }
     );
+    
+    const result = await response.json();
+    if (response.status === 400 && result?.error === 'Study not found') {
+      console.warn(`⚠️ Study document not found in DB for studyUID: ${studyUID} — it may have been deleted.`);
+      throw new Error('Study not found in DB');
+    }
 
     if (!response.ok) throw new Error('Failed to fetch annotations from DB');
 
-    const { payload: annotationsList, legend } = await response.json();
+    const { payload: annotationsList, legend } = result;
 
     setListOfUsersAnnotations(annotationsList);
     listOfUsersAnnotationsRef.current = annotationsList;
