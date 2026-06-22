@@ -103,8 +103,24 @@ export const convertAnnotationsToMeasurements = ({
           return;
         }
 
+        // annotationToRawMeasurement now returns null (instead of throwing
+        // or silently returning undefined) whenever the annotation can't be
+        // converted. We guard here so a bad annotation never reaches
+        // addRawMeasurement.
         const annotation = annotationToRawMeasurement(annotationObj, displaySetService);
-        
+
+        if (!annotation) {
+          // Already logged with the specific reason + annotationUID inside
+          // annotationToRawMeasurement. Skip this one and move on to the
+          // next annotation instead of aborting the whole batch.
+          processedCount++;
+          if (processedCount === totalAnnotations) {
+            console.log('✅ All measurements converted and styled');
+            onComplete?.();
+          }
+          return;
+        }
+
         measurementService.addRawMeasurement(
           csToolsSource,
           'Length',
@@ -140,22 +156,57 @@ export const convertAnnotationsToMeasurements = ({
 /**
  * Convert a DB annotation into a valid raw measurement
  * for MeasurementService.addRawMeasurement.
+ *
+ * Returns `null` (instead of `undefined`, and instead of throwing) for any
+ * annotation that can't be converted, so callers can reliably filter/skip
+ * bad annotations rather than passing `undefined` downstream.
  */
 export const annotationToRawMeasurement = (dbAnnotation, displaySetService) => {
-  // Extract cached stats
+  const annotationUID = dbAnnotation?.annotationUID ?? '(unknown UID)';
+
+  // Extract cached stats.
+  // Stack-viewport annotations key cachedStats by 'imageId:wadors:...' — one
+  // entry, directly parseable.
+  // Volume-viewport (MPR) annotations instead key cachedStats by
+  // 'volumeId:cornerstoneStreamingImageVolume:<uuid>?sliceIndex=...', which
+  // has no parseable Study/Series/SOPInstanceUID in it at all. For those, we
+  // fall back to metadata.referencedImageId, which OHIF populates regardless
+  // of viewport type.
   const cachedStats = dbAnnotation.data.cachedStats;
-  const referencedImageId = Object.keys(cachedStats).find(key =>
-      key.startsWith('imageId:')
-);
+  let referencedImageId = cachedStats
+    ? Object.keys(cachedStats).find(key => key.startsWith('imageId:'))
+    : undefined;
+
+  let usedFallback = false;
+  if (!referencedImageId) {
+    referencedImageId = dbAnnotation.metadata?.referencedImageId;
+    usedFallback = true;
+  }
+
+  if (!referencedImageId) {
+    console.warn(
+      `Skipping annotation ${annotationUID}: no 'imageId:' key found in cachedStats, and no metadata.referencedImageId fallback available`,
+      cachedStats
+    );
+    return null;
+  }
 
   // Parse identifiers from imageId
+  const parsed = parseReferenceImageId(referencedImageId);
+  if (!parsed) {
+    console.warn(
+      `Skipping annotation ${annotationUID}: could not parse referencedImageId "${referencedImageId}"`
+    );
+    return null;
+  }
+
   const {
     StudyInstanceUID,
     SeriesInstanceUID,
     SOPInstanceUID,
     frameNumber,
     strippedReferencedImageId,
-  } = parseReferenceImageId(referencedImageId);
+  } = parsed;
 
   // console.log(' *** IN ANN TO RAW ... SOPInstance, StudyUID, SeriesUID:', SOPInstanceUID, StudyInstanceUID, SeriesInstanceUID, displaySetService);
 
@@ -172,9 +223,19 @@ export const annotationToRawMeasurement = (dbAnnotation, displaySetService) => {
   );
 
   if (!displaySet) {
-    console.warn(' No valid displaySet for this series - skipping');
-    return;
+    console.warn(
+      `Skipping annotation ${annotationUID}: no valid displaySet for SOPInstanceUID=${SOPInstanceUID}, SeriesInstanceUID=${SeriesInstanceUID}`
+    );
+    return null;
   }
+
+  if (!dbAnnotation.metadata) {
+    console.warn(
+      `Skipping annotation ${annotationUID}: missing metadata (no FrameOfReferenceUID available)`
+    );
+    return null;
+  }
+
   return {
     // shape of object required for 'toMeasurementSchema' function
     uid: dbAnnotation.annotationUID, // required unique identifier
@@ -210,10 +271,33 @@ export const annotationToRawMeasurement = (dbAnnotation, displaySetService) => {
 
 //=========================================================
 function parseReferenceImageId(referenceImageId: string) {
-  // strip scheme
-  const strippedReferencedImageId = referenceImageId.replace(/^imageId:/, '');
-  const url = referenceImageId.replace(/^imageId:wadors:/, '');
-  const u = new URL(url);
+  if (!referenceImageId) {
+    return null;
+  }
+
+  // Normalize the *input* so all observed source shapes are accepted:
+  //  - from cachedStats:                    'imageId:wadors:https://...'
+  //  - from metadata.referencedImageId:     'wadors:https://...'
+  //  - from metadata.referencedImageId:     'https://...' (no scheme prefix at all)
+  // Strip any 'imageId:' and/or 'wadors:' prefixes first, then rebuild the
+  // canonical 'imageId:wadors:https://...' form. This guarantees
+  // strippedReferencedImageId (stored back on the new measurement's
+  // metadata) always comes out as 'wadors:https://...', matching the
+  // original stack-viewport shape, regardless of which prefix shape we
+  // started with.
+  const bareUrl = referenceImageId
+    .replace(/^imageId:/, '')
+    .replace(/^wadors:/, '');
+  const strippedReferencedImageId = `wadors:${bareUrl}`;
+  const url = bareUrl;
+
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch (err) {
+    console.warn(`parseReferenceImageId: invalid URL "${url}"`, err);
+    return null;
+  }
 
   const parts = u.pathname.split('/');
 
@@ -222,11 +306,18 @@ function parseReferenceImageId(referenceImageId: string) {
   const instancesIndex = parts.indexOf('instances');
   const framesIndex = parts.indexOf('frames');
 
+  if (studyIndex === -1 || seriesIndex === -1 || instancesIndex === -1) {
+    console.warn(
+      `parseReferenceImageId: URL is missing expected path segments (studies/series/instances): "${u.pathname}"`
+    );
+    return null;
+  }
+
   return {
     StudyInstanceUID: parts[studyIndex + 1],
     SeriesInstanceUID: parts[seriesIndex + 1],
     SOPInstanceUID: parts[instancesIndex + 1],
-    frameNumber: Number(parts[framesIndex + 1]),
+    frameNumber: framesIndex !== -1 ? Number(parts[framesIndex + 1]) : undefined,
     strippedReferencedImageId,
   };
 }
