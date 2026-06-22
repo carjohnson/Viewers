@@ -314,19 +314,49 @@ useEffect(() => {
     //      working with multi-series studies
     //  - Rerun this when the study changes
 
-    useEffect(() => {
-        // console.log(' *** IN USE EFFECT FOR CONVERT ... annLoaded, studyUID', annotationsLoaded, studyUID)
-        if (annotationsLoaded  && studyUID) {
-            // console.log('🚀 Converting annotations for study:', studyUID);
-            convertAnnotationsToMeasurements({
-                annotationsList: listOfUsersAnnotationsRef,
-                measurementService,
-                displaySetService,
-                onComplete: () => { console.log('🎉 Conversion complete'); },
-                onError: (error) => { console.error('Conversion failed:', error); },
-            });
+useEffect(() => {
+    // console.log(' *** IN USE EFFECT FOR CONVERT ... annLoaded, studyUID', annotationsLoaded, studyUID)
+    if (!annotationsLoaded || !studyUID) {
+        return;
+    }
+
+    const runConversion = () => {
+        // console.log('🚀 Converting annotations for study:', studyUID);
+        convertAnnotationsToMeasurements({
+            annotationsList: listOfUsersAnnotationsRef,
+            measurementService,
+            displaySetService,
+            onComplete: () => { console.log('🎉 Conversion complete'); },
+            onError: (error) => { console.error('Conversion failed:', error); },
+        });
+    };
+
+    // Fast path: convert whatever is already resolvable right now. If every
+    // referenced series already has a displaySet (the common case), this is
+    // the only call that runs and nothing waits on the subscription below.
+    runConversion();
+
+    // Re-run conversion every time OHIF registers more display sets, in case
+    // some of the fetched annotations reference series that weren't ready
+    // yet on the call above. This covers the race condition: opening the
+    // extension immediately after the study mounts, before all series have
+    // been registered with DisplaySetService.
+    const { unsubscribe } = displaySetService.subscribe(
+        displaySetService.EVENTS.DISPLAY_SETS_ADDED,
+        () => {
+            // console.log('📦 DISPLAY_SETS_ADDED fired — retrying annotation conversion');
+            runConversion();
         }
-    }, [annotationsLoaded, studyUID]);
+    );
+
+    return () => {
+        unsubscribe();
+    };
+    // Intentionally NOT depending on displaySetService/measurementService
+    // identity here, same as the original effect — only re-run when the
+    // study or load-completion state actually changes.
+}, [annotationsLoaded, studyUID]);
+
 
 
     //=========================================================
