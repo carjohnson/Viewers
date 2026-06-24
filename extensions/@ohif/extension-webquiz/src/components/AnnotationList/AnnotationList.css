@@ -52,9 +52,10 @@
 
 .toggle-all-wrapper {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   padding-right: 1rem;
   margin-bottom: 0.5rem;
+  align-items: center;
 }
 
 .toggle-all-button {
@@ -66,6 +67,14 @@
   border-radius: 4px;
   font-size: 0.9rem;
 }
+
+.score-column-label {
+  color: #ccc;
+  font-size: 14px;
+  font-weight: bold;
+  text-align: left;
+}
+
 
 /* to prevent the double scrollbar 
     - one from the right panel (introduced by newer version of OHIF) - hide this one

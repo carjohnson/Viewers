@@ -16,11 +16,11 @@ type Props = {
   dropdownSelectionMap: Record<string, number>;
   visibilityMap: Record<string, boolean>;
   scoreOptions: { value: number; label: string }[];
-  onDropdownChange: (uid: string, value: number) => void;
   onMeasurementClick: (uid: string) => void;
   onToggleVisibility: (uid: string) => void;
   triggerPost: (args: TriggerPostArgs) => void;
   annotation: any;
+  onScoreClick: (uid: string, currentScore: number | null) => void;
 };
 
 export const AnnotationList = ({
@@ -28,9 +28,9 @@ export const AnnotationList = ({
   dropdownSelectionMap,
   visibilityMap,
   scoreOptions,
-  onDropdownChange,
   onMeasurementClick,
   onToggleVisibility,
+  onScoreClick,
 }: Props) => {
 
   const allVisible = useMemo(() => {
@@ -55,6 +55,8 @@ export const AnnotationList = ({
       <legend>Annotations</legend>
 
       <div className="toggle-all-wrapper">
+        <span className="score-column-label">Score</span>
+
         <button className="toggle-all-button" onClick={handleToggleAll}>
           {allVisible ? 'Hide All 🙈' : 'Show All 👁️'}
         </button>
@@ -75,11 +77,10 @@ export const AnnotationList = ({
                 scoreOptions={scoreOptions}
                 selectedScore={selectedScore}
                 isVisible={isVisible}
-                onMenuOpen={() => onMeasurementClick(uid)}
-                onDropdownChange={(value) => onDropdownChange(uid, value)}
                 onClick={() => onMeasurementClick(uid)}
                 onToggleVisibility={() => onToggleVisibility(uid)}
                 isAdmin={isAdmin}
+                onScoreClick={() => onScoreClick(uid, selectedScore)}
               />
             );
           })}

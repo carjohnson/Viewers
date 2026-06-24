@@ -13,11 +13,10 @@ type Props = {
   scoreOptions: { value: number; label: string }[];
   selectedScore: number;
   isVisible: boolean;
-  onMenuOpen: () => void;
-  onDropdownChange: (value: number) => void;
   onClick: () => void;
   onToggleVisibility: () => void;
   isAdmin: boolean;
+  onScoreClick: (uid: string, currentScore: number | null) => void;
 };
 
 export const AnnotationItem = ({
@@ -26,46 +25,47 @@ export const AnnotationItem = ({
   scoreOptions,
   selectedScore,
   isVisible,
-  onMenuOpen,
-  onDropdownChange,
   onClick,
   onToggleVisibility,
   isAdmin,
-}: Props) => (
-  <li className="annotation-item">
-    <Select
-      options={scoreOptions}
-      value={isAdmin ? scoreOptions.find(opt => opt.value === 99) : scoreOptions.find(opt => opt.value === selectedScore)}
-      isDisabled={isAdmin}
-      onMenuOpen={!isAdmin ? onMenuOpen: undefined}
-      onChange={(option) => !isAdmin && onDropdownChange(option!.value)}
-      getOptionLabel={(e) => e.label}
-      styles={{
-        control: (base) => ({
-          ...base,
-          backgroundColor: 'transparent',
-          borderColor: '#ccc',
-          color: 'white',
-        }),
-        singleValue: (base) => ({ ...base, color: 'white' }),
-        menu: (base) => ({ ...base, backgroundColor: '#222', color: 'white' }),
-        option: (base, state) => ({
-          ...base,
-          backgroundColor: state.isFocused ? '#444' : '#222',
-          color: 'white',
-        }),
-      }}
-      placeholder="Suspicion score"
-    />
-    <span className="annotation-label" onClick={onClick}>
-      {label}
-    </span>
-    <span
-      className="annotation-visibility"
-      onClick={onToggleVisibility}
-      title={isVisible ? 'Hide annotation' : 'Show annotation'}
-    >
-      {isVisible ? <EyeIcon /> : <EyeOffIcon />}
-    </span>
-  </li>
-);
+  onScoreClick,
+}: Props) => {
+  const scoreLabel =
+    scoreOptions.find(opt => opt.value === selectedScore)?.label ??
+    "Set score";
+
+  return (
+    <li className="annotation-item">
+      <span
+        className="annotation-score-pill"
+        onClick={() => !isAdmin && onScoreClick(uid, selectedScore)}
+        style={{
+          padding: "4px 10px",
+          borderRadius: "4px",
+          border: "1px solid #ccc",
+          background: "#222",
+          color: "white",
+          cursor: isAdmin ? "default" : "pointer",
+          userSelect: "none",
+          minWidth: "80px",
+          textAlign: "center",
+          display: "inline-block",
+        }}
+      >
+        {isAdmin ? "N/A" : scoreLabel}
+      </span>
+
+      <span className="annotation-label" onClick={onClick}>
+        {label}
+      </span>
+
+      <span
+        className="annotation-visibility"
+        onClick={onToggleVisibility}
+        title={isVisible ? "Hide annotation" : "Show annotation"}
+      >
+        {isVisible ? <EyeIcon /> : <EyeOffIcon />}
+      </span>
+    </li>
+  );
+};

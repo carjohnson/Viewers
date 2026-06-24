@@ -20,7 +20,11 @@ import { useSystem } from '@ohif/core';
 import { AnnotationList } from './components/AnnotationList/AnnotationList';
 import { SegmentationList } from './components/SegmentationList/SegmentationList'
 import { ScoreModal } from './components/ScoreModal';
-import { handleMeasurementAdded, handleAnnotationChanged, handleMeasurementRemoved, handleMeasurementUpdated } from './handlers/annotationEventHandlers';
+import { handleMeasurementAdded,
+        handleAnnotationChanged,
+        handleMeasurementRemoved,
+        handleMeasurementUpdated,
+       } from './handlers/annotationEventHandlers';
 import { ToolGroupManager } from '@cornerstonejs/tools';
 import { base64ToArrayBuffer } from './utils/dataUtils';
 import { loadDicomSegIntoOHIF, refreshSegmentMetadataStore, saveAllSegmentations } from './utils/segmentationUtils';
@@ -529,23 +533,9 @@ useEffect(() => {
         toggleVisibility({ uid, visibilityMap, setVisibilityMap, measurementService });
 
     //~~~~~~~~~~~~~~~~~
-    const onDropdownChange = (uid: string, value: number) => {
-        if (!triggerPost) {
-            console.warn('⏳ triggerPost not ready yet — skipping dropdown change post');
-            return;
-        }
-        // console.log(' *** IN ONDROPDOWNCHANGE:', annotation.state.getAllAnnotations());
-
-        handleDropdownChange({
-            uid,
-            value,
-            dropdownSelectionMap,
-            setDropdownSelectionMap,
-            triggerPost,
-            annotation,
-            isStudyCompletedRef,
-            showModal,
-        });
+    const handleScoreClick = (uid: string, currentScore: number | null) => {
+    setSelectedScore(currentScore);
+    debouncedShowScoreModal(uid);
     };
 
     //~~~~~~~~~~~~~~~~~
@@ -879,11 +869,11 @@ useEffect(() => {
                     dropdownSelectionMap={dropdownSelectionMap}
                     visibilityMap={visibilityMap}
                     scoreOptions={measurementScoreOptions}
-                    onDropdownChange={onDropdownChange}
                     onMeasurementClick={onMeasurementClick}
                     onToggleVisibility={onToggleVisibility}
                     triggerPost={triggerPost}
                     annotation={annotation}
+                    onScoreClick={handleScoreClick}
                     />
                 </div>
                 </div>
