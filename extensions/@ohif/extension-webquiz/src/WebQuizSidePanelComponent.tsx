@@ -386,32 +386,26 @@ useEffect(() => {
     // ********************* Segmentations ************************
     // ************************************************************
 
-    //=========================================================
+    const loadingSegmentationRef = useRef(false);
     useEffect(() => {
         async function loadSegmentations() {
             const username = userInfo?.username;
 
+            // check everything needed BEFORE doing any work
+            if (!username || !studyUID || !activeViewportId || !seriesInstanceUID) {
+                return;
+            }
+
             const currentLoaded = useSegmentationLoadStore.getState().getLoadedForStudy(studyUID);
-            console.log('*** IN FETCH ... user:', username, 'study:', studyUID, 'loaded:', currentLoaded);
-            
-            if (!username || !studyUID || currentLoaded) return;
+            if (currentLoaded || loadingSegmentationRef.current) return;
 
-
+            loadingSegmentationRef.current = true;
             try {
-
                 const res = await fetch(
-                    `${API_BASE_URL}/webquiz/list-study-segmentations?username=${username}&studyUID=${studyUID}`,
-                    { credentials: 'include' }
-                )
-                const data = await res.json();
-                console.log('📥 Segmentations response:', data);
-
-                const { payload } = data;
-
-                // make sure all display sets are available for loading
-                if (!activeViewportId || !seriesInstanceUID) {
-                    return;
-                }
+                 `${API_BASE_URL}/webquiz/list-study-segmentations?username=${username}&studyUID=${studyUID}`,
+                 { credentials: 'include' }
+                );
+                const { payload } = await res.json();
 
                 for (const seg of payload) {
                     console.log(' *** IN FETCH SEGS ... url', seg.segmentationFileUrl);
@@ -436,21 +430,16 @@ useEffect(() => {
                 }
                 // flag set to true after load
                 // - even if there were no entries in the database (starting fresh)
-                useSegmentationLoadStore.getState().setLoaded(loadStudyUID!, true);
-
+                useSegmentationLoadStore.getState().setLoaded(studyUID, true);
             } catch (err) {
                 console.error('❌ Error fetching segmentations:', err);
+            } finally {
+                loadingSegmentationRef.current = false;
             }
         }
         loadSegmentations();
-
-        // // for debug
-        // const allSegmentations = segmentationService.getSegmentations();
-        // Object.entries(allSegmentations).forEach(([id, seg]) => {
-        // console.log(`Seg ${id}:`, Object.keys(seg.segments || {}).length, 'segments');
-        // });        
-        
     }, [userInfo?.username, studyUID, activeViewportId, seriesInstanceUID]);
+
 
     //~~~~~~~~~~~~~~~~~
     useEffect(() => {
