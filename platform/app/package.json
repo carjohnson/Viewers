@@ -68,7 +68,6 @@
     "@ohif/extension-ultrasound-pleura-bline": "3.12.0-beta.123",
     "@ohif/i18n": "3.12.0-beta.123",
     "@ohif/mode-basic-dev-mode": "3.12.0-beta.123",
-    "@ohif/mode-longitudinal": "3.12.0-beta.123",
     "@ohif/mode-microscopy": "3.12.0-beta.123",
     "@ohif/mode-test": "3.12.0-beta.123",
     "@ohif/mode-ultrasound-pleura-bline": "3.12.0-beta.123",
