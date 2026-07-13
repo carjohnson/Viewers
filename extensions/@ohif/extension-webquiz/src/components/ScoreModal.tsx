@@ -76,6 +76,7 @@ export const ScoreModal = ({
 
       <div style={{ display: "flex", gap: "12px", marginTop: "16px" }}>
         <button
+          className={styles.okButton}
           style={{
             padding: "8px 16px",
             backgroundColor: isStudyCompleted ? "#999" : "#007bff",

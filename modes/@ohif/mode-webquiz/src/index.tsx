@@ -293,7 +293,7 @@ function modeFactory({ modeConfiguration }) {
               leftPanels: [ ohif.thumbnailList],
               leftPanelResizable: true,
               rightPanels,
-              rightPanelResizable: true,
+              rightPanelResizable: false,
               viewports: [
                 {
                   namespace: cornerstone.viewport,
