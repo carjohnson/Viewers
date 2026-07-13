@@ -35,7 +35,7 @@ export const handleMeasurementClick = ({
 
     if (viewportId) {
       measurementService?.jumpToMeasurement?.(viewportId, measurementId);
-      console.log('[handleMeasurementClick] jumpToMeasurement with viewportId');
+      console.log('[handleMeasurementClick] jumpToMeasurement with viewportId, measurementId:',viewportId, measurementId);
     } else if (
       typeof measurementService?.jumpToMeasurement === 'function' &&
       measurementService.jumpToMeasurement.length < 2

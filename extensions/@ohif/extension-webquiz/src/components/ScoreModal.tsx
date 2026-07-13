@@ -17,10 +17,11 @@ type Props = {
   scoreOptions: { value: number; label: string }[];
   selectedScore: number | null;
   setSelectedScore: (score: number | null) => void;
-  onClose: () => void;
+  onClose: (uid: string) => void;
   pendingAnnotationUIDRef: React.MutableRefObject<string | null>;
   setDropdownSelectionMap: React.Dispatch<React.SetStateAction<Record<string, number>>>
   triggerPost: (args: TriggerPostArgs) => void;
+  isStudyCompleted: boolean;
 };
 
 export const ScoreModal = ({
@@ -32,36 +33,80 @@ export const ScoreModal = ({
   pendingAnnotationUIDRef,
   setDropdownSelectionMap,
   triggerPost,
+  isStudyCompleted,
 }: Props) => {
+
+  const uid = pendingAnnotationUIDRef.current;
+
+  const handleOkClick = () => {
+    if (!uid) return;
+    customizeAnnotationLabel(uid);
+    onClose(uid);
+    rebuildMapAndPostAnnotations(setDropdownSelectionMap, triggerPost);
+    pendingAnnotationUIDRef.current = null;
+  };
+
+  const handleCancel = () => {
+    pendingAnnotationUIDRef.current = null;
+    onClose("");   // close without saving
+  };
+
   return (
     <Modal
-        isOpen={isOpen}
-        className={styles.scoreModal}
-        overlayClassName={styles.scoreModalOverlay}
-        shouldCloseOnOverlayClick={false} // disables clicking outside to close
-        shouldCloseOnEsc={false}          // disables ESC key
-        >
-        <h3>Select Suspicion Score</h3>
-        <Select<ScoreOption>
-            options={scoreOptions}
-            value={scoreOptions.find(opt => opt.value === selectedScore) ?? null}
-            onChange={(option) => setSelectedScore(option?.value ?? null)}
-        />
+      isOpen={isOpen}
+      className={styles.scoreModal}
+      overlayClassName={styles.scoreModalOverlay}
+      shouldCloseOnOverlayClick={false}
+      shouldCloseOnEsc={false}
+    >
+      <h3>Select Suspicion Score</h3>
 
+      {isStudyCompleted && (
+        <div style={{ marginBottom: "1rem", color: "red", fontWeight: 600 }}>
+          Changes disabled — study marked as complete
+        </div>
+      )}
+
+      <Select<ScoreOption>
+        options={scoreOptions}
+        value={scoreOptions.find(opt => opt.value === selectedScore) ?? null}
+        onChange={(option) => setSelectedScore(option?.value ?? null)}
+        isDisabled={isStudyCompleted}
+      />
+
+      <div style={{ display: "flex", gap: "12px", marginTop: "16px" }}>
         <button
-            style={{ padding: '8px 16px', backgroundColor: '#007bff', color: '#fff', border: 'none', borderRadius: '4px' }}
-            disabled={selectedScore === null}
-            onClick={() => { 
-                console.log('✅ OK button clicked', pendingAnnotationUIDRef.current);
-                const uid = pendingAnnotationUIDRef.current;
-                if (!uid) return;
-                customizeAnnotationLabel(uid);
-                onClose(); //closing modal will set suspicionScore
-                rebuildMapAndPostAnnotations(setDropdownSelectionMap, triggerPost);
-                pendingAnnotationUIDRef.current = null;
-                }}
+          style={{
+            padding: "8px 16px",
+            backgroundColor: isStudyCompleted ? "#999" : "#007bff",
+            color: "#fff",
+            border: "none",
+            borderRadius: "4px"
+          }}
+          disabled={isStudyCompleted || selectedScore === null}
+          onClick={() => {
+            if (isStudyCompleted) return;
+            handleOkClick();
+          }}
         >
-            OK
+          OK
         </button>
+
+        {isStudyCompleted && (
+          <button
+            style={{
+              padding: "8px 16px",
+              backgroundColor: "#666",
+              color: "#fff",
+              border: "none",
+              borderRadius: "4px"
+            }}
+            onClick={handleCancel}
+          >
+            Cancel
+          </button>
+        )}
+      </div>
     </Modal>
-  )};
+  );
+};

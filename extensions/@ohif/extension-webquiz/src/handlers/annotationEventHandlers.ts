@@ -99,23 +99,6 @@ export function handleMeasurementAdded({
     }
   }, 50);
 }
-//=========================================================
-
-export const handleAnnotationChanged = ({
-  event,
-}: {
-  event: any;
-}) => {
-  try {
-    const { annotation: changedAnnotation } = event?.detail ?? {};
-    if (!changedAnnotation) return;
-    // console.log(' *** IN HANDLE ANNOTATION CHANGE ... changedAnnotation', changedAnnotation);
-  } catch (err) {
-    console.error('Error in handleAnnotationChanged:', err);
-  }
-};
-
-
 
 //=========================================================
 export const handleMeasurementUpdated = ({

@@ -161,7 +161,7 @@ export const rebuildMapAndPostAnnotations = (
   // Dropdown map
   const newMap = buildDropdownSelectionMapFromState(adjustedAnnotationsList);
   setDropdownSelectionMap(newMap);
-  // console.log(' *** IN REBUILD:', removedAnnotationUID, allAnnotations, adjustedAnnotationsList, newMap);
+  console.log(' *** IN REBUILD:', removedAnnotationUID, allAnnotations, adjustedAnnotationsList, newMap);
 
   // Trigger POST
   triggerPost({ allAnnotations: adjustedAnnotationsList, dropdownSelectionMap: newMap });

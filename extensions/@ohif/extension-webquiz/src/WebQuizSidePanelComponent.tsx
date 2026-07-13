@@ -490,6 +490,7 @@ useEffect(() => {
             segmentationService,
             activeViewportId,
             studyInstanceUID:studyInfoFromHook?.studyUID,
+            isStudyCompleted: isStudyCompletedRef.current,
         });
             
     //=========================================================
@@ -535,9 +536,9 @@ useEffect(() => {
     };
 
     //~~~~~~~~~~~~~~~~~
-    const onCloseScoreModal = () =>
+    const onCloseScoreModal = (selectedUid: string) =>
     closeScoreModal({
-        activeUID,
+        activeUID: selectedUid,
         selectedScore,
         setSelectedScore,
         setDropdownSelectionMap,
@@ -734,20 +735,15 @@ useEffect(() => {
             pendingAnnotationUIDRef,
 
         })
-        const wrappedAnnotationChangedHandler = (event: any) => handleAnnotationChanged({
-            event,
-        });
 
         const subscriptionAdd = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_ADDED,wrappedMeasurementAddedHandler);
         const subscriptionRemove = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_REMOVED,wrappedMeasurementRemovedHandler);
         const subscriptionUpdated = measurementService.subscribe(measurementService.EVENTS.MEASUREMENT_UPDATED,wrappedMeasurementUpdatedHandler);
-        // cornerstone.eventTarget.addEventListener(cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangedHandler);
 
         return () => {
           subscriptionAdd.unsubscribe();
           subscriptionRemove.unsubscribe();
           subscriptionUpdated.unsubscribe();
-        //   cornerstone.eventTarget.removeEventListener( cornerstoneTools.Enums.Events.ANNOTATION_MODIFIED, wrappedAnnotationChangedHandler);
         }
 
     }, [patientName, studyUID]);
@@ -883,6 +879,7 @@ useEffect(() => {
         pendingAnnotationUIDRef={pendingAnnotationUIDRef}
         setDropdownSelectionMap={setDropdownSelectionMap}
         triggerPost={triggerPost}
+        isStudyCompleted={isStudyCompletedRef.current}
     />
 
         {modalInfo && (

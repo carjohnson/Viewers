@@ -1,7 +1,8 @@
 // src/handlers/fetchAnnotations.ts
 import { buildDropdownSelectionMapFromFetched } from '../utils/annotationUtils';
 import { Enums as CSExtensionEnums } from '@ohif/extension-cornerstone';
-
+import { annotation as csToolsAnnotation } from '@cornerstonejs/tools';
+import { getRenderingEngines, RenderingEngine } from '@cornerstonejs/core';
 
 //=========================================================
 export const fetchAnnotationsFromDB = async ({
@@ -42,10 +43,10 @@ export const fetchAnnotationsFromDB = async ({
 
     setListOfUsersAnnotations(annotationsList);
     listOfUsersAnnotationsRef.current = annotationsList;
-    // console.log(' *** IN FETCH ... studyUID, listRef, legend', studyUID, listOfUsersAnnotationsRef.current, legend);
 
     const newMap = buildDropdownSelectionMapFromFetched(annotationsList);
     setDropdownSelectionMap(newMap);
+    console.log(' *** IN FETCH ... studyUID, listRef, legend, newMap', studyUID, listOfUsersAnnotationsRef.current, legend, newMap);
 
     setAnnotationsLoaded(true);
 
@@ -57,7 +58,6 @@ export const fetchAnnotationsFromDB = async ({
 
 
 //=========================================================
-
 export const convertAnnotationsToMeasurements = ({
   annotationsList,
   measurementService,
@@ -72,8 +72,6 @@ export const convertAnnotationsToMeasurements = ({
   onError?: (error: string) => void;
 }) => {
   try {
-    // console.log(' *** IN CONVERT TO MEASUREMENTS ... annList', annotationsList.current);
-    
     const { 
       CORNERSTONE_3D_TOOLS_SOURCE_NAME,
       CORNERSTONE_3D_TOOLS_SOURCE_VERSION,
@@ -92,53 +90,76 @@ export const convertAnnotationsToMeasurements = ({
 
     const currentMeasurements = measurementService.getMeasurements();
 
-    let processedCount = 0;
-    const totalAnnotations = annotationsList.current?.size || 0;
-
-    annotationsList.current?.forEach(({ data, color }) => {
-      data.forEach((annotationObj: any) => {
-        if (!annotationObj?.annotationUID) return;
-
-        if (hasAnnotationInMeasurements(annotationObj, currentMeasurements)) {
-          return;
+    // Pre-filter: drop any annotation missing a UID up front, so every
+    // entry we count in totalAnnotations is guaranteed to reach the
+    // processedCount++ below. Keeps the loop and the completion check
+    // in sync without special-casing invalid entries mid-loop.
+    const validEntries = (annotationsList.current || []).map(userEntry => ({
+      color: userEntry.color,
+      data: (userEntry.data || []).filter((annotationObj: any) => {
+        const isValid = !!annotationObj?.annotationUID;
+        if (!isValid) {
+          console.warn('⚠️ Skipping annotation with missing annotationUID:', annotationObj);
         }
+        return isValid;
+      }),
+    }));
 
-        // annotationToRawMeasurement now returns null (instead of throwing
-        // or silently returning undefined) whenever the annotation can't be
-        // converted. We guard here so a bad annotation never reaches
-        // addRawMeasurement.
-        const annotation = annotationToRawMeasurement(annotationObj, displaySetService);
+    let processedCount = 0;
+    const totalAnnotations = validEntries.reduce(
+      (sum, userEntry) => sum + userEntry.data.length,
+      0
+    );
 
-        if (!annotation) {
-          // Already logged with the specific reason + annotationUID inside
-          // annotationToRawMeasurement. Skip this one and move on to the
-          // next annotation instead of aborting the whole batch.
+    if (totalAnnotations === 0) {
+      onComplete?.();
+      return;
+    }
+
+    validEntries.forEach(({ data, color }) => {
+      data.forEach((annotationObj: any) => {
+        if (hasAnnotationInMeasurements(annotationObj, currentMeasurements)) {
           processedCount++;
           if (processedCount === totalAnnotations) {
             console.log('✅ All measurements converted and styled');
+            getRenderingEngines()?.forEach(engine => engine.render());
             onComplete?.();
           }
           return;
         }
 
-        measurementService.addRawMeasurement(
+        const annotation = annotationToRawMeasurement(annotationObj, displaySetService);
+
+        if (!annotation) {
+          processedCount++;
+          if (processedCount === totalAnnotations) {
+            console.log('✅ All measurements converted and styled');
+            getRenderingEngines()?.forEach(engine => engine.render());
+            onComplete?.();
+          }
+          return;
+        }
+
+        const measurementUID = measurementService.addRawMeasurement(
           csToolsSource,
           'Length',
           { annotation }, 
           matchingMapping.toMeasurementSchema,
         );
 
-        // Apply custom style
-        setTimeout(() => {
-          annotationObj.config?.style?.setAnnotationStyles(annotationObj.annotationUID, { color });
-          
-          // Count completion for last style update
-          processedCount++;
-          if (processedCount === totalAnnotations) {
-            console.log('✅ All measurements converted and styled');
-            onComplete?.();  // ← Fire when ALL done (including styles)
-          }
-        }, 100);
+        const registered = csToolsAnnotation.state.getAnnotation(measurementUID);
+        console.log('🔎 UID', measurementUID, '— found in CS3D state?', !!registered, registered);
+
+
+        csToolsAnnotation.config.style.setAnnotationStyles(measurementUID, { color });
+
+        processedCount++;
+        if (processedCount === totalAnnotations) {
+          console.log('✅ All measurements converted and styled');
+          getRenderingEngines()?.forEach(engine => engine.render());
+          onComplete?.();
+        }
+
       });
     });
 
@@ -147,7 +168,6 @@ export const convertAnnotationsToMeasurements = ({
     onError?.(error as string);
   }
 };
-
 
 
 
@@ -237,8 +257,14 @@ export const annotationToRawMeasurement = (dbAnnotation, displaySetService) => {
   }
 
   return {
-    // shape of object required for 'toMeasurementSchema' function
-    uid: dbAnnotation.annotationUID, // required unique identifier
+    // shape of object required for 'toMeasurementSchema' function.
+    // NOTE: `uid` here is NOT preserved — measurementService/CS3D always
+    // generates its own annotation UID internally, regardless of what's
+    // passed here. Confirmed empirically: setting this to dbAnnotation's
+    // original annotationUID had no effect on the UID actually registered
+    // in Cornerstone3D state. Kept only because the shape appears to
+    // require the key; do not rely on this value downstream.
+    uid: dbAnnotation.annotationUID,
     SOPInstanceUID,
     FrameOfReferenceUID: dbAnnotation.metadata.FrameOfReferenceUID,
     isLocked: false,
@@ -325,6 +351,8 @@ function parseReferenceImageId(referenceImageId: string) {
 //=========================================================
 // function to check if the annotation fetched from the database
 //    matches any of the measurements currently loaded 
+//    NOTE: label has username embedded as a prefix 
+//          which will distinguish an annotation on same image, same tool by different users
 function hasAnnotationInMeasurements(fetchedAnnotation, currentMeasurements) {
   if (!currentMeasurements?.length) return null;
 
