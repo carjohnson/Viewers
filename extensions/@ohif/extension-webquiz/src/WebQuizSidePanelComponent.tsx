@@ -46,7 +46,10 @@ import MarkStudyCompletedButton from './components/MarkStudyCompletedButton';
 import { useSeriesValidation } from './hooks/useSeriesValidation';
 import { useViewportAndSeriesSync } from './hooks/useViewportAndSeriesSync';
 import  useCustomizeAnnotationMenu  from './hooks/useCustomizeAnnotationMenu'
-import { postStudyProgress, postSeriesProgress, fetchStudyProgressFromDB } from './handlers/studyProgressHandlers';
+import { postSeriesProgress,
+            fetchStudyProgressFromDB,
+            postStudyOpened,
+            postStudyClosed } from './handlers/studyProgressHandlers';
 import { ModalComponent } from './components/ModalComponent';
 import { TriggerPostArgs } from './models/TriggerPostArgs';
 import { extensionManager } from 'platform/app/src/App';
@@ -632,6 +635,46 @@ useEffect(() => {
         isStudyCompletedRef.current = isStudyCompleted;
     }, [isStudyCompleted]);
 
+    //=========================================================
+    // Capture & post the time when the study was opened
+    // Post the opened StudyUID to be added to the Session
+    useEffect(() => {
+        if (!studyUID || !userInfo?.username) return;
+        console.log(' *** In useEffect to post studyUID:', studyUID);
+        const setCurrentStudyAndPostOpened = async () => {
+            try {
+            await fetch(`${API_BASE_URL}/users/session-study`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ studyUID }),
+            });
+
+            await postStudyOpened({
+                baseUrl: API_BASE_URL,
+                username: userInfo.username,
+                studyUID: studyInfo.studyUID,
+            });
+            } catch (error) {
+            console.error('❌ Error setting current study / posting opened:', error);
+            }
+        };
+
+        setCurrentStudyAndPostOpened();
+
+        return () => {
+            if (!studyUID || !userInfo?.username) return;
+            console.log(' *** In useEffect to post the close');
+            
+            postStudyClosed({
+            baseUrl: API_BASE_URL,
+            username: userInfo.username,
+            studyUID,
+            closeMethod: 'route_change',
+            });
+        };
+
+    }, [studyUID, userInfo?.username]);
 
     //=========================================================
     // rebuild the dropdown score map whenever there are changes to annotations

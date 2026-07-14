@@ -107,3 +107,53 @@ export const fetchStudyListFromDB = async({
         return { error };
     }
 }
+
+//=========================================================
+export const postStudyOpened = async ({
+  baseUrl,
+  username,
+  studyUID,
+}: {
+  baseUrl: string;
+  username: string;
+  studyUID: string;
+}) => {
+  try {
+    const res = await fetch(`${baseUrl}/api/study-opened`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, studyUID }),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('🚨 Error posting study opened:', err);
+    return { error: err };
+  }
+};
+
+//=========================================================
+export const postStudyClosed = async ({
+  baseUrl,
+  username,
+  studyUID,
+  closeMethod = 'unknown',
+}: {
+  baseUrl: string;
+  username: string;
+  studyUID: string;
+  closeMethod?: 'logout' | 'browser' | 'tab_close' | 'study_browser' | 'route_change' | 'unknown';
+}) => {
+  try {
+    const res = await fetch(`${baseUrl}/api/study-closed`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, studyUID, closeMethod }),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('🚨 Error posting study closed:', err);
+    return { error: err };
+  }
+};
