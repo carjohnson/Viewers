@@ -48,8 +48,7 @@ import { useViewportAndSeriesSync } from './hooks/useViewportAndSeriesSync';
 import  useCustomizeAnnotationMenu  from './hooks/useCustomizeAnnotationMenu'
 import { postSeriesProgress,
             fetchStudyProgressFromDB,
-            postStudyOpened,
-            postStudyClosed } from './handlers/studyProgressHandlers';
+            postTimedEvent, } from './handlers/studyProgressHandlers';
 import { ModalComponent } from './components/ModalComponent';
 import { TriggerPostArgs } from './models/TriggerPostArgs';
 import { extensionManager } from 'platform/app/src/App';
@@ -654,10 +653,12 @@ useEffect(() => {
                     body: JSON.stringify({ studyUID }),
                 });
 
-                await postStudyOpened({
+                await postTimedEvent({
                     baseUrl: API_BASE_URL,
                     username: userInfo.username,
                     studyUID,
+                    event: 'open',
+                    method: 'enter_extension',
                 });
             } catch (error) {
                 console.error('❌ Error setting current study / posting opened:', error);
@@ -670,14 +671,15 @@ useEffect(() => {
         // can post a fresh 'open', and so we don't double-post a close.
         let sessionOpen = true;
 
-        const postCloseOnce = (closeMethod) => {
+        const postCloseOnce = (method) => {
             if (!sessionOpen) return;
             sessionOpen = false;
-            postStudyClosed({
+            postTimedEvent({
                 baseUrl: API_BASE_URL,
                 username: userInfo.username,
                 studyUID,
-                closeMethod,
+                event: 'close',
+                method,
             });
         };
 
@@ -688,10 +690,12 @@ useEffect(() => {
                 postCloseOnce('visibility_lost');
             } else if (document.visibilityState === 'visible' && !sessionOpen) {
                 sessionOpen = true;
-                postStudyOpened({
+                postTimedEvent({
                     baseUrl: API_BASE_URL,
                     username: userInfo.username,
                     studyUID,
+                    event: 'open',
+                    method: 'visibility_regained',
                 });
             }
         };
@@ -713,6 +717,8 @@ useEffect(() => {
             postCloseOnce('exit_extension');
         };
     }, [studyUID, userInfo?.username]);
+
+
 
     //=========================================================
     // rebuild the dropdown score map whenever there are changes to annotations

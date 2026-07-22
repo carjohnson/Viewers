@@ -109,52 +109,30 @@ export const fetchStudyListFromDB = async({
 }
 
 //=========================================================
-export const postStudyOpened = async ({
+export const postTimedEvent = async ({
   baseUrl,
   username,
   studyUID,
+  event,
+  method = 'unknown',
 }: {
   baseUrl: string;
   username: string;
   studyUID: string;
+  event: 'open' | 'close';
+  method?: 'logout' | 'browser_close' | 'tab_close' | 'visibility_lost' | 'visibility_regained' | 'exit_extension' | 'enter_extension' | 'unknown';
 }) => {
   try {
-    const res = await fetch(`${baseUrl}/api/study-opened`, {
+    const res = await fetch(`${baseUrl}/api/timed-event`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, studyUID }),
+      body: JSON.stringify({ username, studyUID, event, method }),
+      keepalive: true,
     });
     return await res.json();
   } catch (err) {
-    console.error('🚨 Error posting study opened:', err);
-    return { error: err };
-  }
-};
-
-//=========================================================
-export const postStudyClosed = async ({
-  baseUrl,
-  username,
-  studyUID,
-  closeMethod = 'unknown',
-}: {
-  baseUrl: string;
-  username: string;
-  studyUID: string;
-  closeMethod?: 'logout' | 'browser_close' | 'tab_close' | 'visibility_lost' | 'exit_extension' | 'unknown';
-}) => {
-  try {
-    const res = await fetch(`${baseUrl}/api/study-closed`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, studyUID, closeMethod }),
-      keepalive: true,   // ← lets the browser finish sending this after the page/context unmounts
-    });
-    return await res.json();
-  } catch (err) {
-    console.error('🚨 Error posting study closed:', err);
+    console.error('🚨 Error posting timed event:', err);
     return { error: err };
   }
 };
