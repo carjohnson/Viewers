@@ -590,7 +590,7 @@ useEffect(() => {
             const progressData = await fetchStudyProgressFromDB({
                 baseUrl: API_BASE_URL,
                 username: userInfo.username,
-                studyUID: studyInfo.studyUID,
+                studyUID,
             });
 
             console.log('📦 Progress data from hook:', progressData);
@@ -636,44 +636,82 @@ useEffect(() => {
     }, [isStudyCompleted]);
 
     //=========================================================
-    // Capture & post the time when the study was opened
-    // Post the opened StudyUID to be added to the Session
+    // Capture & post the time when the study was opened and closed
+    // NOTE:
+    // 'pagehide' listener captures user events like tab close or browser close. 
+    //      It will fire off a 'visibilitychange' event first as part of the 
+    //      tear-down then the 'pagehide' event will fire. This app logs 
+    //      the first event as 'visibility_lost' and does not have time to log 'browser_close'
     useEffect(() => {
         if (!studyUID || !userInfo?.username) return;
-        console.log(' *** In useEffect to post studyUID:', studyUID);
+
         const setCurrentStudyAndPostOpened = async () => {
             try {
-            await fetch(`${API_BASE_URL}/users/session-study`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ studyUID }),
-            });
+                await fetch(`${API_BASE_URL}/users/session-study`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ studyUID }),
+                });
 
-            await postStudyOpened({
-                baseUrl: API_BASE_URL,
-                username: userInfo.username,
-                studyUID: studyInfo.studyUID,
-            });
+                await postStudyOpened({
+                    baseUrl: API_BASE_URL,
+                    username: userInfo.username,
+                    studyUID,
+                });
             } catch (error) {
-            console.error('❌ Error setting current study / posting opened:', error);
+                console.error('❌ Error setting current study / posting opened:', error);
             }
         };
 
         setCurrentStudyAndPostOpened();
 
-        return () => {
-            if (!studyUID || !userInfo?.username) return;
-            console.log(' *** In useEffect to post the close');
-            
+        // sessionOpen tracks current open/close state so re-entering the tab
+        // can post a fresh 'open', and so we don't double-post a close.
+        let sessionOpen = true;
+
+        const postCloseOnce = (closeMethod) => {
+            if (!sessionOpen) return;
+            sessionOpen = false;
             postStudyClosed({
-            baseUrl: API_BASE_URL,
-            username: userInfo.username,
-            studyUID,
-            closeMethod: 'route_change',
+                baseUrl: API_BASE_URL,
+                username: userInfo.username,
+                studyUID,
+                closeMethod,
             });
         };
 
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') {
+                // Fires on tab switch, minimize, tab close, browser close.
+                // Can't fully distinguish "closing" from "backgrounding" here.
+                postCloseOnce('visibility_lost');
+            } else if (document.visibilityState === 'visible' && !sessionOpen) {
+                sessionOpen = true;
+                postStudyOpened({
+                    baseUrl: API_BASE_URL,
+                    username: userInfo.username,
+                    studyUID,
+                });
+            }
+        };
+
+        const handlePageHide = () => {
+            // Fires specifically on unload (tab/browser close, navigation away)
+            postCloseOnce('browser_close');
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('pagehide', handlePageHide);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('pagehide', handlePageHide);
+
+            if (!studyUID || !userInfo?.username) return;
+            // In-app unmount (e.g. navigating to OHIF's study browser)
+            postCloseOnce('exit_extension');
+        };
     }, [studyUID, userInfo?.username]);
 
     //=========================================================

@@ -142,7 +142,7 @@ export const postStudyClosed = async ({
   baseUrl: string;
   username: string;
   studyUID: string;
-  closeMethod?: 'logout' | 'browser' | 'tab_close' | 'study_browser' | 'route_change' | 'unknown';
+  closeMethod?: 'logout' | 'browser_close' | 'tab_close' | 'visibility_lost' | 'exit_extension' | 'unknown';
 }) => {
   try {
     const res = await fetch(`${baseUrl}/api/study-closed`, {
@@ -150,6 +150,7 @@ export const postStudyClosed = async ({
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, studyUID, closeMethod }),
+      keepalive: true,   // ← lets the browser finish sending this after the page/context unmounts
     });
     return await res.json();
   } catch (err) {
