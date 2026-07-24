@@ -2,6 +2,9 @@ import { id } from './id';
 import WebQuizSidePanelComponent from './WebQuizSidePanelComponent';
 import CreateCustomIcon from './utils/CreateCustomIcon';
 import { Icons } from '@ohif/ui-next';
+// import getPanelModule from './getPanelModule';
+import  WrappedPanelStudyBrowser  from './Panels/WrappedPanelStudyBrowser';
+
 
 CreateCustomIcon(Icons);
 
@@ -28,7 +31,20 @@ export default {
    * iconName, iconLabel, label, component} object. Example of a panel module
    * is the StudyBrowserPanel that is provided by the default extension in OHIF.
    */
-  getPanelModule: ({ servicesManager, commandsManager, extensionManager }) => {
+  // getPanelModule: ({ servicesManager, commandsManager, extensionManager }) => {
+  //   // console.log('🧪 In Panel Module Is baines-logo in Icons?', 'baines-logo' in Icons);
+  //   return [
+  //     {
+  //       name: "webquiz",
+  //       iconName: 'baines-logo',
+  //       iconLabel: "Web Quiz",
+  //       label: "Baines Imaging Study",
+  //       component: WebQuizSidePanelComponent
+  //     }
+  //   ]
+  // },
+
+    getPanelModule: ({ servicesManager, commandsManager, extensionManager }) => {
     // console.log('🧪 In Panel Module Is baines-logo in Icons?', 'baines-logo' in Icons);
     return [
       {
@@ -37,9 +53,17 @@ export default {
         iconLabel: "Web Quiz",
         label: "Baines Imaging Study",
         component: WebQuizSidePanelComponent
-      }
+      },
+      {
+        name: 'seriesList',
+        iconName: 'group-layers',
+        iconLabel: 'Studies',
+        label: 'Studies',
+        component: WrappedPanelStudyBrowser,
+      },
     ]
   },
+ 
   /**
    * ViewportModule should provide a list of viewports that will be available in OHIF
    * for Modes to consume and use in the viewports. Each viewport is defined by
