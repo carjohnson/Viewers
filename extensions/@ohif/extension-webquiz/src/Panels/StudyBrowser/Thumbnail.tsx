@@ -38,7 +38,6 @@ const Thumbnail = ({
   // TODO: We should wrap our thumbnail to create a "DraggableThumbnail", as
   // this will still allow for "drag", even if there is no drop target for the
   // specified item.
-  console.log('🔥 MY FORKED THUMBNAIL', displaySetInstanceUID, isFlagged);
   const [collectedProps, drag, dragPreview] = useDrag({
     type: 'displayset',
     item: { ...dragData },

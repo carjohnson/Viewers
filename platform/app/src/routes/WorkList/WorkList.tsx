@@ -40,9 +40,12 @@ import { Types } from '@ohif/ui';
 
 import { preserveQueryParameters, preserveQueryStrings } from '../../utils/preserveQueryParameters';
 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// ~~ Customizing for WebQuiz ~~
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import { setUserInfo, getUserInfo, onUserInfoReady } from './../../../../../modes/@ohif/mode-webquiz/src/userInfoService';
 import { API_BASE_URL } from './../../../../../extensions/@ohif/extension-webquiz/src/config/config';
-import { fetchStudyListFromDB, fetchStudyProgressFromDB } from './../../../../../extensions/@ohif/extension-webquiz/src/handlers/studyProgressHandlers';
+import { fetchStudyListFromDB, fetchStudyProgressFromDB } from '../../../../../extensions/@ohif/extension-webquiz/src/handlers/studyHandlers';
 import { fetchSessionUserInfo } from './../../../../../extensions/@ohif/extension-webquiz/src/handlers/fetchSessionInfo';
 import {Study} from './../../../../../extensions/@ohif/extension-webquiz/src/models/Study';
 import {UserInfo} from './../../../../../extensions/@ohif/extension-webquiz/src/models/UserInfo';
@@ -256,12 +259,15 @@ function WorkList({
 
 
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // ~~ Customizing for WebQuiz ~~
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
   const [studyList, setStudyList] = useState<Study[]>([]);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [studyStatusMap, setStudyStatusMap] = useState<Record<string, 'new' | 'wip' | 'done'>>({});
 
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // used to identify the role of the user
   useEffect(() => {
     const fetchUser = async () => {
       const user = await fetchSessionUserInfo({ baseUrl: API_BASE_URL });
@@ -274,6 +280,7 @@ function WorkList({
   }, []);
 
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // used to assign 'study progress' icons to worklist 
   useEffect(() => {
     const fetchList = async () => {
       const result = await fetchStudyListFromDB({ baseUrl: API_BASE_URL });
@@ -313,6 +320,8 @@ function WorkList({
     }
   }, [userInfo, studyList]);
 
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // ~~~~~~ End Customizing ~~~~~~
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 

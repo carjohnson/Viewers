@@ -48,7 +48,8 @@ import { useViewportAndSeriesSync } from './hooks/useViewportAndSeriesSync';
 import  useCustomizeAnnotationMenu  from './hooks/useCustomizeAnnotationMenu'
 import { postSeriesProgress,
             fetchStudyProgressFromDB,
-            postTimedEvent, } from './handlers/studyProgressHandlers';
+            postTimedEvent,
+            fetchSeriesToBeAnnotatedFromDB, } from './handlers/studyHandlers';
 import { ModalComponent } from './components/ModalComponent';
 import { TriggerPostArgs } from './models/TriggerPostArgs';
 import { extensionManager } from 'platform/app/src/App';
@@ -181,6 +182,9 @@ function WebQuizSidePanelComponent() {
     const patientName = useStudyInfoStore(state => state.studyInfo?.patientName);
     const studyUID = studyInfo?.studyUID;
 
+    const { setSeriesToBeAnnotatedUIDs } = useStudyInfoStore();
+    const seriesFetchRequestId = useRef(0);
+
     const userInfo = getUserInfo();
 
 
@@ -213,12 +217,32 @@ function WebQuizSidePanelComponent() {
 
 
 
-useEffect(() => {
-  if (!studyUID) return;
-  
-  console.log('📊 Reset check: studyUID=', studyUID);
-  useSegmentationLoadStore.getState().resetForNewStudy(studyUID);
-}, [studyUID]);
+    //=========================================================
+    useEffect(() => {
+        if (!studyUID) return;
+        
+        console.log('📊 Reset check: studyUID=', studyUID);
+        useSegmentationLoadStore.getState().resetForNewStudy(studyUID);
+    }, [studyUID]);
+
+
+    //=========================================================
+    useEffect(() => {
+        const currentStudyUID = studyUID;
+        if (!currentStudyUID) return;
+
+        const requestId = ++seriesFetchRequestId.current;
+
+        fetchSeriesToBeAnnotatedFromDB({baseUrl:API_BASE_URL, studyUID: currentStudyUID}) // your DB call, TBD
+            .then((seriesUIDs) => {
+            // bail if a newer study was selected before this resolved
+            if (requestId !== seriesFetchRequestId.current) return;
+            setSeriesToBeAnnotatedUIDs(seriesUIDs);
+            })
+            .catch((err) => {
+            console.error('Failed to fetch series to annotate', err);
+            });
+    }, [studyUID]);
 
 
     // //>>>>> for debug <<<<<

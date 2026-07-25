@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@ohif/ui'; // or your preferred button source
-import { postStudyProgressComplete } from '../handlers/studyProgressHandlers';
+import { postStudyProgressComplete } from '../handlers/studyHandlers';
 import {UserInfo} from '../models/UserInfo'
 
 type Props = {

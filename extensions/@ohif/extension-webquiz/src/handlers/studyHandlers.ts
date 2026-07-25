@@ -73,6 +73,7 @@ export const fetchStudyProgressFromDB = async ({
     }
 
     const result = await res.json();
+
     return result;
   } catch (error) {
     console.error('❌ Error fetching study progress:', error);
@@ -95,7 +96,7 @@ export const fetchStudyListFromDB = async({
 
         if (!res.ok) {
         console.warn(`⚠️ Failed to fetch study list: ${res.status}`);
-        return { error: `studyProgressHandlers>>fetchStudyListFromDB>Server responded with ${res.status}` };
+        return { error: `studyHandlers>>fetchStudyListFromDB>Server responded with ${res.status}` };
         }
 
         const result = await res.json();
@@ -103,10 +104,39 @@ export const fetchStudyListFromDB = async({
         return result;
 
     } catch (error) {
-        console.error('❌ studyProgressHandlers>>fetchStudyListFromDB>Error fetching study list:', error);
+        console.error('❌ studyHandlers>>fetchStudyListFromDB>Error fetching study list:', error);
         return { error };
     }
 }
+
+//=========================================================
+export const fetchSeriesToBeAnnotatedFromDB = async({
+  baseUrl,
+  studyUID,
+}: {
+  baseUrl: string;
+  studyUID: string;
+}): Promise<string[]> => {
+  try {
+      const res = await fetch(
+        `${baseUrl}/webquiz/list-study-seriesToBeAnnotated?studyUID=${studyUID}`,
+        { credentials: 'include' }
+        );
+
+      if (!res.ok) {
+        console.warn(`⚠️ Failed to fetch seriesToBeAnnotated list: ${res.status}`);
+        throw new Error(`Failed to fetch seriesToBeAnnotated for Study. Server responded with ${res.status} `);
+        }
+
+    const { payload: seriesToBeAnnotatedList } = await res.json();
+    console.log(' *** IN FETCH SERIES UIDS:', seriesToBeAnnotatedList);
+
+
+      return seriesToBeAnnotatedList;
+    } catch (err) {
+      throw err;
+    }
+  }
 
 //=========================================================
 export const postTimedEvent = async ({

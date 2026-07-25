@@ -28,16 +28,22 @@ type StudyInfo = {
   patientId?: string;
   studyUID?: string;
   frameUID?: string;
+  seriesToBeAnnotatedUIDs?: string[];
 };
 
 type StudyInfoStore = {
   studyInfo: StudyInfo | null;
   setStudyInfo: (info: StudyInfo) => void;
+  setSeriesToBeAnnotatedUIDs: (uids: string[]) => void;
   clearStudyInfo: () => void;
 };
 
 export const useStudyInfoStore = create<StudyInfoStore>((set) => ({
   studyInfo: null,
   setStudyInfo: (info) => set({ studyInfo: info }),
+  setSeriesToBeAnnotatedUIDs: (uids) =>
+    set((state) => ({
+      studyInfo: { ...state.studyInfo, seriesToBeAnnotatedUIDs: uids },
+    })),
   clearStudyInfo: () => set({ studyInfo: null }),
 }));

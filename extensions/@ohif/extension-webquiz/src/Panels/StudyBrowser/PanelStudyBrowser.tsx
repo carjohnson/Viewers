@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useImageViewer } from '@ohif/ui-next';
 import { useSystem, utils } from '@ohif/core';
 import { useNavigate } from 'react-router-dom';
@@ -11,6 +11,8 @@ import { defaultActionIcons } from '@ohif/extension-default/src/Panels/StudyBrow
 import MoreDropdownMenu from '@ohif/extension-default/src/Components/MoreDropdownMenu';
 import { CallbackCustomization } from 'platform/core/src/types';
 import { type TabsProps } from '@ohif/core/src/utils/createStudyBrowserTabs';
+
+import { useStudyInfoStore } from '../../stores/useStudyInfoStore';
 
 const { sortStudyInstances, formatDate, createStudyBrowserTabs } = utils;
 
@@ -37,7 +39,15 @@ function PanelStudyBrowser({
   const internalImageViewer = useImageViewer();
   const StudyInstanceUIDs = internalImageViewer.StudyInstanceUIDs;
   const fetchedStudiesRef = useRef(new Set());
-  const flaggedUIDs = new Set(['1.3.6.1.4.1.14519.5.2.1.8421.4008.188706028250957540305275257325']); // hardcoded for now
+
+  const seriesToBeAnnotatedUIDs = useStudyInfoStore(
+    state => state.studyInfo?.seriesToBeAnnotatedUIDs
+  );
+
+  const flaggedUIDs = useMemo(
+    () => new Set(seriesToBeAnnotatedUIDs ?? []),
+    [seriesToBeAnnotatedUIDs]
+  );
 
   const [{ activeViewportId, viewports, isHangingProtocolLayout }] = useViewportGrid();
   const [activeTabName, setActiveTabName] = useState(studyMode);
@@ -246,6 +256,7 @@ function PanelStudyBrowser({
     viewports,
     thumbnailImageSrcMap,
     customMapDisplaySets,
+    flaggedUIDs,
   ]);
 
   // ~~ subscriptions --> displaySets
