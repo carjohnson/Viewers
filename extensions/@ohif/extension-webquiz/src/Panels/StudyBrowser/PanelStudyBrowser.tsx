@@ -362,6 +362,7 @@ function PanelStudyBrowser({
     viewports,
     displaySetService,
     customMapDisplaySets,
+    flaggedUIDs,
   ]);
 
   const tabs = createStudyBrowserTabs(StudyInstanceUIDs, studyDisplayList, displaySets);

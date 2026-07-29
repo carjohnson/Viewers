@@ -40,7 +40,10 @@ type StudyInfoStore = {
 
 export const useStudyInfoStore = create<StudyInfoStore>((set) => ({
   studyInfo: null,
-  setStudyInfo: (info) => set({ studyInfo: info }),
+  setStudyInfo: (info) =>
+    set((state) => ({
+      studyInfo: { ...state.studyInfo, ...info },
+    })),
   setSeriesToBeAnnotatedUIDs: (uids) =>
     set((state) => ({
       studyInfo: { ...state.studyInfo, seriesToBeAnnotatedUIDs: uids },

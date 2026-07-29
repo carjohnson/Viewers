@@ -208,12 +208,13 @@ function WebQuizSidePanelComponent() {
             ...studyInfoFromHook,
             patientName: patientInfo.PatientName,
             patientId: patientInfo.PatientID,
+            seriesToBeAnnotatedUIDs: studyInfo?.seriesToBeAnnotatedUIDs,
         };
 
         console.log('✅ Setting full study info in Zustand:', fullInfo);
         setStudyInfo(fullInfo);
 
-    }, [studyInfoFromHook, patientInfo]);
+    }, [studyInfoFromHook, patientInfo,studyInfo?.seriesToBeAnnotatedUIDs]);
 
 
 
