@@ -37,32 +37,69 @@ export function useViewportAndSeriesSync({
   // ---------------------------------------------------------
   // Main orchestrator: updates viewport + series together
   // ---------------------------------------------------------
-  const updateActiveViewport = useCallback(
-    (viewportId: string | null) => {
-      setActiveViewportId(viewportId);
-      activeViewportIdRef.current = viewportId;
+  // const updateActiveViewport = useCallback(
+  //   (viewportId: string | null) => {
+  //     setActiveViewportId(viewportId);
+  //     activeViewportIdRef.current = viewportId;
 
-            // Get the Cornerstone viewport
-      const csViewport =
-        cornerstoneViewportService.getCornerstoneViewport(viewportId);
+  //           // Get the Cornerstone viewport
+  //     const csViewport =
+  //       cornerstoneViewportService.getCornerstoneViewport(viewportId);
 
-      if (csViewport && 'getImageIds' in csViewport) {
+  //     if (csViewport && 'getImageIds' in csViewport) {
+  //       const imageIds = (csViewport as any).getImageIds() as string[];
+  //       setActiveViewportImageIds(imageIds);
+  //       // console.log(' *** IN HOOK FOR VIEWPORT imageId:', imageIds[0]);
+  //     }
+
+  //     // Optional: sync cornerstone viewport element
+  //     if (viewportId && cornerstoneViewportService) {
+  //       const viewportInfo = cornerstoneViewportService.getViewportInfo(viewportId);
+  //       viewportInfo?.getElement?.() ?? viewportInfo?.element ?? null;
+  //     }
+
+
+  //     updateSeriesUID(viewportId);
+  //   },
+  //   [cornerstoneViewportService, updateSeriesUID]
+  // );
+
+const updateActiveViewport = useCallback(
+  (viewportId: string | null) => {
+    setActiveViewportId(viewportId);
+    activeViewportIdRef.current = viewportId;
+
+    // Update series UID first — this shouldn't depend on volume/actor readiness
+    updateSeriesUID(viewportId);
+
+    // Get the Cornerstone viewport
+    const csViewport =
+      cornerstoneViewportService.getCornerstoneViewport(viewportId);
+
+    if (csViewport && 'getImageIds' in csViewport) {
+      try {
         const imageIds = (csViewport as any).getImageIds() as string[];
         setActiveViewportImageIds(imageIds);
-        // console.log(' *** IN HOOK FOR VIEWPORT imageId:', imageIds[0]);
+      } catch (err) {
+        // Volume/actor not ready yet (e.g. mid layout change or series drop).
+        // Don't crash the subscriber chain — just skip this update.
+        console.warn(
+          `[useViewportAndSeriesSync] getImageIds failed for viewport ${viewportId}, likely mid-transition:`,
+          err
+        );
+        setActiveViewportImageIds(null);
       }
+    }
 
-      // Optional: sync cornerstone viewport element
-      if (viewportId && cornerstoneViewportService) {
-        const viewportInfo = cornerstoneViewportService.getViewportInfo(viewportId);
-        viewportInfo?.getElement?.() ?? viewportInfo?.element ?? null;
-      }
+    if (viewportId && cornerstoneViewportService) {
+      const viewportInfo = cornerstoneViewportService.getViewportInfo(viewportId);
+      viewportInfo?.getElement?.() ?? viewportInfo?.element ?? null;
+    }
+  },
+  [cornerstoneViewportService, updateSeriesUID]
+);
 
 
-      updateSeriesUID(viewportId);
-    },
-    [cornerstoneViewportService, updateSeriesUID]
-  );
 
   // ---------------------------------------------------------
   // Subscriptions: single point for all viewport events
