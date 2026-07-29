@@ -149,8 +149,8 @@ export const postTimedEvent = async ({
   baseUrl: string;
   username: string;
   studyUID: string;
-  event: 'open' | 'close';
-  method?: 'logout' | 'browser_close' | 'tab_close' | 'visibility_lost' | 'visibility_regained' | 'exit_extension' | 'enter_extension' | 'unknown';
+  event: 'open' | 'close' | 'case_completed';
+  method?: 'logout' | 'browser_close' | 'tab_close' | 'visibility_lost' | 'visibility_regained' | 'exit_extension' | 'enter_extension' | 'user_marked_complete' | 'unknown';
 }) => {
   try {
     const res = await fetch(`${baseUrl}/api/timed-event`, {

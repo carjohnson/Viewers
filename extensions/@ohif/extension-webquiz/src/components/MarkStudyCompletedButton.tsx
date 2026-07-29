@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@ohif/ui'; // or your preferred button source
-import { postStudyProgressComplete } from '../handlers/studyHandlers';
+import { postStudyProgressComplete, postTimedEvent } from '../handlers/studyHandlers';
 import {UserInfo} from '../models/UserInfo'
 
 type Props = {
@@ -75,6 +75,15 @@ const MarkStudyCompletedButton: React.FC<Props> = ({
     } else {
       console.log(`📌 Progress posted for ${studyInstanceUID}`);
     }
+
+    // 2) Post a timed event in database for "case completed"
+    await postTimedEvent({
+      baseUrl,
+      username: userInfo.username,
+      studyUID: studyInstanceUID,
+      event: 'case_completed',        // or 'close' if you want to reuse the same event type
+      method: 'user_marked_complete', // distinguishes it from visibility/pagehide/exit_extension
+    });
 
     closeModal();
 
