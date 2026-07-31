@@ -17,6 +17,7 @@ import { segmentation, Enums as ToolEnums } from '@cornerstonejs/tools';
 import { createSegDisplaySetFromArrayBuffer } from './dicomSegUtils';
 import dicomImageLoader from '@cornerstonejs/dicom-image-loader';
 import { eventTarget, EVENTS } from '@cornerstonejs/core';
+import { imageLoader } from '@cornerstonejs/core';
 
 
 // for creating the blob when saving a segment
@@ -96,7 +97,8 @@ export async function loadDicomSegIntoOHIF(
         });
         
         // Give the viewer a moment to switch display sets
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await waitForImagesLoaded(referencedImageIds);
+        // await new Promise(resolve => setTimeout(resolve, 100));
     }
 
 
@@ -187,21 +189,33 @@ export async function loadDicomSegIntoOHIF(
 }
 
 // =====================================
+  export async function forceStatsRecompute(
+    segmentationService: any,
+    segmentationId: string,
+    segmentIndex: number,
+    timeoutMs = 8000, // generous — Render can be slow
+  ) {
+    if (!segmentationId) return;
 
-export function forceStatsRecompute(segmentationService: any, segmentationId: string, segmentIndex: number) {
-  if (!segmentationId) return;
+    eventTarget.dispatchEvent(
+      new CustomEvent(segmentationService.EVENTS.SEGMENTATION_DATA_MODIFIED, {
+        detail: { segmentationId, segmentIndex },
+      })
+    );
 
-  eventTarget.dispatchEvent(
-    new CustomEvent(segmentationService.EVENTS.SEGMENTATION_DATA_MODIFIED, {
-      detail: { segmentationId, segmentIndex },
-    })
-  );
-
-  // Wait longer than the debounce before trusting stats have been computed
-  return new Promise<void>((resolve) => {
-    setTimeout(resolve, 1200); // 1.2s > 1s debounce
-  });
-}
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      await new Promise(r => setTimeout(r, 150));
+      const seg = segmentationService.getSegmentation(segmentationId);
+      const namedStats = seg?.segments?.[segmentIndex]?.cachedStats?.namedStats;
+      if (namedStats && Object.keys(namedStats).length > 0) {
+        return; // stats actually arrived
+      }
+    }
+    console.warn(
+      `Timed out waiting for cachedStats on ${segmentationId} / segment ${segmentIndex} — proceeding anyway`
+    );
+  }
 
 // =====================================
 export async function saveSegmentation({
@@ -364,7 +378,8 @@ for (const seg of Object.values(allSegmentations)) {
         });
 
         // Give the UI time to re-render the volume
-        await new Promise(resolve => setTimeout(resolve, 500)); 
+        const referencedImageIds = referencedDisplaySet.images?.map(i => i.imageId) ?? [];
+        await waitForImagesLoaded(referencedImageIds);
     }
 
     // Now it is safe to generate
@@ -558,14 +573,13 @@ export function refreshSegmentMetadataStore (segmentationService: any) {
   const lIdsFromService: string[] =   lSegmentationsFromService.map(s => s.segmentationId);
   const lIdsFromStore = useSegmentMetadataStore.getState().getAllSegmentationsIds();
 
-  console.log(' *** IN REFRESH - SERVICE SEGMENTATIONS:', lSegmentationsFromService);
-  
   // look for segmentations missing in each list
   const lUnmatchedIdsFromStore: string[] = lIdsFromStore.filter(s => !lIdsFromService.includes(s));
   const lUnmatchedIdsFromService: string[] = lIdsFromService.filter(s => !lIdsFromStore.includes(s));
   const lMatchedIds: string[] = lIdsFromService.filter(s => lIdsFromStore.includes(s));
 
   const store = useSegmentMetadataStore.getState();
+  console.log(' *** IN REFRESH - SERVICE SEGMENTATIONS... SegsFromService, store:', lSegmentationsFromService, store);
 
   // exists in store but not in service
   // remove segmentation items from store if there is no match in the service
@@ -875,7 +889,20 @@ export async function generateSegmentationActivity(
 
     const referencedDisplaySets = displaySetService.getDisplaySetsForSeries(seriesUid);
     const referencedDisplaySet = referencedDisplaySets?.[0];
+  
+    if (!referencedDisplaySet) {
+    const resultsMsg = `No displaySet found for series ${seriesUid} in ${seg.segmentationId}`;
+    console.warn(resultsMsg);
+    return {
+      ...segResult,
+      generateStatus: 'error',
+      databaseAction: 'n/a',
+      resultStatusNote: resultsMsg,
+    };
+  }
+  
     const image0 = referencedDisplaySet.images[0];
+    const displaySetInstanceUID = referencedDisplaySets[0]?.displaySetInstanceUID;
 
     // /////////// FOR DEBUG ////////////
     // const pixelSpacing = image0.PixelSpacing; // [row, col]
@@ -896,19 +923,6 @@ export async function generateSegmentationActivity(
     //   );
     // /////////// END FOR DEBUG ////////////
 
-    const displaySets = displaySetService.getDisplaySetsForSeries(seriesUid);
-    const displaySetInstanceUID = displaySets[0]?.displaySetInstanceUID;
-
-    if (!displaySetInstanceUID) {
-      const resultsMsg = `No displaySet found for series ${seriesUid} in ${seg.segmentationId}`;
-      console.warn(resultsMsg);
-      return {
-        ... segResult,
-        generateStatus: 'error',
-        databaseAction: 'n/a',
-        resultStatusNote: resultsMsg,
-      };
-    }
 
     await viewportGridService.setDisplaySetsForViewport({
       viewportId: activeViewportId,
@@ -916,7 +930,8 @@ export async function generateSegmentationActivity(
     });
 
     // Give OHIF a moment to render the new stack
-    await new Promise(resolve => setTimeout(resolve, 50));
+    const referencedImageIds = referencedDisplaySet.images?.map(i => i.imageId) ?? [];
+    await waitForImagesLoaded(referencedImageIds);
 
     // Check if at least one segment has non‑zero volume
     //    (generateSegmentation will fail if there are no segments with volume)
@@ -1141,6 +1156,13 @@ async function processAndPostSegmentationResults({
 ///////////////////////////////////////////////
 //////////////// HELPERS /////////////////////
 ///////////////////////////////////////////////
+
+// =====================================
+async function waitForImagesLoaded(imageIds: string[]): Promise<void> {
+  // loadAndCacheImage resolves immediately if already cached,
+  // otherwise it resolves once the image is actually decoded and in cache.
+  await Promise.all(imageIds.map(id => imageLoader.loadAndCacheImage(id)));
+}
 
 // =====================================
 type NumericValue = number | number[];
