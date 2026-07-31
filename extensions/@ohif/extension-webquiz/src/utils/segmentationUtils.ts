@@ -98,7 +98,6 @@ export async function loadDicomSegIntoOHIF(
         
         // Give the viewer a moment to switch display sets
         await waitForImagesLoaded(referencedImageIds);
-        // await new Promise(resolve => setTimeout(resolve, 100));
     }
 
 
@@ -1158,10 +1157,35 @@ async function processAndPostSegmentationResults({
 ///////////////////////////////////////////////
 
 // =====================================
-async function waitForImagesLoaded(imageIds: string[]): Promise<void> {
+export async function waitForImagesLoaded(imageIds: string[]): Promise<void> {
   // loadAndCacheImage resolves immediately if already cached,
   // otherwise it resolves once the image is actually decoded and in cache.
   await Promise.all(imageIds.map(id => imageLoader.loadAndCacheImage(id)));
+}
+
+// =====================================
+type DisplaySetService = {
+  getActiveDisplaySets: () => Array<{
+    SeriesInstanceUID: string;
+    imageIds?: string[];
+    images?: Array<{ imageId: string }>;
+  }>;
+};
+
+export function getImageIdsForSeries(
+  displaySetService: DisplaySetService,
+  seriesInstanceUID: string
+): string[] {
+  const displaySets = displaySetService.getActiveDisplaySets();
+  const targetDisplaySet = displaySets.find(
+    ds => ds.SeriesInstanceUID === seriesInstanceUID
+  );
+
+  if (!targetDisplaySet) return [];
+
+  return targetDisplaySet.imageIds
+    ?? targetDisplaySet.images?.map(img => img.imageId)
+    ?? [];
 }
 
 // =====================================

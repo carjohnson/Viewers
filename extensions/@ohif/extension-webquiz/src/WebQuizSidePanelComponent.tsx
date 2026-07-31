@@ -27,7 +27,11 @@ import { handleMeasurementAdded,
        } from './handlers/annotationEventHandlers';
 import { ToolGroupManager } from '@cornerstonejs/tools';
 import { base64ToArrayBuffer } from './utils/dataUtils';
-import { loadDicomSegIntoOHIF, refreshSegmentMetadataStore, saveAllSegmentations } from './utils/segmentationUtils';
+import { loadDicomSegIntoOHIF,
+            refreshSegmentMetadataStore,
+            saveAllSegmentations,
+            getImageIdsForSeries,
+            waitForImagesLoaded } from './utils/segmentationUtils';
 import { measurementScoreOptions } from './models/ScoreOptions';
 import { groundTruthOptions, referenceStandardMethodOptions, hepaticSegmentOptions } from './models/ScoreOptions';
 
@@ -413,6 +417,7 @@ useEffect(() => {
     // ********************* Segmentations ************************
     // ************************************************************
 
+
     const loadingSegmentationRef = useRef(false);
     useEffect(() => {
         async function loadSegmentations() {
@@ -436,6 +441,16 @@ useEffect(() => {
 
                 for (const seg of payload) {
                     console.log(' *** IN FETCH SEGS ... url', seg.segmentationFileUrl);
+                    
+                    //  ensure all images have been loaded for the series before the fetched segmentation is loaded into OHIF
+                    const imageIds = getImageIdsForSeries(displaySetService, seg.referencedSeriesUID);
+                        if (imageIds.length === 0) {
+                            console.warn('No display set / imageIds found yet for', seg.referencedSeriesUID);
+                            // optionally: poll/wait for displaySetService to have it, then retry
+                        } else {
+                            await waitForImagesLoaded(imageIds);
+                        }
+
                     const res = await fetch(
                     `${API_BASE_URL}/webquiz/get-segmentation-file?segmentationId=${seg.segmentationId}`,
                     { credentials: 'include' }
@@ -443,7 +458,6 @@ useEffect(() => {
                     if (!res.ok) throw new Error('Failed to fetch SEG file');
 
                     const arrayBuffer = await res.arrayBuffer();
-
                     await loadDicomSegIntoOHIF({
                         segmentationId: seg.segmentationId,
                         referencedSeriesInstanceUID: seg.referencedSeriesUID,
