@@ -17,10 +17,21 @@
  *
  * debouncedUpdate(); // Will only run if not called again within 200ms
  */
-export function debounce<T extends (...args: any[]) => void>(func: T, delay: number): T {
+// export function debounce<T extends (...args: any[]) => void>(func: T, delay: number): T {
+//   let timer: NodeJS.Timeout;
+//   return function (...args: Parameters<T>) {
+//     clearTimeout(timer);
+//     timer = setTimeout(() => func(...args), delay);
+//   } as T;
+// }
+
+export function debounce<T extends (...args: any[]) => void>(func: T, delay: number): T & { cancel: () => void } {
   let timer: NodeJS.Timeout;
-  return function (...args: Parameters<T>) {
+  const debounced = function (...args: Parameters<T>) {
     clearTimeout(timer);
     timer = setTimeout(() => func(...args), delay);
-  } as T;
+  } as T & { cancel: () => void };
+
+  debounced.cancel = () => clearTimeout(timer);
+  return debounced;
 }
