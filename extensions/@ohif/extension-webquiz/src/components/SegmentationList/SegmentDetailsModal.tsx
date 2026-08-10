@@ -60,6 +60,7 @@ import { SegmentMetadata } from '../../models/SegmentationData';
 
 
   useEffect(() => {
+    let cancelled = false;
     onSaveSegmentData(() => {
       if (!groundTruthValue || !referenceMethodValue || hepaticValues.length === 0)  {
         setStatusType("error");
@@ -71,10 +72,12 @@ import { SegmentMetadata } from '../../models/SegmentationData';
         setStatusMessage("Saving ...");
 
         // simulate async save
-           setTimeout(() => {
-             setStatusType("success");
-             setStatusMessage("Saved successfully!");
-           }, 800);
+          setTimeout(() => {
+            if (!cancelled) {
+              setStatusType("success");
+              setStatusMessage("Saved successfully!");
+            }
+          }, 800);
 
         return {
           groundTruth: groundTruthValue,
@@ -83,6 +86,7 @@ import { SegmentMetadata } from '../../models/SegmentationData';
         };
       }      
     });
+    return () => { cancelled = true; };
   }, [groundTruthValue, referenceMethodValue, hepaticValues]);
 
 

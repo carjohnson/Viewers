@@ -509,7 +509,7 @@ useEffect(() => {
         }
 
         }, 500); // small delay, adjust as needed - temporary - change to event listeners? or remove?
-
+        return () => clearTimeout(timerId);
     }, [hasLoadedSegmentations , activeViewportId, studyInfoFromHook?.studyUID]);
 
 
