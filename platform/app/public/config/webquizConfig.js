@@ -18,12 +18,17 @@ window.config = {
   strictZSpacingForVolumeViewport: true,
   groupEnabledModesFirst: true,
   allowMultiSelectExport: false,
+  // maxNumRequests: {
+  //   interaction: 100,
+  //   thumbnail: 75,
+  //   // Prefetch number is dependent on the http protocol. For http 2 or
+  //   // above, the number of requests can be go a lot higher.
+  //   prefetch: 25,
+  // },
   maxNumRequests: {
-    interaction: 100,
-    thumbnail: 75,
-    // Prefetch number is dependent on the http protocol. For http 2 or
-    // above, the number of requests can be go a lot higher.
-    prefetch: 25,
+    interaction: 15,
+    thumbnail: 6,
+    prefetch: 4,
   },
   // filterQueryParam: false,
   // Defines multi-monitor layouts
