@@ -25,11 +25,15 @@ window.config = {
   //   // above, the number of requests can be go a lot higher.
   //   prefetch: 25,
   // },
+  // /////////////////////
+  // WebQuiz Configuration for Render's memory-constrained Orthanc service 512MB RAM
+  // Reduce from OHIF's defaults to cap how many simultaneous requests any one session can throw at Orthanc at once
   maxNumRequests: {
-    interaction: 15,
-    thumbnail: 6,
-    prefetch: 4,
+    interaction: 30,
+    thumbnail: 15,
+    prefetch: 8,
   },
+  // /////////////////////
   // filterQueryParam: false,
   // Defines multi-monitor layouts
   multimonitor: [
