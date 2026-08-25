@@ -13,10 +13,9 @@ export const referenceStandardMethodOptions = [
     { value: 4, label: 'Grew on follow-up' },
     { value: 5, label: 'Stable on follow-up (no treatment)' },
     { value: 6, label: 'Stable on follow-up (with treatment)' },
-    { value: 7, label: 'Stable on follow-up (no treatment)' },
+    { value: 7, label: 'Shrank on follow-up (no treatment)' },
     { value: 8, label: 'Shrank on follow-up (with treatment)' },
-    { value: 9, label: 'Shrank on follow-up (no treatment)' },
-    { value: 10, label: 'None available' },
+    { value: 9, label: 'None available' },
 ];
 
 //~~~~~~~~~~~~~~~~~
