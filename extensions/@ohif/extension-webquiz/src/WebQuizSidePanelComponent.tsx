@@ -943,38 +943,40 @@ useEffect(() => {
                 flexDirection: 'column',
                 overflowX: 'hidden',
                 padding: '0 0.5rem',
+                boxSizing: 'border-box',
                 }}
             >
-                <MarkStudyCompletedButton
-                baseUrl={API_BASE_URL}
-                getUserInfo={getUserInfo}
-                studyInstanceUID={studyInfoFromHook?.studyUID}
-                isStudyCompleted={isStudyCompleted}
-                setStudyCompleted={setStudyCompleted}
-                isStudyCompletedRef={isStudyCompletedRef}
-                onMarkCompleted={(studyInstanceUID) => {
-                    lockAllAnnotations({ annotation, userInfo, isStudyCompletedRef });
-                    setDropdownMapVersion((v) => v + 1);
-                }}
-                showModal={showModal}
-                closeModal={closeModal}
-                />
-
+                {userInfo?.role !== 'admin' && (
+                    <MarkStudyCompletedButton
+                    baseUrl={API_BASE_URL}
+                    getUserInfo={getUserInfo}
+                    studyInstanceUID={studyInfoFromHook?.studyUID}
+                    isStudyCompleted={isStudyCompleted}
+                    setStudyCompleted={setStudyCompleted}
+                    isStudyCompletedRef={isStudyCompletedRef}
+                    onMarkCompleted={(studyInstanceUID) => {
+                        lockAllAnnotations({ annotation, userInfo, isStudyCompletedRef });
+                        setDropdownMapVersion((v) => v + 1);
+                    }}
+                    showModal={showModal}
+                    closeModal={closeModal}
+                    />
+                )}
                 <div
                 className="text-white w-full text-center"
-                style={{ flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+                style={{ flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}
                 >
                 {/* <div style={{ flex: '1 1 50%', overflowY: 'auto', minHeight: 0 }}> */}
-                <div style={{ flex: '0 1 auto', maxHeight: '40%',overflowY: 'auto', minHeight: 0 }}>
+                <div style={{ flex: '0 1 auto', maxHeight: '50%',overflowY: 'auto', minHeight: 0, boxSizing: 'border-box' }}>
                     <SegmentationList
                     getUserInfo={getUserInfo}
                     segmentationList={segmentationList}
                     onSegmentClick={onSegmentClick}
                     />
                 </div>
-
+                
                 {/* <div style={{ flex: '1 1 50%', overflowY: 'auto', minHeight: 0 }}> */}
-                <div style={{ flex: '1 1 auto', overflowY: 'auto', minHeight: 0 }}>
+                <div style={{ flex: '1 1 auto', overflowY: 'auto', minHeight: 0, boxSizing: 'border-box' }}>
                     <AnnotationList
                     measurementList={measurementList}
                     dropdownSelectionMap={dropdownSelectionMap}
