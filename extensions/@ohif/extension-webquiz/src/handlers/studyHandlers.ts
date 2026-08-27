@@ -1,3 +1,21 @@
+import { notifyBackendError, isServerFailure } from '../utils/notifyBackendError';
+
+// A 2xx/4xx/5xx response that isn't valid JSON almost always means we got
+// redirected to the login page (HTML) instead of the API response - most
+// commonly because this fetch fired before the session/auth cookie was
+// fully recognized by the server, a timing issue rather than a real
+// backend/DB outage. Treat that case separately from an actual network
+// failure so we don't show the "database is down" popup for it.
+async function safeParseJson(res: Response): Promise<{ ok: true; data: any } | { ok: false; error: string }> {
+  try {
+    const data = await res.json();
+    return { ok: true, data };
+  } catch (err) {
+    console.warn('⚠️ Response was not valid JSON (possibly redirected to login - session not yet established?):', err);
+    return { ok: false, error: 'Unexpected response from server - you may need to log in again' };
+  }
+}
+
 //=========================================================
 export const postSeriesProgress = async ({
   baseUrl,
@@ -19,10 +37,21 @@ export const postSeriesProgress = async ({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, studyUID, seriesUID, status }),
     });
-    const result = await res.json();
-    return result;
+
+    if (!res.ok) {
+      if (isServerFailure(res.status)) {
+        notifyBackendError(`Failed to save series progress (server responded ${res.status})`);
+      }
+      console.warn(`⚠️ Failed to post series progress: ${res.status}`);
+      return { error: `Server responded with ${res.status}` };
+    }
+
+    const parsed = await safeParseJson(res);
+    return parsed.ok ? parsed.data : { error: parsed.error };
   } catch (err) {
+    // fetch() itself threw - a genuine network/connectivity failure
     console.error('🚨 Error posting series progress:', err);
+    notifyBackendError(err instanceof Error ? err.message : String(err));
     return { error: err };
   }
 };
@@ -43,10 +72,20 @@ export const postStudyProgressComplete = async ({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, studyUID }),
     });
-    const result = await res.json();
-    return result;
+
+    if (!res.ok) {
+      if (isServerFailure(res.status)) {
+        notifyBackendError(`Failed to mark study complete (server responded ${res.status})`);
+      }
+      console.warn(`⚠️ Failed to post study complete: ${res.status}`);
+      return { error: `Server responded with ${res.status}` };
+    }
+
+    const parsed = await safeParseJson(res);
+    return parsed.ok ? parsed.data : { error: parsed.error };
   } catch (err) {
     console.error('🚨 Error posting study complete progress:', err);
+    notifyBackendError(err instanceof Error ? err.message : String(err));
     return { error: err };
   }
 };
@@ -68,15 +107,18 @@ export const fetchStudyProgressFromDB = async ({
     );
 
     if (!res.ok) {
+      if (isServerFailure(res.status)) {
+        notifyBackendError(`Failed to fetch study progress (server responded ${res.status})`);
+      }
       console.warn(`⚠️ Failed to fetch study progress: ${res.status}`);
       return { error: `Server responded with ${res.status}` };
     }
 
-    const result = await res.json();
-
-    return result;
+    const parsed = await safeParseJson(res);
+    return parsed.ok ? parsed.data : { error: parsed.error };
   } catch (error) {
     console.error('❌ Error fetching study progress:', error);
+    notifyBackendError(error instanceof Error ? error.message : String(error));
     return { error };
   }
 };
@@ -95,16 +137,20 @@ export const fetchStudyListFromDB = async({
         );
 
         if (!res.ok) {
+        if (isServerFailure(res.status)) {
+          notifyBackendError(`Failed to fetch study list (server responded ${res.status})`);
+        }
         console.warn(`⚠️ Failed to fetch study list: ${res.status}`);
         return { error: `studyHandlers>>fetchStudyListFromDB>Server responded with ${res.status}` };
         }
 
-        const result = await res.json();
+        const parsed = await safeParseJson(res);
         // const studyUIDList = result.map(item => item.studyUID);
-        return result;
+        return parsed.ok ? parsed.data : { error: parsed.error };
 
     } catch (error) {
         console.error('❌ studyHandlers>>fetchStudyListFromDB>Error fetching study list:', error);
+        notifyBackendError(error instanceof Error ? error.message : String(error));
         return { error };
     }
 }
@@ -124,16 +170,37 @@ export const fetchSeriesToBeAnnotatedFromDB = async({
         );
 
       if (!res.ok) {
+        if (isServerFailure(res.status)) {
+          notifyBackendError(`Failed to fetch seriesToBeAnnotated (server responded ${res.status})`);
+        }
         console.warn(`⚠️ Failed to fetch seriesToBeAnnotated list: ${res.status}`);
         throw new Error(`Failed to fetch seriesToBeAnnotated for Study. Server responded with ${res.status} `);
         }
 
-    const { payload: seriesToBeAnnotatedList } = await res.json();
+    const parsed = await safeParseJson(res);
+    if (!parsed.ok) {
+      // Not a connectivity/DB issue - likely an auth redirect. Don't
+      // notify the popup for this one, just surface it to the caller.
+      throw new Error(parsed.error);
+    }
+    const { payload: seriesToBeAnnotatedList } = parsed.data;
     console.log(' *** IN FETCH SERIES UIDS:', seriesToBeAnnotatedList);
 
 
       return seriesToBeAnnotatedList;
     } catch (err) {
+      // Only notify here for the network-exception case (fetch itself
+      // threw before any response came back) - the !res.ok branch above
+      // already notified for 5xx responses, and a JSON-parse failure
+      // isn't a connectivity issue, so avoid notifying for either of
+      // those here.
+      const alreadyHandled =
+        err instanceof Error &&
+        (err.message.startsWith('Failed to fetch seriesToBeAnnotated for Study') ||
+          err.message.startsWith('Unexpected response from server'));
+      if (!alreadyHandled) {
+        notifyBackendError(err instanceof Error ? err.message : String(err));
+      }
       throw err;
     }
   }
@@ -160,6 +227,18 @@ export const postTimedEvent = async ({
       body: JSON.stringify({ username, studyUID, event, method }),
       keepalive: true,
     });
+
+    if (!res.ok) {
+      // Best-effort only: this call often fires during page unload
+      // (browser/tab close), where showing a popup wouldn't be seen
+      // anyway. Still log/notify for the cases where it's not.
+      if (isServerFailure(res.status)) {
+        notifyBackendError(`Failed to log timed event (server responded ${res.status})`);
+      }
+      console.warn(`⚠️ Failed to post timed event: ${res.status}`);
+      return { error: `Server responded with ${res.status}` };
+    }
+
     return await res.json();
   } catch (err) {
     console.error('🚨 Error posting timed event:', err);

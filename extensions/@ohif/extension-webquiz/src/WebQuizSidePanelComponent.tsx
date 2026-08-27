@@ -245,7 +245,9 @@ function WebQuizSidePanelComponent() {
             setSeriesToBeAnnotatedUIDs(seriesUIDs);
             })
             .catch((err) => {
+            if (requestId !== seriesFetchRequestId.current) return;
             console.error('Failed to fetch series to annotate', err);
+            setSeriesToBeAnnotatedUIDs([]); // or a dedicated error state, your call
             });
     }, [studyUID]);
 
@@ -966,8 +968,7 @@ useEffect(() => {
                 className="text-white w-full text-center"
                 style={{ flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}
                 >
-                {/* <div style={{ flex: '1 1 50%', overflowY: 'auto', minHeight: 0 }}> */}
-                <div style={{ flex: '0 1 auto', maxHeight: '50%',overflowY: 'auto', minHeight: 0, boxSizing: 'border-box' }}>
+                <div style={{ flex: '1 1 25%', overflowY: 'auto', minHeight: 0, boxSizing: 'border-box' }}>
                     <SegmentationList
                     getUserInfo={getUserInfo}
                     segmentationList={segmentationList}
@@ -975,7 +976,6 @@ useEffect(() => {
                     />
                 </div>
                 
-                {/* <div style={{ flex: '1 1 50%', overflowY: 'auto', minHeight: 0 }}> */}
                 <div style={{ flex: '1 1 auto', overflowY: 'auto', minHeight: 0, boxSizing: 'border-box' }}>
                     <AnnotationList
                     measurementList={measurementList}

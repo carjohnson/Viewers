@@ -281,7 +281,14 @@ function WorkList({
 
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   // used to assign 'study progress' icons to worklist 
+  // Waits for userInfo (session confirmed) before hitting any other
+  // DB-backed endpoint - previously this fired independently on mount
+  // at the same time as the session-info fetch, so it could reach the
+  // backend before the session was recognized and get redirected to
+  // the login page instead of getting real JSON back.
   useEffect(() => {
+    if (!userInfo) return;
+
     const fetchList = async () => {
       const result = await fetchStudyListFromDB({ baseUrl: API_BASE_URL });
       if (result && !result.error) {
@@ -292,7 +299,7 @@ function WorkList({
     };
 
     fetchList();
-  }, []);
+  }, [userInfo]);
 
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   useEffect(() => {

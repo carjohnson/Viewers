@@ -1,5 +1,6 @@
 // src/handlers/fetchAnnotations.ts
 import { buildDropdownSelectionMapFromFetched } from '../utils/annotationUtils';
+import { notifyBackendError } from '../utils/notifyBackendError';
 import { Enums as CSExtensionEnums } from '@ohif/extension-cornerstone';
 import { annotation as csToolsAnnotation } from '@cornerstonejs/tools';
 import { getRenderingEngines, RenderingEngine } from '@cornerstonejs/core';
@@ -53,6 +54,18 @@ export const fetchAnnotationsFromDB = async ({
     window.parent.postMessage({ type: 'update-legend', legend }, '*');
   } catch (error) {
     console.error('❌ Error fetching annotations:', error);
+    // "Study not found" is expected/handled (e.g. study deleted), and an
+    // unparseable response is most likely an auth-redirect timing issue -
+    // neither is a "stop working, call the administrator" situation.
+    // Only a genuine non-2xx server response or fetch() itself failing
+    // outright (network/DB down) is worth surfacing that way.
+    const isBenign =
+      error instanceof Error &&
+      (error.message === 'Study not found in DB' ||
+        error.message === 'Unexpected response from server - you may need to log in again');
+    if (!isBenign) {
+      notifyBackendError(error instanceof Error ? error.message : String(error));
+    }
   }
 };
 
