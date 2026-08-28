@@ -18,11 +18,6 @@ const configs = {
   //
 };
 
-const href = window.location.search;
-const params = new URLSearchParams(window.location.search);
-const userRole = params.get('role');
-// console.log(' *** IN MODE INDEX ... userRole:', userRole, 'href:',href, 'params:', params);
-
 
 function modeFactory({ modeConfiguration }) {
     const _unsubscriptions = [];
@@ -193,6 +188,15 @@ function modeFactory({ modeConfiguration }) {
 
           toolbarService.updateSection(toolbarService.sections.primary, primaryTools);
 
+          // Dynamically add the Segmentation Panel for Admins
+          if (userInfo.role === 'admin') {
+            panelService?.addPanel(
+              panelService.PanelPosition.Right,
+              cornerstone.labelMapSegmentationPanel,
+              []
+            )
+          }          
+
       });
 
 
@@ -279,21 +283,14 @@ function modeFactory({ modeConfiguration }) {
       {
         path: 'webquiz',
         layoutTemplate: ({ location, servicesManager }) => {
-          let rightPanels = ['@ohif/extension-webquiz.panelModule.webquiz'];
-          if (userRole === 'admin') {
-                // rightPanels = [ '@ohif/extension-webquiz.panelModule.webquiz', cornerstone.segLabelMap, cornerstone.segContour];
-            rightPanels = [ '@ohif/extension-webquiz.panelModule.webquiz',
-              cornerstone.labelMapSegmentationPanel,
-              // cornerstone.contourSegmentationPanel,
-            ]
-          }
+          // let rightPanels = ['@ohif/extension-webquiz.panelModule.webquiz'];
           return {
             id: ohif.layout,
             props: {
               // leftPanels: [ ohif.thumbnailList],
               leftPanels:  ['@ohif/extension-webquiz.panelModule.seriesList'],
               leftPanelResizable: true,
-              rightPanels,
+              rightPanels: ['@ohif/extension-webquiz.panelModule.webquiz'],
               rightPanelResizable: false,
               viewports: [
                 {

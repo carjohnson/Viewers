@@ -31,21 +31,8 @@ export default {
    * iconName, iconLabel, label, component} object. Example of a panel module
    * is the StudyBrowserPanel that is provided by the default extension in OHIF.
    */
-  // getPanelModule: ({ servicesManager, commandsManager, extensionManager }) => {
-  //   // console.log('🧪 In Panel Module Is baines-logo in Icons?', 'baines-logo' in Icons);
-  //   return [
-  //     {
-  //       name: "webquiz",
-  //       iconName: 'baines-logo',
-  //       iconLabel: "Web Quiz",
-  //       label: "Baines Imaging Study",
-  //       component: WebQuizSidePanelComponent
-  //     }
-  //   ]
-  // },
 
     getPanelModule: ({ servicesManager, commandsManager, extensionManager }) => {
-    // console.log('🧪 In Panel Module Is baines-logo in Icons?', 'baines-logo' in Icons);
     return [
       {
         name: "webquiz",
@@ -54,6 +41,8 @@ export default {
         label: "Baines Imaging Study",
         component: WebQuizSidePanelComponent
       },
+      // WrappedPanelStudyBrowser
+      //    for customizing the StudyBrowser to highlight specified series from a list
       {
         name: 'seriesList',
         iconName: 'group-layers',
