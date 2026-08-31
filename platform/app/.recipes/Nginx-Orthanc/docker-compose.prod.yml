@@ -1,4 +1,6 @@
 # overrides for production environment
+# NOTE: docker-compose-prod is not used for Render's production environment
+#       Render builds its own docker container
 services:
   # Exposed server that's handling incoming web requests
   ohif_viewer:

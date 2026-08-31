@@ -190,13 +190,17 @@ function modeFactory({ modeConfiguration }) {
 
           // Dynamically add the Segmentation Panel for Admins
           if (userInfo.role === 'admin') {
-            panelService?.addPanel(
+            const alreadyAdded = panelService?.getPanels(panelService.PanelPosition.Right)
+              .some(panel => panel.id === cornerstone.labelMapSegmentationPanel);
+
+            if (!alreadyAdded) {
+              panelService?.addPanel(
               panelService.PanelPosition.Right,
               cornerstone.labelMapSegmentationPanel,
               []
-            )
+              )
+            }
           }          
-
       });
 
 
