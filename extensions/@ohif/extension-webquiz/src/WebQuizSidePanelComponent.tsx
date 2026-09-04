@@ -57,6 +57,9 @@ import { postSeriesProgress,
 import { ModalComponent } from './components/ModalComponent';
 import { TriggerPostArgs } from './models/TriggerPostArgs';
 import { extensionManager } from 'platform/app/src/App';
+import { notifyBackendError, isServerFailure } from './utils/notifyBackendError';
+import { safeParseJson } from './utils/fetchHelpers';
+
 
 
 function WebQuizSidePanelComponent() {
@@ -439,10 +442,27 @@ useEffect(() => {
                  `${API_BASE_URL}/webquiz/list-study-segmentations?username=${username}&studyUID=${studyUID}`,
                  { credentials: 'include' }
                 );
-                const { payload } = await res.json();
 
-                for (const seg of payload) {
-                    console.log(' *** IN FETCH SEGS ... url', seg.segmentationFileUrl);
+                if (!res.ok) {
+                    if (isServerFailure(res.status)) {
+                        notifyBackendError(`Failed to list segmentations (status ${res.status})`);
+                    }
+                    throw new Error(`Server responded with status ${res.status}`);
+                }
+
+                let payload;
+                const parsed = await safeParseJson(res);
+                if (parsed.ok) {
+                    payload = parsed.data.payload;
+                 } else {
+                    throw new Error(parsed.error);
+                 } 
+
+
+                const segList = Array.isArray(payload) ? payload : [];
+
+                for (const seg of segList) {
+                    // console.log(' *** IN FETCH SEGS ... url', seg.segmentationFileUrl);
                     
                     //  ensure all images have been loaded for the series before the fetched segmentation is loaded into OHIF
                     const imageIds = getImageIdsForSeries(displaySetService, seg.referencedSeriesUID);
@@ -453,13 +473,17 @@ useEffect(() => {
                             await waitForImagesLoaded(imageIds);
                         }
 
-                    const res = await fetch(
+                    const segRes = await fetch(
                     `${API_BASE_URL}/webquiz/get-segmentation-file?segmentationId=${seg.segmentationId}`,
                     { credentials: 'include' }
                     );
-                    if (!res.ok) throw new Error('Failed to fetch SEG file');
-
-                    const arrayBuffer = await res.arrayBuffer();
+                    if (!segRes.ok) {
+                        if (isServerFailure(segRes.status)) {
+                            notifyBackendError(`Failed to fetch SEG file (status ${segRes.status})`);
+                        }
+                        throw new Error('Failed to fetch SEG file');
+                    }
+                    const arrayBuffer = await segRes.arrayBuffer();
                     await loadDicomSegIntoOHIF({
                         segmentationId: seg.segmentationId,
                         referencedSeriesInstanceUID: seg.referencedSeriesUID,
@@ -476,6 +500,9 @@ useEffect(() => {
                 useSegmentationLoadStore.getState().setLoaded(studyUID, true);
             } catch (err) {
                 console.error('❌ Error fetching segmentations:', err);
+                if (err instanceof TypeError) { // fetch network-level failure, no res to check
+                    notifyBackendError('Network error while loading segmentations');
+                }
             } finally {
                 loadingSegmentationRef.current = false;
             }
@@ -687,12 +714,18 @@ useEffect(() => {
 
         const setCurrentStudyAndPostOpened = async () => {
             try {
-                await fetch(`${API_BASE_URL}/users/session-study`, {
+                const res = await fetch(`${API_BASE_URL}/users/session-study`, {
                     method: 'POST',
                     credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ studyUID }),
                 });
+                if (!res.ok) {
+                    if (isServerFailure(res.status)) {
+                        notifyBackendError(`Failed to list segmentations (status ${res.status})`);
+                    }
+                    throw new Error(`Server responded with status ${res.status}`);
+                }
 
                 await postTimedEvent({
                     baseUrl: API_BASE_URL,
@@ -701,8 +734,10 @@ useEffect(() => {
                     event: 'open',
                     method: 'enter_extension',
                 });
-            } catch (error) {
-                console.error('❌ Error setting current study / posting opened:', error);
+            } catch (err) {
+                console.error('🚨 Error posting timed event:', err);
+                notifyBackendError(err instanceof Error ? err.message : String(err));
+                return { error: err };
             }
         };
 
@@ -968,14 +1003,16 @@ useEffect(() => {
                 className="text-white w-full text-center"
                 style={{ flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}
                 >
-                <div style={{ flex: '1 1 25%', overflowY: 'auto', minHeight: 0, boxSizing: 'border-box' }}>
-                    <SegmentationList
-                    getUserInfo={getUserInfo}
-                    segmentationList={segmentationList}
-                    onSegmentClick={onSegmentClick}
-                    />
-                </div>
-                
+                {userInfo?.role === 'admin' && (
+                    <div style={{ flex: '0 1 25%', overflowY: 'auto', minHeight: 0, boxSizing: 'border-box' }}>
+                        <SegmentationList
+                        getUserInfo={getUserInfo}
+                        segmentationList={segmentationList}
+                        onSegmentClick={onSegmentClick}
+                        />
+                    </div>
+                )}
+
                 <div style={{ flex: '1 1 auto', overflowY: 'auto', minHeight: 0, boxSizing: 'border-box' }}>
                     <AnnotationList
                     measurementList={measurementList}

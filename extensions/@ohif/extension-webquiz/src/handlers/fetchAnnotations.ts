@@ -1,12 +1,13 @@
 // src/handlers/fetchAnnotations.ts
 import { buildDropdownSelectionMapFromFetched } from '../utils/annotationUtils';
-import { notifyBackendError } from '../utils/notifyBackendError';
+import { notifyBackendError, isServerFailure } from '../utils/notifyBackendError';
+import { safeParseJson } from '../utils/fetchHelpers';
 import { Enums as CSExtensionEnums } from '@ohif/extension-cornerstone';
 import { annotation as csToolsAnnotation } from '@cornerstonejs/tools';
 import { getRenderingEngines, RenderingEngine } from '@cornerstonejs/core';
 
 //=========================================================
-export const fetchAnnotationsFromDB = async ({
+export const fetchAnnotationsFromDB = async ({ 
   userInfo,
   studyUID,
   baseUrl,
@@ -23,7 +24,7 @@ export const fetchAnnotationsFromDB = async ({
   setAnnotationsLoaded: (loaded: boolean) => void;
   listOfUsersAnnotationsRef: React.MutableRefObject<Record<string, any> | null>;
 
-}) => {
+  }) => {
   const username = userInfo.role === 'reader' ? userInfo.username : 'all';
 
   try {
@@ -31,41 +32,39 @@ export const fetchAnnotationsFromDB = async ({
       `${baseUrl}/webquiz/list-users-annotations?username=${username}&studyUID=${studyUID}`,
       { credentials: 'include' }
     );
-    
-    const result = await response.json();
-    if (response.status === 400 && result?.error === 'Study not found') {
-      console.warn(`⚠️ Study document not found in DB for studyUID: ${studyUID} — it may have been deleted.`);
-      throw new Error('Study not found in DB');
+
+    if (!response.ok) {
+      if (isServerFailure(response.status)) {
+        notifyBackendError(`Failed to fetch annotations (server responded ${response.status})`);
+        return;
+      }
+      // 401 (session expired) / 400 (e.g. study deleted) / other 4xx —
+      // not a backend outage, don't show the "stop working" popup.
+      const parsed = await safeParseJson(response);
+      if (parsed.ok && parsed.data?.error === 'Study not found') {
+        console.warn(`⚠️ Study document not found in DB for studyUID: ${studyUID} — it may have been deleted.`);
+      } else {
+        console.warn(`⚠️ Failed to fetch annotations: ${response.status}`);
+      }
+      return;
     }
 
-    if (!response.ok) throw new Error('Failed to fetch annotations from DB');
+    const parsed = await safeParseJson(response);
+    if (!parsed.ok) {
+      console.warn('⚠️ Could not parse annotations response:', parsed.error);
+      return;
+    }
 
-    const { payload: annotationsList, legend } = result;
-
+    const { payload: annotationsList, legend } = parsed.data;
     setListOfUsersAnnotations(annotationsList);
     listOfUsersAnnotationsRef.current = annotationsList;
-
-    const newMap = buildDropdownSelectionMapFromFetched(annotationsList);
-    setDropdownSelectionMap(newMap);
-    console.log(' *** IN FETCH ... studyUID, listRef, legend, newMap', studyUID, listOfUsersAnnotationsRef.current, legend, newMap);
-
+    setDropdownSelectionMap(buildDropdownSelectionMapFromFetched(annotationsList));
     setAnnotationsLoaded(true);
-
     window.parent.postMessage({ type: 'update-legend', legend }, '*');
   } catch (error) {
+    // fetch() itself threw — genuine network/connectivity failure
     console.error('❌ Error fetching annotations:', error);
-    // "Study not found" is expected/handled (e.g. study deleted), and an
-    // unparseable response is most likely an auth-redirect timing issue -
-    // neither is a "stop working, call the administrator" situation.
-    // Only a genuine non-2xx server response or fetch() itself failing
-    // outright (network/DB down) is worth surfacing that way.
-    const isBenign =
-      error instanceof Error &&
-      (error.message === 'Study not found in DB' ||
-        error.message === 'Unexpected response from server - you may need to log in again');
-    if (!isBenign) {
-      notifyBackendError(error instanceof Error ? error.message : String(error));
-    }
+    notifyBackendError(error instanceof Error ? error.message : String(error));
   }
 };
 

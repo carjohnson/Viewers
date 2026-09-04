@@ -270,9 +270,11 @@ function WorkList({
   // used to identify the role of the user
   useEffect(() => {
     const fetchUser = async () => {
-      const user = await fetchSessionUserInfo({ baseUrl: API_BASE_URL });
+      const { user, reason } = await fetchSessionUserInfo({ baseUrl: API_BASE_URL });
       if (user) {
         setUserInfo(user);
+      } else if (reason === 'unauthenticated') {
+        window.location.href = '/users/login';
       }
     };
 
