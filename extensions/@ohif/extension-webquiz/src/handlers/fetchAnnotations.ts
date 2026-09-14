@@ -268,6 +268,34 @@ export const annotationToRawMeasurement = (dbAnnotation, displaySetService) => {
     return null;
   }
 
+  // Correct the host embedded in the DB-stored referencedImageId so it
+  // matches whatever proxy/origin THIS environment actually loads images
+  // from. Without this, jumpToMeasurement's exact-string match fails on any
+  // environment other than the one the annotation was originally created
+  // in, and silently falls back to an imprecise camera-based reposition.
+  let finalReferencedImageId = strippedReferencedImageId;
+  const runtimeOrigin = getRuntimeWadoOrigin(displaySet);
+  if (runtimeOrigin) {
+    const bareForRehost = strippedReferencedImageId.replace(/^wadors:/, '');
+    let currentOrigin: string | null = null;
+    try {
+      currentOrigin = new URL(bareForRehost).origin;
+    } catch {
+      // ignore — rehostUrl below will warn if this ends up unparsable
+    }
+
+    if (currentOrigin && currentOrigin !== runtimeOrigin) {
+      finalReferencedImageId = `wadors:${rehostUrl(bareForRehost, runtimeOrigin)}`;
+      console.log(
+        `↻ Rehosted referencedImageId for ${annotationUID}: ${currentOrigin} → ${runtimeOrigin}`
+      );
+    }
+  } else {
+    console.warn(
+      `Could not determine runtime WADO origin from displaySet for annotation ${annotationUID}; using DB-stored referencedImageId as-is, which may not match this environment.`
+    );
+  }
+
   return {
     // shape of object required for 'toMeasurementSchema' function.
     // NOTE: `uid` here is NOT preserved — measurementService/CS3D always
@@ -276,6 +304,12 @@ export const annotationToRawMeasurement = (dbAnnotation, displaySetService) => {
     // original annotationUID had no effect on the UID actually registered
     // in Cornerstone3D state. Kept only because the shape appears to
     // require the key; do not rely on this value downstream.
+      // IMPORTANT: 'finalReferencedImageID' overrides the stale, DB-stored host 
+      // that would otherwise be spread in from dbAnnotation.metadata.
+      // This is necessary for CornerstoneViewportService's jumpToMeasurement
+      // which reads metadata.referencedImageId directly; Otherwise you
+      // may see the warning "Unable to apply reference viewable" 
+
     uid: dbAnnotation.annotationUID,
     SOPInstanceUID,
     FrameOfReferenceUID: dbAnnotation.metadata.FrameOfReferenceUID,
@@ -283,13 +317,14 @@ export const annotationToRawMeasurement = (dbAnnotation, displaySetService) => {
     isVisible: true,
     metadata: {
       ...dbAnnotation.metadata,
-      strippedReferencedImageId,
+      referencedImageId: finalReferencedImageId,
+      strippedReferencedImageId: finalReferencedImageId,
       toolName: 'Length',
     },
 
     referenceSeriesUID: SeriesInstanceUID,
     referenceStudyUID: StudyInstanceUID,
-    referencedImageId: strippedReferencedImageId,
+    referencedImageId: finalReferencedImageId,
     frameNumber,
     displaySetInstanceUID: displaySet?.displaySetInstanceUID,
 
@@ -306,6 +341,54 @@ export const annotationToRawMeasurement = (dbAnnotation, displaySetService) => {
 
   };
 };
+
+//=========================================================
+/**
+ * The DB-stored referencedImageId embeds whatever proxy/host was live at the
+ * moment the annotation was created (e.g. a specific Render CORS-proxy
+ * hostname). That host is NOT part of the DICOM identity of the instance and
+ * is not guaranteed to match the host the *current* environment is using
+ * (prod vs staging vs local, or after a proxy is renamed/redeployed).
+ *
+ * The displaySet passed in here, by contrast, is built by *this* running
+ * app instance from its own dataSource config, so any image already
+ * registered on it carries the correct, environment-local origin. We pull
+ * that origin and graft it onto the DB-derived path (studies/series/
+ * instances/frames), which we trust because it's built from UIDs we've
+ * already verified match across environments.
+ */
+function getRuntimeWadoOrigin(displaySet): string | null {
+  const candidateImageId =
+    displaySet?.images?.[0]?.imageId ??
+    displaySet?.instances?.[0]?.imageId ??
+    displaySet?.imageIds?.[0];
+
+  if (!candidateImageId) return null;
+
+  const bare = candidateImageId.replace(/^imageId:/, '').replace(/^wadors:/, '');
+  try {
+    return new URL(bare).origin;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Re-host a wadors URL onto a different origin, leaving the path
+ * (studies/.../series/.../instances/.../frames/...) untouched.
+ */
+function rehostUrl(url: string, newOrigin: string): string {
+  try {
+    const u = new URL(url);
+    const target = new URL(newOrigin);
+    u.protocol = target.protocol;
+    u.host = target.host; // includes port, if any
+    return u.toString();
+  } catch (err) {
+    console.warn(`rehostUrl: failed to rehost "${url}" onto "${newOrigin}"`, err);
+    return url;
+  }
+}
 
 //=========================================================
 function parseReferenceImageId(referenceImageId: string) {
@@ -370,12 +453,24 @@ function hasAnnotationInMeasurements(fetchedAnnotation, currentMeasurements) {
 
   const { metadata, data } = fetchedAnnotation;
   const fetchedPoints = data?.handles?.points;
-  const fetchedImageId = metadata?.referencedImageId;
   const fetchedTool = metadata?.toolName;
   const fetchedLabel = data?.label;
 
+  // NOTE: referencedImageId strings are no longer directly comparable —
+  // annotationToRawMeasurement rehosts the DB-stored value onto the
+  // runtime's WADO origin, so a converted measurement's referencedImageId
+  // will legitimately differ (by host only) from the raw DB-shaped
+  // fetchedAnnotation's. Compare by parsed DICOM identity (SOPInstanceUID +
+  // frame) instead, which is stable across environments.
+  const fetchedParsed = parseReferenceImageId(metadata?.referencedImageId);
+
   return currentMeasurements.find(meas => {
-    const sameImage = meas.referencedImageId === fetchedImageId;
+    const measParsed = parseReferenceImageId(meas.referencedImageId);
+    const sameImage =
+      !!fetchedParsed &&
+      !!measParsed &&
+      fetchedParsed.SOPInstanceUID === measParsed.SOPInstanceUID &&
+      fetchedParsed.frameNumber === measParsed.frameNumber;
     const sameTool = meas.toolName === fetchedTool;
 
     const measPoints =
