@@ -65,3 +65,6 @@ lerna-debug.log
 
 testdata
 *.bak
+
+nginx.crt
+nginx.key
