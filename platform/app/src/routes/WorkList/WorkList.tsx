@@ -392,33 +392,22 @@ function WorkList({
       dataCY: `studyRow-${studyInstanceUid}`,
       clickableCY: studyInstanceUid,
       row: [
-
-        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        {
-          key: 'status',
-          content: (
-            <span
-              className={`text-center text-lg font-semibold ${
-                status === 'done'
-                  ? 'text-green-400'
-                  : status === 'wip'
-                  ? 'text-yellow-400'
-                  : 'text-red-400'
-              }`}
-            >
-              {status === 'done' ? '✅' : status === 'wip' ? '🟡' : '❌'}
-            </span>
-          ),
-          title: status === 'done' ? 'Completed' : status === 'wip' ? 'In Progress' : 'New',
-          gridCol: 2,
-        },
-        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
         {
           key: 'patientName',
-          content: patientName ? makeCopyTooltipCell(patientName) : null,
+          content: (
+            <span className="flex items-center gap-2">
+              <span
+                className="shrink-0"
+                title={status === 'done' ? 'Completed' : status === 'wip' ? 'In Progress' : 'New'}
+              >
+                {status === 'done' ? '✅' : status === 'wip' ? '🟡' : '❌'}
+              </span>
+              {patientName ? makeCopyTooltipCell(patientName) : null}
+            </span>
+          ),
           gridCol: 4,
         },
+
         {
           key: 'mrn',
           content: makeCopyTooltipCell(mrn),
