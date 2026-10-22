@@ -6,6 +6,7 @@ services:
     volumes:
       # Nginx config
       - ./config/nginx.conf:/etc/nginx/nginx.conf
+      - ${CERTS_DIR}:/etc/nginx/ssl:ro
     env_file:
       - .\..\..\.env
     environment:
